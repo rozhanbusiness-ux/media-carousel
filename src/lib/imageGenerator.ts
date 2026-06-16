@@ -27,9 +27,9 @@ export async function generateImage(prompt: string, apiKey: string): Promise<str
 }
 
 export function hookImagePrompt(destination: string): string {
-  return `Ultra-realistic luxury travel photography, cinematic aerial wide shot of ${destination} coastline at golden hour, crystal blue sea, dramatic warm sky, no text, no watermarks, no logos, dark vignette at bottom for text overlay, 1080x1080`;
+  return `Ultra-realistic luxury travel photography, cinematic aerial wide shot of ${destination} at golden hour, stunning coastline or iconic landmark, crystal-clear sea or dramatic landscape, warm dramatic sky, no text, no watermarks, no logos, dark navy vignette at top and bottom for text overlay, professional travel magazine quality`;
 }
 
-export function hotelImagePrompt(hotelName: string, stars: number, destination: string): string {
-  return `Ultra-realistic luxury travel photography, facade view of a ${stars}-star resort named ${hotelName} in ${destination}, golden hour or dusk lighting, cinematic, no text, no watermarks, no logos, dark navy gradient at bottom 40% for text overlay, 1080x1080, professional hotel photography`;
+export function hotelImagePrompt(hotelName: string, location: string): string {
+  return `Ultra-realistic luxury hotel photography, facade or pool view of a luxury resort named ${hotelName} in ${location}, golden hour or dusk lighting, warm cinematic tones, no text, no watermarks, no logos, dark navy gradient at bottom 45% for text overlay, professional architectural hotel photography`;
 }

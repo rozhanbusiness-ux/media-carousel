@@ -71,7 +71,7 @@ export default function App() {
         for (const hotel of offer.hotels) {
           tick(`Generiere Bild: ${hotel.name}`);
           hotelImages[offer.destination][hotel.name] = await generateImage(
-            hotelImagePrompt(hotel.name, hotel.stars, offer.destination),
+            hotelImagePrompt(hotel.name, hotel.location),
             apiKey
           );
         }
@@ -84,7 +84,7 @@ export default function App() {
         // Hook slide per offer
         for (const offer of offers) {
           tick(`Render ${size}: Hook ${offer.destination}`);
-          const blob = await renderHookSlide(offer.destination, offer.hookHeadline, hookImages[offer.destination], size);
+          const blob = await renderHookSlide(offer, hookImages[offer.destination], size);
           result[size].push({ label: `hook_${offer.destination}`, blob });
 
           for (const hotel of offer.hotels) {

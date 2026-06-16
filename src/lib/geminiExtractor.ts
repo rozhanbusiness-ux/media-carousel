@@ -1,27 +1,28 @@
 import { Offer } from '../types';
 
 export async function extractOffersFromText(text: string, apiKey: string): Promise<Offer[]> {
-  const prompt = `Extract all travel offers from the text below. Return ONLY a valid JSON array.
-Each offer object must have:
+  const prompt = `Extract all travel offers from the text below. Return ONLY a valid JSON array — no markdown, no explanation.
+Each offer object must have exactly this shape:
 {
-  "destination": "string",
-  "hookHeadline": "string (e.g. Sommer Angebote)",
+  "destination": "string (e.g. Griechenland)",
+  "hookHeadline": "string (season/theme, e.g. Sommer Angebote)",
+  "hookTagline": "string (call-to-action line, e.g. Luxus am Meer - Jetzt buchen!)",
   "hotels": [
     {
-      "name": "string",
-      "stars": number,
-      "price": "string",
-      "dateFrom": "string",
-      "dateTo": "string",
-      "airportDeparture": "string",
-      "airportReturn": "string",
-      "mealPlan": "string",
-      "transfer": "string",
-      "rating": number
+      "name": "string (hotel name)",
+      "location": "string (city and area, e.g. Kos - Kardamena)",
+      "stars": number (1-5),
+      "price": "string (numeric only, e.g. 533)",
+      "dateFrom": "string (e.g. 20.05.2026)",
+      "dateTo": "string (e.g. 26.05.2026)",
+      "airportDeparture": "string (departure city or airport)",
+      "airportReturn": "string (return airport name)",
+      "mealPlan": "string (e.g. All Inklusiv)",
+      "transfer": "string (e.g. Inklusiv)",
+      "rating": number (percentage 0-100, e.g. 94)
     }
   ]
 }
-Return ONLY the JSON array, no markdown, no explanation.
 Text: ${text}`;
 
   const response = await fetch(
