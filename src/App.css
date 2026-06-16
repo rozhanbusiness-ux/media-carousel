@@ -1,0 +1,213 @@
+:root {
+  --navy: #001F3F;
+  --gold: #D4AF37;
+  --white: #FFFFFF;
+  --bg: #000d1a;
+  --card-bg: #001a30;
+  --border: #1a3a5c;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--white);
+  font-family: Arial, sans-serif;
+  min-height: 100vh;
+}
+
+.app {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 32px 20px 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+header h1 {
+  font-family: Georgia, serif;
+  font-size: 2.2rem;
+  letter-spacing: 0.05em;
+}
+header p { color: #a0b4c8; margin-top: 4px; }
+.gold { color: var(--gold); }
+
+.api-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.api-section label { font-size: 0.85rem; color: var(--gold); font-weight: bold; }
+.api-input {
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  color: var(--white);
+  border-radius: 6px;
+  font-size: 1rem;
+}
+.api-input:focus { outline: none; border-color: var(--gold); }
+
+.upload-zone {
+  border: 2px dashed var(--gold);
+  border-radius: 12px;
+  padding: 40px;
+  text-align: center;
+  cursor: pointer;
+  transition: background 0.2s;
+  color: var(--gold);
+  font-size: 1.05rem;
+}
+.upload-zone:hover { background: rgba(212,175,55,0.06); }
+
+.status { color: #a0b4c8; font-size: 0.95rem; margin-top: 8px; }
+.error { background: rgba(200,50,50,0.15); border: 1px solid #c83232; border-radius: 8px; padding: 12px 16px; color: #ff7070; }
+
+h2 { font-family: Georgia, serif; font-size: 1.4rem; color: var(--gold); }
+
+.offer-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px;
+  margin-top: 12px;
+}
+
+.field-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.field-row label {
+  min-width: 140px;
+  font-size: 0.8rem;
+  color: var(--gold);
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.field-row input {
+  flex: 1;
+  padding: 7px 10px;
+  background: #001228;
+  border: 1px solid var(--border);
+  color: var(--white);
+  border-radius: 5px;
+  font-size: 0.92rem;
+}
+.field-row input:focus { outline: none; border-color: var(--gold); }
+
+.hotel-row {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+  margin-top: 12px;
+}
+
+h4 { font-size: 0.95rem; }
+
+.btn-gold {
+  margin-top: 16px;
+  padding: 13px 28px;
+  background: var(--gold);
+  color: var(--navy);
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+.btn-gold:hover { opacity: 0.85; }
+.btn-gold:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-outline {
+  margin-top: 16px;
+  margin-left: 12px;
+  padding: 13px 28px;
+  background: transparent;
+  color: var(--gold);
+  border: 2px solid var(--gold);
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.btn-outline:hover { background: rgba(212,175,55,0.1); }
+
+.progress-wrap {
+  margin-top: 8px;
+}
+.progress-label { font-size: 0.85rem; color: #a0b4c8; margin-bottom: 6px; }
+.progress-bar {
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: var(--gold);
+  border-radius: 3px;
+  transition: width 0.3s;
+}
+
+.size-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.tab {
+  padding: 9px 18px;
+  border: 2px solid var(--border);
+  background: transparent;
+  color: #a0b4c8;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s;
+}
+.tab:hover { border-color: var(--gold); color: var(--gold); }
+.tab.active { border-color: var(--gold); color: var(--gold); background: rgba(212,175,55,0.1); }
+
+.slide-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.slide-thumb {
+  cursor: pointer;
+  text-align: center;
+}
+.slide-thumb img {
+  display: block;
+  border-radius: 6px;
+  border: 2px solid var(--border);
+  transition: border-color 0.2s;
+}
+.slide-thumb:hover img { border-color: var(--gold); }
+.slide-label { font-size: 0.72rem; color: #a0b4c8; margin-top: 4px; }
+
+.lightbox {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  cursor: zoom-out;
+}
+.lightbox img {
+  max-width: 90vw;
+  max-height: 90vh;
+  border-radius: 8px;
+  box-shadow: 0 0 60px rgba(212,175,55,0.3);
+}
+
+.download-row { margin-top: 20px; }
