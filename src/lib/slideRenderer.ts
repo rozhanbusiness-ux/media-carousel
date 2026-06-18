@@ -101,7 +101,9 @@ function drawFooter(ctx: CanvasRenderingContext2D, w: number, h: number) {
 /** MEDIA logo top-center, 28% of slide width */
 async function drawLogo(ctx: CanvasRenderingContext2D, w: number, h: number) {
   try {
-    const logo = await loadImage('/logo.png');
+    // Respect Vite base path so the logo loads on GitHub Pages (/media-carousel/logo.png)
+    const base = import.meta.env.BASE_URL ?? '/';
+    const logo = await loadImage(`${base}logo.png`);
     const logoW = Math.round(w * 0.28);
     const logoH = Math.round(logoW * (logo.height / logo.width));
     ctx.drawImage(logo, (w - logoW) / 2, Math.round(h * 0.038), logoW, logoH);
