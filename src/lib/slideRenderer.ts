@@ -8,15 +8,21 @@ const FOOTER_EMAIL = 'info@media-travels.com';
 
 /** Normalize ligatures and odd whitespace that PDF extraction can leave behind */
 function clean(text: string): string {
-  return (text ?? '')
+  // NFKD normalization splits ligatures; then explicit replacements for any that survive
+  let s = (text ?? '').normalize('NFKD');
+  s = s
     .replace(/ﬀ/g, 'ff')
     .replace(/ﬁ/g, 'fi')
     .replace(/ﬂ/g, 'fl')
     .replace(/ﬃ/g, 'ffi')
     .replace(/ﬄ/g, 'ffl')
-    .replace(/ /g, ' ')
+    .replace(/ﬅ/g, 'st')
+    .replace(/ﬆ/g, 'st')
+    .replace(/[­​‌‍﻿]/g, '')
+    .replace(/[     ]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+  return s;
 }
 
 /** Boost saturation & contrast of the drawn photo so colors pop (matches the vivid template look) */

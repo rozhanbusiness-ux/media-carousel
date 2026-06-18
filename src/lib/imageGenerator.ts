@@ -48,8 +48,8 @@ async function tryImagen(model: string, prompt: string, apiKey: string): Promise
   throw new Error(`[${model}] No bytesBase64Encoded: ${JSON.stringify(data).slice(0, 300)}`);
 }
 
-// Clean cinematic gradient — no text. Used only when all APIs fail.
-function gradientPlaceholder(): string {
+// Clean cinematic gradient — no text. Exported so App can use it as fallback.
+export function gradientFallback(): string {
   const canvas = document.createElement('canvas');
   canvas.width = 1080;
   canvas.height = 1080;
@@ -83,9 +83,10 @@ export async function generateImage(prompt: string, apiKey: string): Promise<str
       errors.push(e.message ?? String(e));
     }
   }
-  // Log all errors to console so we can debug
-  console.warn('All image models failed. Errors:\n' + errors.join('\n'));
-  return gradientPlaceholder();
+  const msg = errors.join(' | ');
+  console.warn('All image models failed:', msg);
+  // Surface the real error so user can see it
+  throw new Error(`Bildgenerierung fehlgeschlagen: ${msg}`);
 }
 
 export function hookImagePrompt(destination: string): string {

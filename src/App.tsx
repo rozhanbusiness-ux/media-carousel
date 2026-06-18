@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { Offer, SlideSize, GeneratedSlide, GenerationProgress, SLIDE_DIMENSIONS } from './types';
 import { extractTextFromPDF } from './lib/pdfExtractor';
 import { extractOffersFromText } from './lib/geminiExtractor';
-import { generateImage, hookImagePrompt, hotelImagePrompt, describeHotel } from './lib/imageGenerator';
+import { generateImage, hookImagePrompt, hotelImagePrompt, describeHotel, gradientFallback } from './lib/imageGenerator';
 import { renderHookSlide, renderHotelVisualSlide, renderHotelDetailsSlide, renderCtaSlide } from './lib/slideRenderer';
 import { exportZip } from './lib/exporter';
 import { UploadZone } from './components/UploadZone';
@@ -80,19 +80,34 @@ export default function App() {
       const hookImages: Record<string, string> = {};
       const hotelImages: Record<string, Record<string, string>> = {};
 
+      const imgErrors: string[] = [];
+
+      const safeGen = async (prompt: string, label: string): Promise<string> => {
+        try {
+          return await generateImage(prompt, apiKey);
+        } catch (e: any) {
+          imgErrors.push(`[${label}] ${e.message}`);
+          return gradientFallback();
+        }
+      };
+
       for (const offer of offers) {
         tick(`Generiere Bild: ${offer.destination}`);
-        hookImages[offer.destination] = await generateImage(hookImagePrompt(offer.destination), apiKey);
+        hookImages[offer.destination] = await safeGen(hookImagePrompt(offer.destination), offer.destination);
 
         hotelImages[offer.destination] = {};
         for (const hotel of offer.hotels) {
           tick(`Generiere Bild: ${hotel.name}`);
           const desc = await describeHotel(hotel.name, hotel.location, apiKey);
-          hotelImages[offer.destination][hotel.name] = await generateImage(
+          hotelImages[offer.destination][hotel.name] = await safeGen(
             hotelImagePrompt(hotel.name, hotel.location, desc),
-            apiKey
+            hotel.name
           );
         }
+      }
+
+      if (imgErrors.length > 0) {
+        setError(`⚠️ Bildgenerierung-Fehler (Folien trotzdem erstellt):\n${imgErrors.slice(0, 2).join('\n')}`);
       }
 
       // Render slides per size
