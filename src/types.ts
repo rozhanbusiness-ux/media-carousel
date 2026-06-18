@@ -52,8 +52,9 @@ export interface FlightRoute {
   airline: string;     // "SunExpress" or ''
   price: string;       // numeric only, per person
   priceNote: string;   // "p.P. Hin & Rück" or ''
-  baggage: string;     // "20kg" or ''
-  flightClass: string; // "Economy" or ''
+  baggage: string;      // "20kg" or '' (checked/hold luggage)
+  baggageCabin: string; // "8 KG" or '' (cabin/hand luggage)
+  flightClass: string;  // "Economy" or ''
   legs: FlightLeg[];   // outbound (+ optional return)
 }
 

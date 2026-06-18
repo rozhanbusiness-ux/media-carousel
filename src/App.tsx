@@ -3,7 +3,7 @@ import { Carousel, SlideSize, GeneratedSlide, GenerationProgress, SLIDE_DIMENSIO
 import { extractTextFromPDF } from './lib/pdfExtractor';
 import { extractCarouselFromText, extractCarouselFromImage } from './lib/geminiExtractor';
 import { generateImage, hookImagePrompt, itemImagePrompt, describeHotel, gradientFallback, listAvailableImageModels } from './lib/imageGenerator';
-import { renderHookSlide, renderVisualSlide, renderDetailsSlide, renderPostSlide, renderFlightVisualSlide, renderFlightDetailsSlide, renderCtaSlide } from './lib/slideRenderer';
+import { renderHookSlide, renderVisualSlide, renderDetailsSlide, renderPostSlide, renderFlightCoverSlide, renderFlightRouteSlide, renderCtaSlide } from './lib/slideRenderer';
 import { exportZip } from './lib/exporter';
 import { UploadZone } from './components/UploadZone';
 import { OfferCard } from './components/OfferCard';
@@ -68,10 +68,10 @@ export default function App() {
     }
   }, [apiKey]);
 
-  const handleCustomPhoto = (itemIdx: number, file: File) => {
+  const handleCustomPhoto = (key: string, file: File) => {
     const reader = new FileReader();
     reader.onload = () => {
-      setCustomPhotos(prev => ({ ...prev, [String(itemIdx)]: reader.result as string }));
+      setCustomPhotos(prev => ({ ...prev, [key]: reader.result as string }));
     };
     reader.readAsDataURL(file);
   };
@@ -84,8 +84,10 @@ export default function App() {
     const isPost = carousel.type === 'post';
     const isFlight = carousel.type === 'flight';
     const flights = carousel.flights ?? [];
-    const totalImages = isPost ? 1 : isFlight ? flights.length : 1 + carousel.items.length; // backgrounds
-    const totalSlides = (isPost ? 2 : isFlight ? flights.length * 2 : 1 + carousel.items.length * 2) + 1; // +CTA
+    // flight: 1 airplane cover bg + N city route bgs; other: 1 hook + N item bgs
+    const totalImages = isPost ? 1 : isFlight ? 1 + flights.length : 1 + carousel.items.length;
+    // flight: cover + N route slides + CTA
+    const totalSlides = (isPost ? 2 : isFlight ? 1 + flights.length : 1 + carousel.items.length * 2) + 1;
     const totalSteps = totalImages + totalSlides * SIZES.length;
     let step = 0;
     const tick = (label: string) => { step++; setProgress({ current: step, total: totalSteps, label }); };
@@ -102,16 +104,24 @@ export default function App() {
       const flightImages: string[] = [];
 
       if (isFlight) {
-        // One airplane background per flight option (custom photo overrides)
+        // Index 0 = airplane cover photo; indices 1..N = departure city photos per route
+        const coverKey = 'cover';
+        tick(`Generiere Cover: ${carousel.destination}`);
+        flightImages[0] = customPhotos[coverKey]
+          ?? await safeGen(hookImagePrompt(carousel.destination, 'flight'), carousel.destination);
+
         for (let i = 0; i < flights.length; i++) {
           const r = flights[i];
-          const dest = r.title || carousel.destination;
+          const outLeg = r.legs.find(l => /hin/i.test(l.direction)) ?? r.legs[0];
+          const cityRaw = outLeg?.from ?? r.title ?? carousel.destination;
+          const cityName = cityRaw.replace(/\s*\(.*\)/, '').trim();
           if (customPhotos[String(i)]) {
-            tick(`Foto: ${dest} (eigenes Bild)`);
-            flightImages[i] = customPhotos[String(i)];
+            tick(`Foto: ${cityName} (eigenes Bild)`);
+            flightImages[i + 1] = customPhotos[String(i)];
           } else {
-            tick(`Generiere Bild: ${dest}`);
-            flightImages[i] = await safeGen(hookImagePrompt(dest, 'flight'), dest);
+            tick(`Generiere Bild: ${cityName}`);
+            const cityPrompt = `Cinematic aerial golden hour cityscape of ${cityName}, famous landmarks, vivid saturated colors, travel photography, no text, no watermarks`;
+            flightImages[i + 1] = await safeGen(cityPrompt, cityName);
           }
         }
       } else {
@@ -148,13 +158,13 @@ export default function App() {
       const result: Record<SlideSize, GeneratedSlide[]> = { story: [], post: [], reel: [] };
       for (const size of SIZES) {
         if (isFlight) {
+          tick(`Render ${size}: Cover`);
+          result[size].push({ label: 'flug_cover', blob: await renderFlightCoverSlide(carousel, flightImages[0], size) });
           for (let i = 0; i < flights.length; i++) {
             const r = flights[i];
             const dest = r.title || carousel.destination;
-            tick(`Render ${size}: ${dest} Visual`);
-            result[size].push({ label: `flug_${i + 1}_visual`, blob: await renderFlightVisualSlide(carousel, r, flightImages[i], size) });
-            tick(`Render ${size}: ${dest} Details`);
-            result[size].push({ label: `flug_${i + 1}_details`, blob: await renderFlightDetailsSlide(r, size) });
+            tick(`Render ${size}: ${dest}`);
+            result[size].push({ label: `flug_${i + 1}`, blob: await renderFlightRouteSlide(r, flightImages[i + 1], size) });
           }
           tick(`Render ${size}: CTA`);
           result[size].push({ label: 'cta', blob: await renderCtaSlide(size) });

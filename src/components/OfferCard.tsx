@@ -4,7 +4,7 @@ import { Carousel, CarouselItem, ContentType, CONTENT_TYPE_LABELS, DetailRow, Fl
 interface Props {
   carousel: Carousel;
   customPhotos: Record<string, string>;
-  onCustomPhoto: (itemIdx: number, file: File) => void;
+  onCustomPhoto: (key: string, file: File) => void;
   onChange: (updated: Carousel) => void;
 }
 
@@ -17,13 +17,14 @@ function field(label: string, value: string, onChange: (v: string) => void, type
   );
 }
 
-function PhotoUpload({ itemIdx, customPhotos, onCustomPhoto }: {
-  itemIdx: number;
+function PhotoUpload({ photoKey, label, customPhotos, onCustomPhoto }: {
+  photoKey: string;
+  label?: string;
   customPhotos: Record<string, string>;
-  onCustomPhoto: (i: number, f: File) => void;
+  onCustomPhoto: (key: string, f: File) => void;
 }) {
   const ref = useRef<HTMLInputElement>(null);
-  const key = String(itemIdx);
+  const key = photoKey;
   const hasPhoto = !!customPhotos[key];
   return (
     <div className="field-row" style={{ alignItems: 'center' }}>
@@ -35,10 +36,10 @@ function PhotoUpload({ itemIdx, customPhotos, onCustomPhoto }: {
         )}
         <button className="btn-outline" style={{ fontSize: '0.8em', padding: '4px 10px' }}
           onClick={() => ref.current?.click()}>
-          {hasPhoto ? '🔄 Ersetzen' : '📷 Foto hochladen'}
+          {hasPhoto ? '🔄 Ersetzen' : (label ?? '📷 Foto hochladen')}
         </button>
         <input ref={ref} type="file" accept="image/*" hidden
-          onChange={(e) => { const f = e.target.files?.[0]; if (f) onCustomPhoto(itemIdx, f); e.target.value = ''; }} />
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) onCustomPhoto(key, f); e.target.value = ''; }} />
       </div>
     </div>
   );
@@ -59,7 +60,7 @@ function ItemEditor({ item, itemIdx, customPhotos, onCustomPhoto, onChange }: {
   item: CarouselItem;
   itemIdx: number;
   customPhotos: Record<string, string>;
-  onCustomPhoto: (i: number, f: File) => void;
+  onCustomPhoto: (key: string, f: File) => void;
   onChange: (it: CarouselItem) => void;
 }) {
   const setRow = (i: number, r: DetailRow) => {
@@ -81,7 +82,7 @@ function ItemEditor({ item, itemIdx, customPhotos, onCustomPhoto, onChange }: {
         onClick={() => onChange({ ...item, rows: [...item.rows, { icon: '•', label: '', value: '' }] })}>
         ➕ Zeile hinzufügen
       </button>
-      <PhotoUpload itemIdx={itemIdx} customPhotos={customPhotos} onCustomPhoto={onCustomPhoto} />
+      <PhotoUpload photoKey={String(itemIdx)} customPhotos={customPhotos} onCustomPhoto={onCustomPhoto} />
     </div>
   );
 }
@@ -91,7 +92,7 @@ function emptyLeg(direction: string): FlightLeg {
 }
 
 function emptyRoute(): FlightRoute {
-  return { title: '', airline: '', price: '', priceNote: '', baggage: '', flightClass: '',
+  return { title: '', airline: '', price: '', priceNote: '', baggage: '', baggageCabin: '', flightClass: '',
     legs: [emptyLeg('Hinflug'), emptyLeg('Rückflug')] };
 }
 
@@ -128,7 +129,8 @@ function RouteEditor({ route, onChange, onRemove }: { route: FlightRoute; onChan
       {field('Airline', route.airline, (v) => onChange({ ...route, airline: v }))}
       {field('Preis (nur Zahl)', route.price, (v) => onChange({ ...route, price: v }))}
       {field('Preis-Hinweis (z.B. p.P. Hin & Rück)', route.priceNote, (v) => onChange({ ...route, priceNote: v }))}
-      {field('Gepäck', route.baggage, (v) => onChange({ ...route, baggage: v }))}
+      {field('Gepäck (Aufgabe, z.B. 23 KG)', route.baggage, (v) => onChange({ ...route, baggage: v }))}
+      {field('Handgepäck (Kabine, z.B. 8 KG)', route.baggageCabin, (v) => onChange({ ...route, baggageCabin: v }))}
       {field('Klasse', route.flightClass, (v) => onChange({ ...route, flightClass: v }))}
       {route.legs.map((l, i) => (
         <LegEditor key={i} leg={l} onChange={(nl) => setLeg(i, nl)}
@@ -173,13 +175,14 @@ export function OfferCard({ carousel, customPhotos, onCustomPhoto, onChange }: P
 
       {isFlight && (
         <>
+          <PhotoUpload photoKey="cover" label="🛩 Cover-Foto (Flugzeug)" customPhotos={customPhotos} onCustomPhoto={onCustomPhoto} />
           <h4 style={{ color: '#D4AF37', marginTop: 16 }}>Flugoptionen ({flights.length})</h4>
           {flights.map((r, i) => (
             <div key={i}>
               <RouteEditor route={r}
                 onChange={(nr) => { const next = [...flights]; next[i] = nr; onChange({ ...carousel, flights: next }); }}
                 onRemove={() => onChange({ ...carousel, flights: flights.filter((_, j) => j !== i) })} />
-              <PhotoUpload itemIdx={i} customPhotos={customPhotos} onCustomPhoto={onCustomPhoto} />
+              <PhotoUpload photoKey={String(i)} label="🏙 Stadtfoto hochladen" customPhotos={customPhotos} onCustomPhoto={onCustomPhoto} />
             </div>
           ))}
           <button className="btn-outline" style={{ fontSize: '0.85em', padding: '6px 12px', marginTop: 8 }}

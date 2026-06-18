@@ -459,20 +459,107 @@ export async function renderPostSlide(
   return new Promise((res) => canvas.toBlob((b) => res(b!), 'image/png'));
 }
 
-// ─── Flight Slide 1: Visual (airplane + cities + destination) — ONE offer ─────
+// ─── Flight Slide 1: Cover (airplane background, destination title) ───────────
 
-/** Cities line for a single route: "Frankfurt ✈ Antalya" */
-function routeCitiesLine(route: FlightRoute): string {
-  const out = route.legs.find((l) => /hin/i.test(l.direction)) ?? route.legs[0];
-  if (!out) return '';
-  const from = out.from.replace(/\s*\(.*\)/, '').trim();
-  const to = out.to.replace(/\s*\(.*\)/, '').trim();
-  if (!from && !to) return '';
-  return `${from}  ✈  ${to}`;
+/** Strip airport code parentheses, e.g. "Frankfurt (FRA)" → "Frankfurt" */
+function cityShort(s: string): string {
+  return s.replace(/\s*\(.*\)/, '').trim();
 }
 
-export async function renderFlightVisualSlide(
+export async function renderFlightCoverSlide(
   carousel: Pick<Carousel, 'destination' | 'hookHeadline' | 'hookTagline'>,
+  bgDataUrl: string,
+  size: SlideSize
+): Promise<Blob> {
+  const canvas = createCanvas(size);
+  const ctx = canvas.getContext('2d')!;
+  const { width: w, height: h } = SLIDE_DIMENSIONS[size];
+
+  const bg = await loadImage(bgDataUrl);
+  coverImage(ctx, bg, w, h);
+  boostContrast(ctx, w, h);
+
+  // Vignette: top 30% light, bottom 28% very dark
+  const vignette = ctx.createLinearGradient(0, 0, 0, h);
+  vignette.addColorStop(0, 'rgba(0,10,30,0.55)');
+  vignette.addColorStop(0.3, 'rgba(0,10,30,0.10)');
+  vignette.addColorStop(0.72, 'rgba(0,10,30,0.15)');
+  vignette.addColorStop(1, 'rgba(0,10,30,0.95)');
+  ctx.fillStyle = vignette;
+  ctx.fillRect(0, 0, w, h);
+
+  await drawLogo(ctx, w, h);
+
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+
+  // Destination name — large bold caps
+  const destFs = Math.round(w * 0.115);
+  ctx.font = `bold ${destFs}px Arial Black, Arial, sans-serif`;
+  ctx.fillStyle = WHITE;
+  const destLines = wrapText(ctx, carousel.destination.toUpperCase(), w * 0.9);
+  let y = h * 0.32;
+  destLines.forEach((line) => { ctx.fillText(line, w / 2, y); y += Math.round(destFs * 1.1); });
+
+  // hookHeadline — italic bold gold
+  const hlFs = Math.round(w * 0.095);
+  ctx.font = `italic bold ${hlFs}px Georgia, serif`;
+  ctx.fillStyle = GOLD;
+  ctx.fillText(clean(carousel.hookHeadline), w / 2, h * 0.62);
+
+  // Tagline
+  const tagFs = Math.round(w * 0.048);
+  ctx.font = `bold ${tagFs}px Arial, sans-serif`;
+  ctx.fillStyle = WHITE;
+  ctx.fillText(clean(carousel.hookTagline), w / 2, h * 0.80);
+
+  // Contact row at h*0.868 — phone left-of-center, email right-of-center
+  const contactFs = Math.round(w * 0.033);
+  const r = Math.round(w * 0.028);
+  const contactY = h * 0.868;
+
+  // Phone group: circle at (w/2 - w*0.18), text after
+  const phoneX = Math.round(w / 2 - w * 0.18);
+  ctx.beginPath();
+  ctx.arc(phoneX, contactY - r * 0.2, r, 0, Math.PI * 2);
+  ctx.strokeStyle = GOLD;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.font = `${Math.round(r * 1.1)}px Arial`;
+  ctx.fillStyle = GOLD;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('📞', phoneX, contactY - r * 0.2);
+  ctx.font = `${contactFs}px Arial, sans-serif`;
+  ctx.fillStyle = GOLD;
+  ctx.textAlign = 'left';
+  ctx.fillText(FOOTER_PHONE, phoneX + r + Math.round(w * 0.012), contactY - r * 0.2);
+
+  // Email group: centered on right side
+  const emailX = Math.round(w / 2 + w * 0.04);
+  ctx.beginPath();
+  ctx.arc(emailX, contactY - r * 0.2, r, 0, Math.PI * 2);
+  ctx.strokeStyle = GOLD;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.font = `${Math.round(r * 1.1)}px Arial`;
+  ctx.fillStyle = GOLD;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('✉', emailX, contactY - r * 0.2);
+  ctx.font = `${contactFs}px Arial, sans-serif`;
+  ctx.fillStyle = GOLD;
+  ctx.textAlign = 'left';
+  ctx.fillText(FOOTER_EMAIL, emailX + r + Math.round(w * 0.012), contactY - r * 0.2);
+
+  ctx.textBaseline = 'alphabetic';
+
+  return new Promise((res) => canvas.toBlob((b) => res(b!), 'image/png'));
+}
+
+// ─── Flight Slide 2: Route slide (city photo + departure/arrival + price/info) ─
+
+export async function renderFlightRouteSlide(
   route: FlightRoute,
   bgDataUrl: string,
   size: SlideSize
@@ -485,12 +572,15 @@ export async function renderFlightVisualSlide(
   coverImage(ctx, bg, w, h);
   boostContrast(ctx, w, h);
 
-  const vignette = ctx.createLinearGradient(0, 0, 0, h);
-  vignette.addColorStop(0, 'rgba(0,20,50,0.5)');
-  vignette.addColorStop(0.35, 'rgba(0,20,50,0.05)');
-  vignette.addColorStop(0.7, 'rgba(0,20,50,0.15)');
-  vignette.addColorStop(1, 'rgba(0,20,50,0.8)');
-  ctx.fillStyle = vignette;
+  const aspect = h / w;
+  const photoFrac = Math.min(0.65, 0.38 + aspect * 0.155);
+
+  // Bottom dark gradient
+  const gradStart = photoFrac * 0.85;
+  const grad = ctx.createLinearGradient(0, gradStart * h, 0, h);
+  grad.addColorStop(0, 'rgba(0,15,45,0)');
+  grad.addColorStop(1, 'rgba(0,15,45,0.97)');
+  ctx.fillStyle = grad;
   ctx.fillRect(0, 0, w, h);
 
   await drawLogo(ctx, w, h);
@@ -498,157 +588,58 @@ export async function renderFlightVisualSlide(
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
 
-  // Headline (e.g. "Flugangebote")
-  const hlFs = Math.round(w * 0.05);
-  ctx.font = `italic bold ${hlFs}px Georgia, serif`;
+  const outLeg = route.legs.find((l) => /hin/i.test(l.direction)) ?? route.legs[0];
+  const retLeg = route.legs.find((l) => /rück/i.test(l.direction));
+  const outDate = outLeg?.date || '';
+  const retDate = retLeg?.date || '';
+  const fromCity = cityShort(outLeg?.from || '').toUpperCase();
+  const toCity = cityShort(outLeg?.to || '');
+
+  // Departure city — HUGE white bold
+  const cityFs = Math.round(w * 0.165);
+  ctx.font = `900 ${cityFs}px Arial Black, Arial, sans-serif`;
+  ctx.fillStyle = WHITE;
+  const cityLines = wrapText(ctx, fromCity, w * 0.9);
+  let y = h * photoFrac - Math.round(cityFs * 0.1);
+  cityLines.forEach((line) => { ctx.fillText(line, w / 2, y); y += cityFs * 1.0; });
+
+  // Destination city — smaller gold italic
+  const destFs = Math.round(w * 0.055);
+  ctx.font = `italic ${destFs}px Georgia, serif`;
   ctx.fillStyle = GOLD;
-  ctx.fillText(clean(carousel.hookHeadline || 'Flugangebote'), w / 2, h * 0.4);
+  y += Math.round(destFs * 0.3);
+  ctx.fillText(clean(toCity), w / 2, y);
+  y += Math.round(destFs * 1.4);
 
-  // Destination — large (prefer route title, else carousel destination)
-  const destFs = Math.round(w * 0.1);
-  ctx.font = `bold ${destFs}px Georgia, serif`;
-  ctx.fillStyle = WHITE;
-  const destLines = wrapText(ctx, clean(route.title || carousel.destination), w * 0.86);
-  let y = h * 0.5;
-  destLines.forEach((line) => { ctx.fillText(line, w / 2, y); y += Math.round(destFs * 1.12); });
-
-  // Gold divider
-  const divW = Math.round(w * 0.45);
+  // Sparkle divider
+  const sparkY = y + Math.round(h * 0.01);
   ctx.strokeStyle = GOLD;
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 1.5;
+  ctx.globalAlpha = 0.8;
   ctx.beginPath();
-  ctx.moveTo((w - divW) / 2, y);
-  ctx.lineTo((w + divW) / 2, y);
+  ctx.moveTo(w * 0.12, sparkY);
+  ctx.lineTo(w * 0.42, sparkY);
   ctx.stroke();
-  y += Math.round(h * 0.04);
-
-  // Cities line for this route (Frankfurt ✈ Antalya)
-  const cities = routeCitiesLine(route);
-  if (cities) {
-    const cFs = Math.round(w * 0.05);
-    ctx.font = `bold ${cFs}px Arial, sans-serif`;
-    ctx.fillStyle = GOLD;
-    ctx.fillText(cities, w / 2, y);
-    y += Math.round(cFs * 1.4);
-  }
-
-  // Tagline
-  if (carousel.hookTagline) {
-    const tagFs = Math.round(w * 0.036);
-    ctx.font = `${tagFs}px Arial, sans-serif`;
-    ctx.fillStyle = WHITE;
-    ctx.globalAlpha = 0.9;
-    ctx.fillText(clean(carousel.hookTagline), w / 2, y);
-    ctx.globalAlpha = 1;
-  }
-
-  drawFooter(ctx, w, h);
-
-  return new Promise((res) => canvas.toBlob((b) => res(b!), 'image/png'));
-}
-
-// ─── Flight Slide 2: Details for ONE offer (ذهاب/عودة separated + price) ───────
-
-export async function renderFlightDetailsSlide(route: FlightRoute, size: SlideSize): Promise<Blob> {
-  const canvas = createCanvas(size);
-  const ctx = canvas.getContext('2d')!;
-  const { width: w, height: h } = SLIDE_DIMENSIONS[size];
-
-  ctx.fillStyle = NAVY;
-  ctx.fillRect(0, 0, w, h);
-  await drawLogo(ctx, w, h);
-
-  ctx.textAlign = 'center';
+  ctx.beginPath();
+  ctx.moveTo(w * 0.58, sparkY);
+  ctx.lineTo(w * 0.88, sparkY);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  const sparkFs = Math.round(w * 0.042);
+  ctx.font = `${sparkFs}px Arial`;
+  ctx.fillStyle = GOLD;
+  ctx.textBaseline = 'middle';
+  ctx.fillText('✦', w / 2, sparkY);
   ctx.textBaseline = 'alphabetic';
+  y = sparkY + Math.round(h * 0.04);
 
-  // Route title
-  const titleFs = Math.round(w * 0.056);
-  ctx.font = `bold ${titleFs}px Georgia, serif`;
-  ctx.fillStyle = WHITE;
-  const titleLines = wrapText(ctx, clean(route.title || 'Flugdetails'), w * 0.84);
-  let y = h * 0.2;
-  titleLines.forEach((line) => { ctx.fillText(line, w / 2, y); y += Math.round(titleFs * 1.15); });
-
-  // Airline + class + baggage line
-  const meta = [route.airline, route.flightClass, route.baggage ? `🧳 ${route.baggage}` : '']
-    .filter((s) => s && s.trim()).map(clean).join('   ·   ');
-  if (meta) {
-    const mFs = Math.round(w * 0.034);
-    ctx.font = `${mFs}px Arial, sans-serif`;
-    ctx.fillStyle = GOLD;
-    y += Math.round(mFs * 0.6);
-    ctx.fillText(meta, w / 2, y);
-    y += Math.round(mFs * 0.8);
-  }
-
-  // Gold divider
-  y += Math.round(h * 0.015);
-  ctx.strokeStyle = GOLD;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(w * 0.1, y);
-  ctx.lineTo(w * 0.9, y);
-  ctx.stroke();
-
-  const padX = w * 0.1;
-  const legs = route.legs ?? [];
-
-  // Each leg gets a clearly-separated block
-  const legsTop = y + Math.round(h * 0.04);
-  const priceReserve = route.price ? h * 0.16 : h * 0.04;
-  const legsArea = (h * 0.895 - priceReserve) - legsTop;
-  const legBlockH = legs.length > 0 ? legsArea / legs.length : 0;
-
-  legs.forEach((leg, i) => {
-    const top = legsTop + i * legBlockH;
-    const isReturn = /rück/i.test(leg.direction);
-    const icon = isReturn ? '🛬' : '🛫';
-
-    // direction header
-    ctx.textAlign = 'left';
-    const dirFs = Math.round(w * 0.04);
-    ctx.font = `bold ${dirFs}px Arial, sans-serif`;
-    ctx.fillStyle = GOLD;
-    ctx.fillText(`${icon} ${clean(leg.direction)}`, padX, top + dirFs);
-
-    // route from → to
-    const routeFs = Math.round(w * 0.046);
-    ctx.font = `bold ${routeFs}px Georgia, serif`;
-    ctx.fillStyle = WHITE;
-    ctx.fillText(`${clean(leg.from)} → ${clean(leg.to)}`, padX, top + dirFs + Math.round(routeFs * 1.3));
-
-    // date / time / flight no
-    const info = [leg.date, leg.time, leg.flightNo].filter((s) => s && s.trim()).map(clean).join('   ·   ');
-    if (info) {
-      const iFs = Math.round(w * 0.032);
-      ctx.font = `${iFs}px Arial, sans-serif`;
-      ctx.fillStyle = WHITE;
-      ctx.globalAlpha = 0.82;
-      ctx.fillText(info, padX, top + dirFs + Math.round(routeFs * 1.3) + Math.round(iFs * 1.4));
-      ctx.globalAlpha = 1;
-    }
-
-    // separator
-    if (i < legs.length - 1) {
-      ctx.strokeStyle = GOLD;
-      ctx.globalAlpha = 0.3;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(padX, top + legBlockH - Math.round(h * 0.01));
-      ctx.lineTo(w - padX, top + legBlockH - Math.round(h * 0.01));
-      ctx.stroke();
-      ctx.globalAlpha = 1;
-    }
-  });
-
-  // Price block — centered near bottom
+  // Price block: "ab [N] €"
   if (route.price) {
-    const priceY = h * 0.85;
     const abText = 'ab ';
-    const abFs = Math.round(w * 0.04);
-    const numFs = Math.round(w * 0.1);
-    const eurFs = Math.round(w * 0.05);
-    const gap = Math.round(w * 0.015);
+    const abFs = Math.round(w * 0.052);
+    const numFs = Math.round(w * 0.20);
+    const eurFs = Math.round(w * 0.075);
+    const gap = Math.round(w * 0.02);
 
     ctx.font = `${abFs}px Arial, sans-serif`;
     const abW = ctx.measureText(abText).width;
@@ -662,30 +653,106 @@ export async function renderFlightDetailsSlide(route: FlightRoute, size: SlideSi
     ctx.textAlign = 'left';
     ctx.font = `${abFs}px Arial, sans-serif`;
     ctx.fillStyle = WHITE;
-    ctx.fillText(abText, cx, priceY); cx += abW + gap;
+    ctx.fillText(abText, cx, y);
+    cx += abW + gap;
     ctx.font = `bold ${numFs}px Georgia, serif`;
     ctx.fillStyle = GOLD;
-    ctx.fillText(clean(route.price), cx, priceY); cx += numW + gap;
+    ctx.fillText(clean(route.price), cx, y);
+    cx += numW + gap;
     ctx.font = `bold ${eurFs}px Georgia, serif`;
     ctx.fillStyle = WHITE;
-    ctx.fillText('€', cx, priceY);
-
-    if (route.priceNote) {
-      ctx.textAlign = 'center';
-      const nFs = Math.round(w * 0.03);
-      ctx.font = `${nFs}px Arial, sans-serif`;
-      ctx.fillStyle = GOLD;
-      ctx.fillText(clean(route.priceNote), w / 2, priceY + Math.round(nFs * 1.6));
-    }
+    ctx.fillText('€', cx, y);
+    ctx.textAlign = 'center';
+    y += Math.round(numFs * 0.2);
   }
 
-  ctx.textAlign = 'center';
-  drawFooter(ctx, w, h);
+  // 2x2 info grid
+  const gridY1 = h * (photoFrac + (1 - photoFrac) * 0.78);
+  const gridY2 = h * (photoFrac + (1 - photoFrac) * 0.91);
+  const col1X = w * 0.20;
+  const col2X = w * 0.62;
+  const iconFs = Math.round(w * 0.042);
+  const infoFs = Math.round(w * 0.038);
+
+  const drawInfoCell = (cellY: number, colX: number, icon: string, text: string) => {
+    if (!text) return;
+    ctx.font = `${iconFs}px Arial`;
+    ctx.fillStyle = WHITE;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(icon, colX, cellY);
+    ctx.font = `bold ${infoFs}px Arial, sans-serif`;
+    ctx.fillStyle = WHITE;
+    ctx.fillText(text, colX + w * 0.065, cellY);
+    ctx.textBaseline = 'alphabetic';
+  };
+
+  drawInfoCell(gridY1, col1X, '📅', outDate);
+  if (retDate) drawInfoCell(gridY1, col2X, '📅', retDate);
+  if (route.baggage) drawInfoCell(gridY2, col1X, '🧳', route.baggage);
+  if (route.baggageCabin) drawInfoCell(gridY2, col2X, '💼', route.baggageCabin);
 
   return new Promise((res) => canvas.toBlob((b) => res(b!), 'image/png'));
 }
 
 // ─── Last Slide: CTA ──────────────────────────────────────────────────────────
+
+function drawSparkleDivider(ctx: CanvasRenderingContext2D, w: number, sparkY: number) {
+  ctx.strokeStyle = GOLD;
+  ctx.lineWidth = 1.5;
+  ctx.globalAlpha = 0.8;
+  ctx.beginPath();
+  ctx.moveTo(w * 0.12, sparkY);
+  ctx.lineTo(w * 0.42, sparkY);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(w * 0.58, sparkY);
+  ctx.lineTo(w * 0.88, sparkY);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  const sparkFs = Math.round(w * 0.042);
+  ctx.font = `${sparkFs}px Arial`;
+  ctx.fillStyle = GOLD;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('✦', w / 2, sparkY);
+  ctx.textBaseline = 'alphabetic';
+}
+
+function drawCircleContact(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  y: number,
+  icon: string,
+  text: string,
+  fontSize: number
+) {
+  const r = Math.round(w * 0.04);
+  ctx.font = `bold ${fontSize}px Arial`;
+  const textW = ctx.measureText(text).width;
+  const gap = Math.round(w * 0.025);
+  const groupW = r * 2 + gap + textW;
+  const startX = (w - groupW) / 2;
+
+  ctx.beginPath();
+  ctx.arc(startX + r, y, r, 0, Math.PI * 2);
+  ctx.strokeStyle = GOLD;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.font = `${Math.round(r * 1.1)}px Arial`;
+  ctx.fillStyle = GOLD;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(icon, startX + r, y);
+
+  ctx.font = `bold ${fontSize}px Arial`;
+  ctx.fillStyle = WHITE;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, startX + r * 2 + gap, y);
+  ctx.textBaseline = 'alphabetic';
+}
 
 export async function renderCtaSlide(size: SlideSize): Promise<Blob> {
   const canvas = createCanvas(size);
@@ -704,39 +771,61 @@ export async function renderCtaSlide(size: SlideSize): Promise<Blob> {
 
   await drawLogo(ctx, w, h);
 
-  const bigFs = Math.round(w * 0.135);
-  ctx.textAlign = 'center';
+  const bigFs = Math.round(w * 0.155);
   ctx.textBaseline = 'alphabetic';
+  const leftX = w * 0.1;
 
-  ctx.font = `bold ${bigFs}px Georgia, serif`;
+  // "Jetzt" huge white LEFT-ALIGNED
+  ctx.textAlign = 'left';
+  ctx.font = `900 ${bigFs}px Arial Black, Arial, sans-serif`;
   ctx.fillStyle = WHITE;
-  ctx.fillText('Jetzt', w / 2, h * 0.43);
+  ctx.fillText('Jetzt', leftX, h * 0.41);
 
+  // Small airplane top-right
+  const planeFs = Math.round(w * 0.065);
+  ctx.font = `${planeFs}px Arial`;
   ctx.fillStyle = GOLD;
-  ctx.fillText('buchen!', w / 2, h * 0.43 + bigFs * 1.18);
+  ctx.textAlign = 'right';
+  ctx.fillText('✈', w * 0.88, h * 0.38);
 
-  // gold divider
-  ctx.strokeStyle = GOLD;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(w * 0.28, h * 0.58);
-  ctx.lineTo(w * 0.72, h * 0.58);
-  ctx.stroke();
+  // "buchen!" huge GOLD LEFT-ALIGNED
+  ctx.textAlign = 'left';
+  ctx.font = `900 ${bigFs}px Arial Black, Arial, sans-serif`;
+  ctx.fillStyle = GOLD;
+  ctx.fillText('buchen!', leftX, h * 0.41 + bigFs * 1.08);
 
-  const subFs = Math.round(w * 0.038);
+  // "Kontaktiere uns heute"
+  ctx.textAlign = 'center';
+  const subFs = Math.round(w * 0.042);
   ctx.font = `${subFs}px Arial, sans-serif`;
   ctx.fillStyle = WHITE;
-  ctx.fillText('Kontaktiere uns heute', w / 2, h * 0.635);
+  ctx.fillText('Kontaktiere uns heute', w / 2, h * 0.60);
 
-  ctx.font = `bold ${Math.round(w * 0.036)}px Arial, sans-serif`;
-  ctx.fillStyle = GOLD;
-  ctx.fillText(`📞 ${FOOTER_PHONE}`, w / 2, h * 0.695);
-  ctx.fillText(`✉ ${FOOTER_EMAIL.toUpperCase()}`, w / 2, h * 0.75);
+  // Phone contact with circle
+  drawCircleContact(ctx, w, h * 0.665, '📞', FOOTER_PHONE, Math.round(w * 0.038));
 
-  // italic script outro
-  ctx.font = `italic ${Math.round(w * 0.052)}px Georgia, serif`;
+  // Email contact with circle
+  drawCircleContact(ctx, w, h * 0.725, '✉', FOOTER_EMAIL.toUpperCase(), Math.round(w * 0.032));
+
+  // Sparkle divider at h*0.785
+  drawSparkleDivider(ctx, w, h * 0.785);
+
+  // "Dein Traumurlaub wartet!" gold italic script
+  ctx.font = `italic bold ${Math.round(w * 0.062)}px Georgia, serif`;
   ctx.fillStyle = GOLD;
-  ctx.fillText('Dein Traumurlaub wartet!', w / 2, h * 0.855);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillText('Dein Traumurlaub wartet!', w / 2, h * 0.865);
+
+  // Underline flourish
+  ctx.strokeStyle = GOLD;
+  ctx.lineWidth = 2;
+  ctx.globalAlpha = 0.6;
+  ctx.beginPath();
+  ctx.moveTo(w * 0.25, h * 0.883);
+  ctx.lineTo(w * 0.75, h * 0.883);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
 
   drawFooter(ctx, w, h);
 

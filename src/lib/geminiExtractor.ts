@@ -14,7 +14,8 @@ const SCHEMA = `Return ONLY a valid JSON object — no markdown, no explanation.
       "airline": "string (airline name, '' if unknown)",
       "price": "string (numeric only, price per person, '' if none)",
       "priceNote": "string (e.g. 'p.P. Hin & Rück' / 'One Way', '' if none)",
-      "baggage": "string (e.g. '20kg', '' if none)",
+      "baggage": "string (checked/hold luggage weight, e.g. '23 KG', '' if none)",
+      "baggageCabin": "string (cabin/hand luggage weight, e.g. '8 KG', '' if not shown)",
       "flightClass": "string (e.g. 'Economy', '' if none)",
       "legs": [
         { "direction": "Hinflug" | "Rückflug", "from": "city (CODE)", "to": "city (CODE)", "date": "DD.MM.YYYY", "time": "HH:MM - HH:MM or ''", "flightNo": "string or ''" }
@@ -41,6 +42,7 @@ Choose the correct "type" yourself by reading the content:
   * Keep the outbound (Hinflug) and return (Rückflug) as SEPARATE leg objects. Never mix their cities, dates, times or flight numbers.
   * Keep each option's price WITH that option — never move a price to a different option. If a price covers round-trip, set priceNote accordingly.
   * If it is one-way, include only the Hinflug leg.
+  * baggage = checked/hold luggage (larger value), baggageCabin = cabin/hand luggage (smaller value).
 - "rivercruise": river cruise (Nile, Rhine, Danube…). rows: Route/Fluss (🌊), Schiff (🚢), Nächte (🌙), Häfen/Stopps (📍), Kabine (🛏), Verpflegung (🍽).
 - "seacruise": ocean cruise. rows: Reederei (🏢), Schiff (🛳), Meer/Region (🌊), Häfen (⚓), Kabine (🛏), Verpflegung (🍽).
 - "post": a non-promotional post (travel tip, destination of the week, quote, greeting). Put the message in "body" and leave "items" as an empty array (or a single item describing the visual).
@@ -53,7 +55,7 @@ function parseCarousel(raw: string): Carousel {
   if (!c.items) c.items = [];
   if (!c.type) c.type = 'hotel';
   c.items.forEach((it) => { if (!it.rows) it.rows = []; });
-  if (c.flights) c.flights.forEach((f) => { if (!f.legs) f.legs = []; });
+  if (c.flights) c.flights.forEach((f) => { if (!f.legs) f.legs = []; if (f.baggageCabin === undefined) f.baggageCabin = ''; });
   return c;
 }
 
