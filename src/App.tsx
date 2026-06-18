@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { Offer, SlideSize, GeneratedSlide, GenerationProgress, SLIDE_DIMENSIONS } from './types';
 import { extractTextFromPDF } from './lib/pdfExtractor';
 import { extractOffersFromText } from './lib/geminiExtractor';
-import { generateImage, hookImagePrompt, hotelImagePrompt, describeHotel, gradientFallback } from './lib/imageGenerator';
+import { generateImage, hookImagePrompt, hotelImagePrompt, describeHotel, gradientFallback, listAvailableImageModels } from './lib/imageGenerator';
 import { renderHookSlide, renderHotelVisualSlide, renderHotelDetailsSlide, renderCtaSlide } from './lib/slideRenderer';
 import { exportZip } from './lib/exporter';
 import { UploadZone } from './components/UploadZone';
@@ -31,15 +31,21 @@ export default function App() {
     if (!apiKey) { setError('Bitte Gemini API Key eingeben.'); return; }
     setError(null);
     setPhase('extracting');
+    // First: discover available image models
+    const available = await listAvailableImageModels(apiKey);
+    if (available.length > 0) {
+      setError(`🔍 Verfügbare Bildmodelle für deinen Key:\n${available.join('\n')}`);
+      setPhase('idle');
+      return;
+    }
+    // If none discovered, try generation anyway
     try {
       const result = await generateImage('A luxury hotel pool in Turkey at sunset', apiKey);
       if (result.startsWith('data:image')) {
-        setError('✅ Bildgenerierung funktioniert! Modell erfolgreich.');
-      } else {
-        setError('⚠️ Bild wurde als Platzhalter zurückgegeben (API nicht verfügbar). Prüfe die Konsole (F12) für Details.');
+        setError('✅ Bildgenerierung funktioniert!');
       }
     } catch (e: any) {
-      setError(`❌ Test fehlgeschlagen: ${e.message}`);
+      setError(`❌ Keine Bildmodelle gefunden. Fehler:\n${e.message}`);
     }
     setPhase('idle');
   };

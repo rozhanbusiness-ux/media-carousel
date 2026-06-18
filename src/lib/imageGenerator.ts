@@ -1,4 +1,4 @@
-// Image generation — tries current Gemini image models then falls back to a clean gradient.
+// Image generation — auto-discovers available image models from the API, then tries them.
 
 async function tryGeminiImage(model: string, prompt: string, apiKey: string): Promise<string> {
   const response = await fetch(
@@ -23,7 +23,7 @@ async function tryGeminiImage(model: string, prompt: string, apiKey: string): Pr
       return `data:${part.inlineData.mimeType ?? 'image/png'};base64,${part.inlineData.data}`;
     }
   }
-  throw new Error(`[${model}] No image part in response: ${JSON.stringify(data).slice(0, 300)}`);
+  throw new Error(`[${model}] No image part in response: ${JSON.stringify(data).slice(0, 200)}`);
 }
 
 async function tryImagen(model: string, prompt: string, apiKey: string): Promise<string> {
@@ -45,7 +45,27 @@ async function tryImagen(model: string, prompt: string, apiKey: string): Promise
   const data = await response.json();
   const img = data.predictions?.[0];
   if (img?.bytesBase64Encoded) return `data:${img.mimeType ?? 'image/png'};base64,${img.bytesBase64Encoded}`;
-  throw new Error(`[${model}] No bytesBase64Encoded: ${JSON.stringify(data).slice(0, 300)}`);
+  throw new Error(`[${model}] No bytesBase64Encoded: ${JSON.stringify(data).slice(0, 200)}`);
+}
+
+/** Query the Gemini API to discover which image-generation models are available for this key */
+export async function listAvailableImageModels(apiKey: string): Promise<string[]> {
+  try {
+    const resp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}&pageSize=100`
+    );
+    if (!resp.ok) return [];
+    const data = await resp.json();
+    const models: Array<{ name: string; supportedGenerationMethods?: string[] }> = data.models ?? [];
+    return models
+      .filter(m =>
+        m.supportedGenerationMethods?.includes('generateContent') &&
+        (m.name.toLowerCase().includes('image') || m.name.toLowerCase().includes('imagen'))
+      )
+      .map(m => m.name.replace('models/', ''));
+  } catch {
+    return [];
+  }
 }
 
 // Clean cinematic gradient — no text. Exported so App can use it as fallback.
@@ -68,40 +88,45 @@ export function gradientFallback(): string {
   return canvas.toDataURL('image/jpeg', 0.9);
 }
 
-const IMAGE_MODELS: Array<(p: string, k: string) => Promise<string>> = [
-  (p, k) => tryGeminiImage('gemini-2.5-flash-image', p, k),
-  (p, k) => tryGeminiImage('gemini-2.5-flash-image-preview', p, k),
-  (p, k) => tryImagen('imagen-4.0-generate-001', p, k),
-  (p, k) => tryImagen('imagen-3.0-generate-002', p, k),
-  (p, k) => tryGeminiImage('gemini-2.0-flash-preview-image-generation', p, k),
-];
-
 export async function generateImage(prompt: string, apiKey: string): Promise<string> {
+  // Discover available image models, then try known hardcoded ones as fallback
+  const discovered = await listAvailableImageModels(apiKey);
+  const knownModels = [
+    'gemini-2.0-flash-preview-image-generation',
+    'gemini-2.5-flash-preview-image-generation',
+    'gemini-2.0-flash-exp',
+    'gemini-2.5-flash-image',
+    'imagen-3.0-generate-002',
+    'imagen-4.0-generate-001',
+  ];
+
+  // Deduplicate: discovered first, then known
+  const toTry = [...new Set([...discovered, ...knownModels])];
+
   const errors: string[] = [];
-  for (const attempt of IMAGE_MODELS) {
+  for (const model of toTry) {
     try {
-      return await attempt(prompt, apiKey);
+      if (model.startsWith('imagen')) {
+        return await tryImagen(model, prompt, apiKey);
+      } else {
+        return await tryGeminiImage(model, prompt, apiKey);
+      }
     } catch (e: any) {
-      errors.push(e.message ?? String(e));
+      errors.push(e.message?.slice(0, 120) ?? String(e));
     }
   }
-  const msg = errors.join(' | ');
-  console.warn('All image models failed:', msg);
-  // Surface the real error so user can see it
-  throw new Error(`Bildgenerierung fehlgeschlagen: ${msg}`);
+
+  const msg = errors.slice(0, 3).join('\n');
+  console.warn('All image models failed:\n', msg);
+  throw new Error(`Bildgenerierung fehlgeschlagen:\n${msg}`);
 }
 
 export function hookImagePrompt(destination: string): string {
   return `Luxury travel photography, cinematic aerial wide shot of ${destination} at golden hour, stunning coastline or famous landmark, crystal blue sea, dramatic sky, no text, no watermarks, professional travel magazine style`;
 }
 
-/**
- * Ask the Gemini text model to describe what the REAL hotel actually looks like,
- * so the generated image is as close as possible to reality.
- * Falls back to a generic description if the lookup fails.
- */
 export async function describeHotel(hotelName: string, location: string, apiKey: string): Promise<string> {
-  const q = `You are a travel photographer. Describe in ONE vivid English paragraph (max 70 words) the real visual appearance of the hotel "${hotelName}" in ${location}: its architecture style, building colors, number of floors, the pool, gardens, beach/sea or mountains around it, and overall atmosphere. If you are not certain of the exact hotel, describe a typical real resort of that name and region. Output only the description, no preamble.`;
+  const q = `You are a travel photographer. Describe in ONE vivid English paragraph (max 70 words) the real visual appearance of the hotel "${hotelName}" in ${location}: its architecture style, building colors, number of floors, the pool, gardens, beach/sea or mountains around it. Output only the description, no preamble.`;
   try {
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
@@ -125,8 +150,6 @@ export async function describeHotel(hotelName: string, location: string, apiKey:
 }
 
 export function hotelImagePrompt(hotelName: string, location: string, description?: string): string {
-  const detail = description
-    ? description
-    : `beautiful facade and pool view of ${hotelName} resort in ${location}`;
+  const detail = description ?? `beautiful facade and pool view of ${hotelName} resort in ${location}`;
   return `Ultra-realistic professional hotel photography. ${detail}. Golden hour lighting, vivid saturated colors, sharp focus, warm cinematic tones, real architectural photo, no text, no watermarks, no people in foreground.`;
 }
