@@ -38,11 +38,13 @@ const SCHEMA = `Return ONLY a valid JSON object — no markdown, no explanation.
 Choose the correct "type" yourself by reading the content:
 - "hotel": holiday/hotel package offers. rows should cover: Reisedatum (📅), Hinflug (✈), Rückflug (✈), Verpflegung (🍽), Transfer (🚌), and Bewertung (⭐) if a rating exists.
 - "flight": flight-only offers. Fill the "flights" array (NOT "items"). CRITICAL RULES for flights:
-  * Each distinct flight option = one object in "flights". Do NOT merge two options into one.
-  * Keep the outbound (Hinflug) and return (Rückflug) as SEPARATE leg objects. Never mix their cities, dates, times or flight numbers.
-  * Keep each option's price WITH that option — never move a price to a different option. If a price covers round-trip, set priceNote accordingly.
-  * If it is one-way, include only the Hinflug leg.
-  * baggage = checked/hold luggage (larger value), baggageCabin = cabin/hand luggage (smaller value).
+  * Create ONE object per DEPARTURE CITY offer. A round-trip (there + back) is ONE object, NOT two. NEVER create a separate object for the return direction.
+  * "title" MUST be "DepartureCity → ArrivalCity" using FULL CITY NAMES, e.g. "Düsseldorf → Erbil". NEVER use airport codes (DUS, EBL, FRA) as the title or as from/to. If the source shows a code, convert it to the full city name (DUS→Düsseldorf, EBL→Erbil, FRA→Frankfurt, STR→Stuttgart, BER→Berlin, etc.).
+  * Inside "legs": the Hinflug goes DepartureCity→ArrivalCity; the Rückflug goes ArrivalCity→DepartureCity. Put BOTH legs in the SAME object with their own separate dates. Use full city names in from/to too.
+  * "destination" (top-level) should be the COMMON arrival city for all offers (e.g. "Erbil"), NOT a route string.
+  * Keep each offer's price WITH that offer. If it is one-way, include only the Hinflug leg.
+  * baggage = checked/hold luggage (larger value, e.g. "23 KG"), baggageCabin = cabin/hand luggage (smaller value, e.g. "8 KG").
+  * Set hookHeadline to the season/month theme (e.g. "Juli Angebote") and hookTagline to a CTA line (e.g. "Luxus & Komfort - Jetzt buchen!").
 - "rivercruise": river cruise (Nile, Rhine, Danube…). rows: Route/Fluss (🌊), Schiff (🚢), Nächte (🌙), Häfen/Stopps (📍), Kabine (🛏), Verpflegung (🍽).
 - "seacruise": ocean cruise. rows: Reederei (🏢), Schiff (🛳), Meer/Region (🌊), Häfen (⚓), Kabine (🛏), Verpflegung (🍽).
 - "post": a non-promotional post (travel tip, destination of the week, quote, greeting). Put the message in "body" and leave "items" as an empty array (or a single item describing the visual).
