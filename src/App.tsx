@@ -27,6 +27,23 @@ export default function App() {
     localStorage.setItem('gemini_api_key', key);
   };
 
+  const testImageGen = async () => {
+    if (!apiKey) { setError('Bitte Gemini API Key eingeben.'); return; }
+    setError(null);
+    setPhase('extracting');
+    try {
+      const result = await generateImage('A luxury hotel pool in Turkey at sunset', apiKey);
+      if (result.startsWith('data:image')) {
+        setError('✅ Bildgenerierung funktioniert! Modell erfolgreich.');
+      } else {
+        setError('⚠️ Bild wurde als Platzhalter zurückgegeben (API nicht verfügbar). Prüfe die Konsole (F12) für Details.');
+      }
+    } catch (e: any) {
+      setError(`❌ Test fehlgeschlagen: ${e.message}`);
+    }
+    setPhase('idle');
+  };
+
   const handleFile = useCallback(async (file: File) => {
     if (!apiKey) { setError('Bitte Gemini API Key eingeben.'); return; }
     setError(null);
@@ -133,6 +150,9 @@ export default function App() {
           onChange={(e) => saveKey(e.target.value)}
           className="api-input"
         />
+        <button className="btn-outline" style={{ marginTop: 8, fontSize: '0.85em' }} onClick={testImageGen}>
+          🔍 Bildgenerierung testen
+        </button>
       </section>
 
       <section>
