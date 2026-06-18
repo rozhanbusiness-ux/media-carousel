@@ -7,6 +7,20 @@ const SCHEMA = `Return ONLY a valid JSON object — no markdown, no explanation.
   "hookHeadline": "string (season/theme line, e.g. Sommer Angebote)",
   "hookTagline": "string (call-to-action line, e.g. Luxus am Meer - Jetzt buchen!)",
   "body": "string (ONLY for type=post: the main post text, 1-3 short sentences. Empty otherwise)",
+  "flights": [
+    // ONLY for type=flight. One object per flight OPTION (route). Never merge separate options.
+    {
+      "title": "string (route heading, e.g. 'Frankfurt → Antalya')",
+      "airline": "string (airline name, '' if unknown)",
+      "price": "string (numeric only, price per person, '' if none)",
+      "priceNote": "string (e.g. 'p.P. Hin & Rück' / 'One Way', '' if none)",
+      "baggage": "string (e.g. '20kg', '' if none)",
+      "flightClass": "string (e.g. 'Economy', '' if none)",
+      "legs": [
+        { "direction": "Hinflug" | "Rückflug", "from": "city (CODE)", "to": "city (CODE)", "date": "DD.MM.YYYY", "time": "HH:MM - HH:MM or ''", "flightNo": "string or ''" }
+      ]
+    }
+  ],
   "items": [
     {
       "name": "string (main heading: hotel name / flight title / ship name)",
@@ -22,7 +36,11 @@ const SCHEMA = `Return ONLY a valid JSON object — no markdown, no explanation.
 
 Choose the correct "type" yourself by reading the content:
 - "hotel": holiday/hotel package offers. rows should cover: Reisedatum (📅), Hinflug (✈), Rückflug (✈), Verpflegung (🍽), Transfer (🚌), and Bewertung (⭐) if a rating exists.
-- "flight": flight-only offers. rows: Abflug (🛫), Ankunft (🛬), Airline (🏢), Reisedatum (📅), Gepäck (🧳), Hin/Rückflug (🔁).
+- "flight": flight-only offers. Fill the "flights" array (NOT "items"). CRITICAL RULES for flights:
+  * Each distinct flight option = one object in "flights". Do NOT merge two options into one.
+  * Keep the outbound (Hinflug) and return (Rückflug) as SEPARATE leg objects. Never mix their cities, dates, times or flight numbers.
+  * Keep each option's price WITH that option — never move a price to a different option. If a price covers round-trip, set priceNote accordingly.
+  * If it is one-way, include only the Hinflug leg.
 - "rivercruise": river cruise (Nile, Rhine, Danube…). rows: Route/Fluss (🌊), Schiff (🚢), Nächte (🌙), Häfen/Stopps (📍), Kabine (🛏), Verpflegung (🍽).
 - "seacruise": ocean cruise. rows: Reederei (🏢), Schiff (🛳), Meer/Region (🌊), Häfen (⚓), Kabine (🛏), Verpflegung (🍽).
 - "post": a non-promotional post (travel tip, destination of the week, quote, greeting). Put the message in "body" and leave "items" as an empty array (or a single item describing the visual).
@@ -35,6 +53,7 @@ function parseCarousel(raw: string): Carousel {
   if (!c.items) c.items = [];
   if (!c.type) c.type = 'hotel';
   c.items.forEach((it) => { if (!it.rows) it.rows = []; });
+  if (c.flights) c.flights.forEach((f) => { if (!f.legs) f.legs = []; });
   return c;
 }
 

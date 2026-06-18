@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { Carousel, CarouselItem, ContentType, CONTENT_TYPE_LABELS, DetailRow } from '../types';
+import { Carousel, CarouselItem, ContentType, CONTENT_TYPE_LABELS, DetailRow, FlightRoute, FlightLeg } from '../types';
 
 interface Props {
   carousel: Carousel;
@@ -86,8 +86,66 @@ function ItemEditor({ item, itemIdx, customPhotos, onCustomPhoto, onChange }: {
   );
 }
 
+function emptyLeg(direction: string): FlightLeg {
+  return { direction, from: '', to: '', date: '', time: '', flightNo: '' };
+}
+
+function emptyRoute(): FlightRoute {
+  return { title: '', airline: '', price: '', priceNote: '', baggage: '', flightClass: '',
+    legs: [emptyLeg('Hinflug'), emptyLeg('Rückflug')] };
+}
+
+function LegEditor({ leg, onChange, onRemove }: { leg: FlightLeg; onChange: (l: FlightLeg) => void; onRemove: () => void; }) {
+  return (
+    <div style={{ border: '1px solid rgba(212,175,55,0.3)', borderRadius: 6, padding: 8, marginTop: 6 }}>
+      <div className="field-row" style={{ gap: 6 }}>
+        <select value={/rück/i.test(leg.direction) ? 'Rückflug' : 'Hinflug'}
+          onChange={(e) => onChange({ ...leg, direction: e.target.value })}
+          style={{ flex: '0 0 110px', padding: 4, background: '#001F3F', color: '#fff', border: '1px solid #D4AF37', borderRadius: 4 }}>
+          <option value="Hinflug">🛫 Hinflug</option>
+          <option value="Rückflug">🛬 Rückflug</option>
+        </select>
+        <button className="btn-outline" style={{ fontSize: '0.8em', padding: '2px 8px', marginLeft: 'auto' }} onClick={onRemove}>✕</button>
+      </div>
+      {field('Von', leg.from, (v) => onChange({ ...leg, from: v }))}
+      {field('Nach', leg.to, (v) => onChange({ ...leg, to: v }))}
+      {field('Datum', leg.date, (v) => onChange({ ...leg, date: v }))}
+      {field('Uhrzeit', leg.time, (v) => onChange({ ...leg, time: v }))}
+      {field('Flug-Nr.', leg.flightNo, (v) => onChange({ ...leg, flightNo: v }))}
+    </div>
+  );
+}
+
+function RouteEditor({ route, onChange, onRemove }: { route: FlightRoute; onChange: (r: FlightRoute) => void; onRemove: () => void; }) {
+  const setLeg = (i: number, l: FlightLeg) => { const legs = [...route.legs]; legs[i] = l; onChange({ ...route, legs }); };
+  return (
+    <div className="hotel-row">
+      <div className="field-row">
+        <label style={{ color: '#D4AF37', fontWeight: 'bold' }}>Flugoption</label>
+        <button className="btn-outline" style={{ fontSize: '0.8em', padding: '2px 8px', marginLeft: 'auto' }} onClick={onRemove}>🗑 Entfernen</button>
+      </div>
+      {field('Titel (z.B. Frankfurt → Antalya)', route.title, (v) => onChange({ ...route, title: v }))}
+      {field('Airline', route.airline, (v) => onChange({ ...route, airline: v }))}
+      {field('Preis (nur Zahl)', route.price, (v) => onChange({ ...route, price: v }))}
+      {field('Preis-Hinweis (z.B. p.P. Hin & Rück)', route.priceNote, (v) => onChange({ ...route, priceNote: v }))}
+      {field('Gepäck', route.baggage, (v) => onChange({ ...route, baggage: v }))}
+      {field('Klasse', route.flightClass, (v) => onChange({ ...route, flightClass: v }))}
+      {route.legs.map((l, i) => (
+        <LegEditor key={i} leg={l} onChange={(nl) => setLeg(i, nl)}
+          onRemove={() => onChange({ ...route, legs: route.legs.filter((_, j) => j !== i) })} />
+      ))}
+      <button className="btn-outline" style={{ fontSize: '0.8em', padding: '4px 10px', marginTop: 6 }}
+        onClick={() => onChange({ ...route, legs: [...route.legs, emptyLeg('Rückflug')] })}>
+        ➕ Flugabschnitt
+      </button>
+    </div>
+  );
+}
+
 export function OfferCard({ carousel, customPhotos, onCustomPhoto, onChange }: Props) {
   const isPost = carousel.type === 'post';
+  const isFlight = carousel.type === 'flight';
+  const flights = carousel.flights ?? [];
   return (
     <div className="offer-card">
       <div className="field-row">
@@ -113,7 +171,23 @@ export function OfferCard({ carousel, customPhotos, onCustomPhoto, onChange }: P
         </div>
       )}
 
-      {!isPost && (
+      {isFlight && (
+        <>
+          <PhotoUpload itemIdx={0} customPhotos={customPhotos} onCustomPhoto={onCustomPhoto} />
+          <h4 style={{ color: '#D4AF37', marginTop: 16 }}>Flugoptionen ({flights.length})</h4>
+          {flights.map((r, i) => (
+            <RouteEditor key={i} route={r}
+              onChange={(nr) => { const next = [...flights]; next[i] = nr; onChange({ ...carousel, flights: next }); }}
+              onRemove={() => onChange({ ...carousel, flights: flights.filter((_, j) => j !== i) })} />
+          ))}
+          <button className="btn-outline" style={{ fontSize: '0.85em', padding: '6px 12px', marginTop: 8 }}
+            onClick={() => onChange({ ...carousel, flights: [...flights, emptyRoute()] })}>
+            ➕ Flugoption hinzufügen
+          </button>
+        </>
+      )}
+
+      {!isPost && !isFlight && (
         <>
           <h4 style={{ color: '#D4AF37', marginTop: 16 }}>Einträge ({carousel.items.length})</h4>
           {carousel.items.map((item, i) => (

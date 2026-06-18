@@ -32,7 +32,29 @@ export interface Carousel {
   hookHeadline: string;  // e.g. "Sommer Angebote"
   hookTagline: string;   // e.g. "Luxus am Meer - Jetzt buchen!"
   items: CarouselItem[]; // for 'post' usually empty
+  flights?: FlightRoute[]; // for 'flight' type — structured flight offers
   body?: string;         // free-form body text for regular posts
+}
+
+/** One direction of a flight (Hinflug or Rückflug) */
+export interface FlightLeg {
+  direction: string;   // "Hinflug" | "Rückflug"
+  from: string;        // "Frankfurt (FRA)"
+  to: string;          // "Antalya (AYT)"
+  date: string;        // "20.05.2026"
+  time: string;        // "10:30 - 14:15" or ''
+  flightNo: string;    // "XQ 123" or ''
+}
+
+/** A complete flight offer (round-trip, one-way, or one option in a package) */
+export interface FlightRoute {
+  title: string;       // "Frankfurt → Antalya" (route heading)
+  airline: string;     // "SunExpress" or ''
+  price: string;       // numeric only, per person
+  priceNote: string;   // "p.P. Hin & Rück" or ''
+  baggage: string;     // "20kg" or ''
+  flightClass: string; // "Economy" or ''
+  legs: FlightLeg[];   // outbound (+ optional return)
 }
 
 export type SlideSize = 'story' | 'post' | 'reel';

@@ -3,7 +3,7 @@ import { Carousel, SlideSize, GeneratedSlide, GenerationProgress, SLIDE_DIMENSIO
 import { extractTextFromPDF } from './lib/pdfExtractor';
 import { extractCarouselFromText, extractCarouselFromImage } from './lib/geminiExtractor';
 import { generateImage, hookImagePrompt, itemImagePrompt, describeHotel, gradientFallback, listAvailableImageModels } from './lib/imageGenerator';
-import { renderHookSlide, renderVisualSlide, renderDetailsSlide, renderPostSlide, renderCtaSlide } from './lib/slideRenderer';
+import { renderHookSlide, renderVisualSlide, renderDetailsSlide, renderPostSlide, renderFlightVisualSlide, renderFlightDetailsSlide, renderCtaSlide } from './lib/slideRenderer';
 import { exportZip } from './lib/exporter';
 import { UploadZone } from './components/UploadZone';
 import { OfferCard } from './components/OfferCard';
@@ -82,8 +82,9 @@ export default function App() {
     setError(null);
 
     const isPost = carousel.type === 'post';
-    const totalImages = 1 + (isPost ? 0 : carousel.items.length); // hook + per-item
-    const totalSlides = (isPost ? 2 : 1 + carousel.items.length * 2) + 1; // +CTA
+    const isFlight = carousel.type === 'flight';
+    const totalImages = 1 + (isPost || isFlight ? 0 : carousel.items.length); // hook + per-item
+    const totalSlides = (isPost ? 2 : isFlight ? 2 : 1 + carousel.items.length * 2) + 1; // +CTA
     const totalSteps = totalImages + totalSlides * SIZES.length;
     let step = 0;
     const tick = (label: string) => { step++; setProgress({ current: step, total: totalSteps, label }); };
@@ -99,8 +100,11 @@ export default function App() {
       tick(`Generiere Bild: ${carousel.destination}`);
       const hookImage = await safeGen(hookImagePrompt(carousel.destination, carousel.type), carousel.destination);
 
+      // Flight visual background: use a custom uploaded photo if provided, else the AI hook image
+      const flightBg = isFlight ? (customPhotos['0'] ?? hookImage) : hookImage;
+
       const itemImages: string[] = [];
-      if (!isPost) {
+      if (!isPost && !isFlight) {
         for (let i = 0; i < carousel.items.length; i++) {
           const item = carousel.items[i];
           if (customPhotos[String(i)]) {
@@ -127,6 +131,16 @@ export default function App() {
       // ── Render slides per size ──
       const result: Record<SlideSize, GeneratedSlide[]> = { story: [], post: [], reel: [] };
       for (const size of SIZES) {
+        if (isFlight) {
+          tick(`Render ${size}: Flug Visual`);
+          result[size].push({ label: `flug_${carousel.destination}`, blob: await renderFlightVisualSlide(carousel, flightBg, size) });
+          tick(`Render ${size}: Flug Details`);
+          result[size].push({ label: 'flug_details', blob: await renderFlightDetailsSlide(carousel, size) });
+          tick(`Render ${size}: CTA`);
+          result[size].push({ label: 'cta', blob: await renderCtaSlide(size) });
+          continue;
+        }
+
         tick(`Render ${size}: Cover`);
         result[size].push({ label: `cover_${carousel.destination}`, blob: await renderHookSlide(carousel, hookImage, size) });
 
