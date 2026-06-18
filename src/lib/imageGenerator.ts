@@ -69,9 +69,11 @@ export function gradientFallback(): string {
 }
 
 const IMAGE_MODELS: Array<(p: string, k: string) => Promise<string>> = [
-  (p, k) => tryGeminiImage('gemini-2.0-flash-preview-image-generation', p, k),
+  (p, k) => tryGeminiImage('gemini-2.5-flash-image', p, k),
+  (p, k) => tryGeminiImage('gemini-2.5-flash-image-preview', p, k),
+  (p, k) => tryImagen('imagen-4.0-generate-001', p, k),
   (p, k) => tryImagen('imagen-3.0-generate-002', p, k),
-  (p, k) => tryGeminiImage('gemini-2.0-flash-exp', p, k),
+  (p, k) => tryGeminiImage('gemini-2.0-flash-preview-image-generation', p, k),
 ];
 
 export async function generateImage(prompt: string, apiKey: string): Promise<string> {
