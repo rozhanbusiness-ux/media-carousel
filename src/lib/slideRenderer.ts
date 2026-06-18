@@ -1,4 +1,4 @@
-import { Hotel, Offer, SLIDE_DIMENSIONS, SlideSize } from '../types';
+import { Carousel, CarouselItem, SLIDE_DIMENSIONS, SlideSize } from '../types';
 
 const NAVY = '#001F3F';
 const GOLD = '#D4AF37';
@@ -144,7 +144,7 @@ function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number)
 // ─── Slide 1: Hook ───────────────────────────────────────────────────────────
 
 export async function renderHookSlide(
-  offer: Pick<Offer, 'destination' | 'hookHeadline' | 'hookTagline'>,
+  offer: Pick<Carousel, 'destination' | 'hookHeadline' | 'hookTagline'>,
   bgDataUrl: string,
   size: SlideSize
 ): Promise<Blob> {
@@ -204,10 +204,10 @@ export async function renderHookSlide(
   return new Promise((res) => canvas.toBlob((b) => res(b!), 'image/png'));
 }
 
-// ─── Slide A: Hotel Visual ───────────────────────────────────────────────────
+// ─── Slide A: Item Visual ────────────────────────────────────────────────────
 
-export async function renderHotelVisualSlide(
-  hotel: Hotel,
+export async function renderVisualSlide(
+  item: CarouselItem,
   bgDataUrl: string,
   size: SlideSize
 ): Promise<Blob> {
@@ -225,9 +225,9 @@ export async function renderHotelVisualSlide(
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
 
-  // Hotel name (wrapped, centered) — positioned bottom block
-  const name = clean(hotel.name);
-  const location = clean(hotel.location);
+  // Item name (wrapped, centered) — positioned bottom block
+  const name = clean(item.name);
+  const location = clean(item.subtitle);
   const nameFs = Math.round(w * 0.07);
   ctx.font = `bold ${nameFs}px Georgia, serif`;
   const nameLines = wrapText(ctx, name, w * 0.86);
@@ -238,7 +238,7 @@ export async function renderHotelVisualSlide(
   const locLines = wrapText(ctx, location, w * 0.86);
   const locLineH = Math.round(locFs * 1.25);
 
-  const hasRating = hotel.rating > 0;
+  const hasRating = item.rating > 0;
   const ratingFs = Math.round(w * 0.036);
   const ratingGap = hasRating ? Math.round(ratingFs * 2.2) : 0;
 
@@ -267,7 +267,7 @@ export async function renderHotelVisualSlide(
     cursorY += ratingGap;
     ctx.font = `bold ${ratingFs}px Arial, sans-serif`;
     ctx.fillStyle = GOLD;
-    ctx.fillText(`${hotel.rating}% Bewertung`, w / 2, cursorY);
+    ctx.fillText(`${item.rating}% Bewertung`, w / 2, cursorY);
   }
 
   drawFooter(ctx, w, h);
@@ -275,9 +275,9 @@ export async function renderHotelVisualSlide(
   return new Promise((res) => canvas.toBlob((b) => res(b!), 'image/png'));
 }
 
-// ─── Slide B: Hotel Details ───────────────────────────────────────────────────
+// ─── Slide B: Item Details ────────────────────────────────────────────────────
 
-export async function renderHotelDetailsSlide(hotel: Hotel, size: SlideSize): Promise<Blob> {
+export async function renderDetailsSlide(item: CarouselItem, size: SlideSize): Promise<Blob> {
   const canvas = createCanvas(size);
   const ctx = canvas.getContext('2d')!;
   const { width: w, height: h } = SLIDE_DIMENSIONS[size];
@@ -287,55 +287,63 @@ export async function renderHotelDetailsSlide(hotel: Hotel, size: SlideSize): Pr
 
   await drawLogo(ctx, w, h);
 
-  // Hotel name
+  // Item name
   const nameFs = Math.round(w * 0.058);
   ctx.font = `bold ${nameFs}px Georgia, serif`;
   ctx.fillStyle = WHITE;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
-  const nameLines = wrapText(ctx, clean(hotel.name), w * 0.82);
-  const nameY = Math.round(h * 0.22);
+  const nameLines = wrapText(ctx, clean(item.name), w * 0.82);
+  const nameY = Math.round(h * 0.2);
   nameLines.forEach((line, i) => ctx.fillText(line, w / 2, nameY + i * Math.round(nameFs * 1.2)));
+  const belowName = nameY + nameLines.length * Math.round(nameFs * 1.2);
 
-  // Price block: "ab" + big number + "€" — measured and centered as one group
-  const priceBlockY = nameY + nameLines.length * Math.round(nameFs * 1.2) + Math.round(h * 0.05);
-  const abFs = Math.round(w * 0.042);
-  const numFs = Math.round(w * 0.11);
-  const eurFs = Math.round(w * 0.055);
-  const gap = Math.round(w * 0.018);
+  const hasPrice = !!item.price && item.price.trim() !== '';
 
-  const abText = 'ab ';
-  ctx.font = `${abFs}px Arial, sans-serif`;
-  const abW = ctx.measureText(abText).width;
-  ctx.font = `bold ${numFs}px Georgia, serif`;
-  const numW = ctx.measureText(hotel.price).width;
-  ctx.font = `bold ${eurFs}px Georgia, serif`;
-  const eurW = ctx.measureText(' €').width;
+  // Price block (only if there is a price)
+  let divY: number;
+  if (hasPrice) {
+    const priceBlockY = belowName + Math.round(h * 0.05);
+    const abFs = Math.round(w * 0.042);
+    const numFs = Math.round(w * 0.11);
+    const eurFs = Math.round(w * 0.055);
+    const gap = Math.round(w * 0.018);
 
-  const totalW = abW + gap + numW + gap + eurW;
-  let cursorX = (w - totalW) / 2;
+    const abText = 'ab ';
+    ctx.font = `${abFs}px Arial, sans-serif`;
+    const abW = ctx.measureText(abText).width;
+    ctx.font = `bold ${numFs}px Georgia, serif`;
+    const numW = ctx.measureText(item.price).width;
+    ctx.font = `bold ${eurFs}px Georgia, serif`;
+    const eurW = ctx.measureText(' €').width;
 
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'alphabetic';
+    const totalW = abW + gap + numW + gap + eurW;
+    let cursorX = (w - totalW) / 2;
 
-  ctx.font = `${abFs}px Arial, sans-serif`;
-  ctx.fillStyle = WHITE;
-  ctx.fillText(abText, cursorX, priceBlockY);
-  cursorX += abW + gap;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
 
-  ctx.font = `bold ${numFs}px Georgia, serif`;
-  ctx.fillStyle = GOLD;
-  ctx.fillText(hotel.price, cursorX, priceBlockY);
-  cursorX += numW + gap;
+    ctx.font = `${abFs}px Arial, sans-serif`;
+    ctx.fillStyle = WHITE;
+    ctx.fillText(abText, cursorX, priceBlockY);
+    cursorX += abW + gap;
 
-  ctx.font = `bold ${eurFs}px Georgia, serif`;
-  ctx.fillStyle = WHITE;
-  ctx.fillText('€', cursorX, priceBlockY);
+    ctx.font = `bold ${numFs}px Georgia, serif`;
+    ctx.fillStyle = GOLD;
+    ctx.fillText(item.price, cursorX, priceBlockY);
+    cursorX += numW + gap;
 
-  ctx.textAlign = 'center';
+    ctx.font = `bold ${eurFs}px Georgia, serif`;
+    ctx.fillStyle = WHITE;
+    ctx.fillText('€', cursorX, priceBlockY);
 
-  // Gold divider under price
-  const divY = priceBlockY + Math.round(h * 0.02);
+    ctx.textAlign = 'center';
+    divY = priceBlockY + Math.round(h * 0.02);
+  } else {
+    divY = belowName + Math.round(h * 0.035);
+  }
+
+  // Gold divider
   ctx.strokeStyle = GOLD;
   ctx.lineWidth = 2;
   ctx.beginPath();
@@ -343,37 +351,23 @@ export async function renderHotelDetailsSlide(hotel: Hotel, size: SlideSize): Pr
   ctx.lineTo(w * 0.9, divY);
   ctx.stroke();
 
-  // Detail rows
-  const rows = [
-    { label: 'Reisedatum', value: `${clean(hotel.dateFrom)} - ${clean(hotel.dateTo)}` },
-    { label: 'Hinflug', value: clean(hotel.airportDeparture) },
-    { label: 'Rückflug', value: clean(hotel.airportReturn) },
-    { label: 'Verpflegung', value: clean(hotel.mealPlan) },
-    { label: 'Transfer', value: clean(hotel.transfer) },
-    ...(hotel.rating > 0 ? [{ label: 'Bewertung', value: `${hotel.rating}%` }] : []),
-  ];
+  // Detail rows — generic, from item.rows; append rating if present and not already a row
+  const rows = [...(item.rows ?? [])];
+  if (item.rating > 0 && !rows.some((r) => /bewertung|rating/i.test(r.label))) {
+    rows.push({ label: 'Bewertung', value: `${item.rating}%`, icon: '⭐' });
+  }
 
   const rowsStartY = divY + Math.round(h * 0.03);
   const rowsEndY = h * 0.895;
-  const rowH = (rowsEndY - rowsStartY) / rows.length;
+  const rowH = rows.length > 0 ? (rowsEndY - rowsStartY) / rows.length : 0;
   const labelFs = Math.round(w * 0.032);
   const valueFs = Math.round(w * 0.042);
   const iconX = w * 0.1;
   const labelX = w * 0.18;
 
-  const icons: Record<string, string> = {
-    Reisedatum: '📅',
-    Hinflug: '✈',
-    Rückflug: '✈',
-    Verpflegung: '🍽',
-    Transfer: '🚌',
-    Bewertung: '⭐',
-  };
-
   rows.forEach((row, i) => {
     const midY = rowsStartY + i * rowH + rowH / 2;
 
-    // row divider above (except first)
     if (i > 0) {
       ctx.strokeStyle = GOLD;
       ctx.lineWidth = 1;
@@ -385,24 +379,80 @@ export async function renderHotelDetailsSlide(hotel: Hotel, size: SlideSize): Pr
       ctx.globalAlpha = 1;
     }
 
-    // icon
     ctx.font = `${valueFs}px Arial`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(icons[row.label] ?? '•', iconX, midY);
+    ctx.fillStyle = WHITE;
+    ctx.fillText(row.icon || '•', iconX, midY);
 
-    // label
     ctx.font = `bold ${labelFs}px Arial, sans-serif`;
     ctx.fillStyle = GOLD;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    ctx.fillText(row.label, labelX, midY - Math.round(labelFs * 0.7));
+    ctx.fillText(clean(row.label), labelX, midY - Math.round(labelFs * 0.7));
 
-    // value
     ctx.font = `${valueFs}px Georgia, serif`;
     ctx.fillStyle = WHITE;
-    ctx.fillText(row.value, labelX, midY + Math.round(valueFs * 0.55));
+    const valLines = wrapText(ctx, clean(row.value), w * 0.72);
+    ctx.fillText(valLines[0] ?? '', labelX, midY + Math.round(valueFs * 0.55));
   });
+
+  drawFooter(ctx, w, h);
+
+  return new Promise((res) => canvas.toBlob((b) => res(b!), 'image/png'));
+}
+
+// ─── Regular post slide: headline + body text over photo ──────────────────────
+
+export async function renderPostSlide(
+  carousel: Pick<Carousel, 'destination' | 'hookHeadline' | 'body'>,
+  bgDataUrl: string,
+  size: SlideSize
+): Promise<Blob> {
+  const canvas = createCanvas(size);
+  const ctx = canvas.getContext('2d')!;
+  const { width: w, height: h } = SLIDE_DIMENSIONS[size];
+
+  const bg = await loadImage(bgDataUrl);
+  coverImage(ctx, bg, w, h);
+  boostContrast(ctx, w, h);
+
+  // strong full overlay for text readability
+  const overlay = ctx.createLinearGradient(0, 0, 0, h);
+  overlay.addColorStop(0, 'rgba(0,20,50,0.55)');
+  overlay.addColorStop(0.5, 'rgba(0,20,50,0.35)');
+  overlay.addColorStop(1, 'rgba(0,20,50,0.85)');
+  ctx.fillStyle = overlay;
+  ctx.fillRect(0, 0, w, h);
+
+  await drawLogo(ctx, w, h);
+
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+
+  // Headline
+  const hlFs = Math.round(w * 0.078);
+  ctx.font = `bold ${hlFs}px Georgia, serif`;
+  ctx.fillStyle = GOLD;
+  const hlLines = wrapText(ctx, clean(carousel.hookHeadline || carousel.destination), w * 0.84);
+  let y = h * 0.4 - (hlLines.length - 1) * hlFs * 0.6;
+  hlLines.forEach((line) => { ctx.fillText(line, w / 2, y); y += Math.round(hlFs * 1.15); });
+
+  // gold divider
+  ctx.strokeStyle = GOLD;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(w * 0.3, y + Math.round(h * 0.005));
+  ctx.lineTo(w * 0.7, y + Math.round(h * 0.005));
+  ctx.stroke();
+  y += Math.round(h * 0.05);
+
+  // Body
+  const bodyFs = Math.round(w * 0.044);
+  ctx.font = `${bodyFs}px Arial, sans-serif`;
+  ctx.fillStyle = WHITE;
+  const bodyLines = wrapText(ctx, clean(carousel.body ?? ''), w * 0.82);
+  bodyLines.forEach((line) => { ctx.fillText(line, w / 2, y); y += Math.round(bodyFs * 1.4); });
 
   drawFooter(ctx, w, h);
 

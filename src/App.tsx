@@ -1,9 +1,9 @@
 import { useState, useCallback } from 'react';
-import { Offer, SlideSize, GeneratedSlide, GenerationProgress, SLIDE_DIMENSIONS } from './types';
+import { Carousel, SlideSize, GeneratedSlide, GenerationProgress, SLIDE_DIMENSIONS } from './types';
 import { extractTextFromPDF } from './lib/pdfExtractor';
-import { extractOffersFromText, extractOffersFromImage } from './lib/geminiExtractor';
-import { generateImage, hookImagePrompt, hotelImagePrompt, describeHotel, gradientFallback, listAvailableImageModels } from './lib/imageGenerator';
-import { renderHookSlide, renderHotelVisualSlide, renderHotelDetailsSlide, renderCtaSlide } from './lib/slideRenderer';
+import { extractCarouselFromText, extractCarouselFromImage } from './lib/geminiExtractor';
+import { generateImage, hookImagePrompt, itemImagePrompt, describeHotel, gradientFallback, listAvailableImageModels } from './lib/imageGenerator';
+import { renderHookSlide, renderVisualSlide, renderDetailsSlide, renderPostSlide, renderCtaSlide } from './lib/slideRenderer';
 import { exportZip } from './lib/exporter';
 import { UploadZone } from './components/UploadZone';
 import { OfferCard } from './components/OfferCard';
@@ -15,8 +15,8 @@ const SIZES: SlideSize[] = ['story', 'post', 'reel'];
 
 export default function App() {
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('gemini_api_key') ?? '');
-  const [offers, setOffers] = useState<Offer[]>([]);
-  // customPhotos[offerIdx][hotelIdx] = data URL of user-uploaded photo
+  const [carousel, setCarousel] = useState<Carousel | null>(null);
+  // customPhotos[itemIdx] = data URL of user-uploaded photo
   const [customPhotos, setCustomPhotos] = useState<Record<string, string>>({});
   const [slides, setSlides] = useState<Record<SlideSize, GeneratedSlide[]> | null>(null);
   const [activeSize, setActiveSize] = useState<SlideSize>('story');
@@ -50,16 +50,16 @@ export default function App() {
     setError(null);
     setPhase('extracting');
     try {
-      let extracted: Offer[];
+      let extracted: Carousel;
       if (file.type === 'application/pdf') {
         const text = await extractTextFromPDF(file);
-        extracted = await extractOffersFromText(text, apiKey);
+        extracted = await extractCarouselFromText(text, apiKey);
       } else if (file.type.startsWith('image/')) {
-        extracted = await extractOffersFromImage(file, apiKey);
+        extracted = await extractCarouselFromImage(file, apiKey);
       } else {
         throw new Error('Nur PDF oder Bild-Dateien werden unterstützt.');
       }
-      setOffers(extracted);
+      setCarousel(extracted);
       setCustomPhotos({});
       setPhase('ready');
     } catch (e: any) {
@@ -68,65 +68,53 @@ export default function App() {
     }
   }, [apiKey]);
 
-  const photoKey = (offerIdx: number, hotelIdx: number) => `${offerIdx}_${hotelIdx}`;
-
-  const handleCustomPhoto = (offerIdx: number, hotelIdx: number, file: File) => {
+  const handleCustomPhoto = (itemIdx: number, file: File) => {
     const reader = new FileReader();
     reader.onload = () => {
-      setCustomPhotos(prev => ({ ...prev, [photoKey(offerIdx, hotelIdx)]: reader.result as string }));
+      setCustomPhotos(prev => ({ ...prev, [String(itemIdx)]: reader.result as string }));
     };
     reader.readAsDataURL(file);
   };
 
   const generate = async () => {
-    if (!apiKey || offers.length === 0) return;
+    if (!apiKey || !carousel) return;
     setPhase('generating');
     setError(null);
 
-    // Count total steps: per size × (hook + hotelA + hotelB per hotel + CTA)
-    const totalImages = offers.reduce((acc, o) => acc + 1 + o.hotels.length, 0); // hook + hotel images
-    const totalSlides = offers.reduce((acc, o) => acc + 1 + o.hotels.length * 2, 0) + 1; // hook + A+B per hotel + CTA
+    const isPost = carousel.type === 'post';
+    const totalImages = 1 + (isPost ? 0 : carousel.items.length); // hook + per-item
+    const totalSlides = (isPost ? 2 : 1 + carousel.items.length * 2) + 1; // +CTA
     const totalSteps = totalImages + totalSlides * SIZES.length;
     let step = 0;
+    const tick = (label: string) => { step++; setProgress({ current: step, total: totalSteps, label }); };
 
-    const tick = (label: string) => {
-      step++;
-      setProgress({ current: step, total: totalSteps, label });
+    const imgErrors: string[] = [];
+    const safeGen = async (prompt: string, label: string): Promise<string> => {
+      try { return await generateImage(prompt, apiKey); }
+      catch (e: any) { imgErrors.push(`[${label}] ${e.message}`); return gradientFallback(); }
     };
 
     try {
-      // Generate images first
-      const hookImages: Record<string, string> = {};
-      const hotelImages: Record<string, Record<string, string>> = {};
+      // ── Generate background images ──
+      tick(`Generiere Bild: ${carousel.destination}`);
+      const hookImage = await safeGen(hookImagePrompt(carousel.destination, carousel.type), carousel.destination);
 
-      const imgErrors: string[] = [];
-
-      const safeGen = async (prompt: string, label: string): Promise<string> => {
-        try {
-          return await generateImage(prompt, apiKey);
-        } catch (e: any) {
-          imgErrors.push(`[${label}] ${e.message}`);
-          return gradientFallback();
-        }
-      };
-
-      for (const offer of offers) {
-        tick(`Generiere Bild: ${offer.destination}`);
-        hookImages[offer.destination] = await safeGen(hookImagePrompt(offer.destination), offer.destination);
-
-        hotelImages[offer.destination] = {};
-        for (let hi = 0; hi < offer.hotels.length; hi++) {
-          const hotel = offer.hotels[hi];
-          const key = photoKey(offers.indexOf(offer), hi);
-          if (customPhotos[key]) {
-            tick(`Foto: ${hotel.name} (eigenes Bild)`);
-            hotelImages[offer.destination][hotel.name] = customPhotos[key];
+      const itemImages: string[] = [];
+      if (!isPost) {
+        for (let i = 0; i < carousel.items.length; i++) {
+          const item = carousel.items[i];
+          if (customPhotos[String(i)]) {
+            tick(`Foto: ${item.name} (eigenes Bild)`);
+            itemImages[i] = customPhotos[String(i)];
           } else {
-            tick(`Generiere Bild: ${hotel.name}`);
-            const desc = await describeHotel(hotel.name, hotel.location, apiKey);
-            hotelImages[offer.destination][hotel.name] = await safeGen(
-              hotelImagePrompt(hotel.name, hotel.location, desc),
-              hotel.name
+            tick(`Generiere Bild: ${item.name}`);
+            let hint = item.imageHint;
+            if (carousel.type === 'hotel') {
+              hint = await describeHotel(item.name, item.subtitle, apiKey);
+            }
+            itemImages[i] = await safeGen(
+              itemImagePrompt(item.name, item.subtitle, carousel.type, hint),
+              item.name
             );
           }
         }
@@ -136,30 +124,27 @@ export default function App() {
         setError(`⚠️ Bildgenerierung-Fehler (Folien trotzdem erstellt):\n${imgErrors.slice(0, 2).join('\n')}`);
       }
 
-      // Render slides per size
+      // ── Render slides per size ──
       const result: Record<SlideSize, GeneratedSlide[]> = { story: [], post: [], reel: [] };
-
       for (const size of SIZES) {
-        // Hook slide per offer
-        for (const offer of offers) {
-          tick(`Render ${size}: Hook ${offer.destination}`);
-          const blob = await renderHookSlide(offer, hookImages[offer.destination], size);
-          result[size].push({ label: `hook_${offer.destination}`, blob });
+        tick(`Render ${size}: Cover`);
+        result[size].push({ label: `cover_${carousel.destination}`, blob: await renderHookSlide(carousel, hookImage, size) });
 
-          for (const hotel of offer.hotels) {
-            tick(`Render ${size}: ${hotel.name} Foto`);
-            const blobA = await renderHotelVisualSlide(hotel, hotelImages[offer.destination][hotel.name], size);
-            result[size].push({ label: `${hotel.name}_foto`, blob: blobA });
-
-            tick(`Render ${size}: ${hotel.name} Details`);
-            const blobB = await renderHotelDetailsSlide(hotel, size);
-            result[size].push({ label: `${hotel.name}_details`, blob: blobB });
+        if (isPost) {
+          tick(`Render ${size}: Inhalt`);
+          result[size].push({ label: 'post_text', blob: await renderPostSlide(carousel, hookImage, size) });
+        } else {
+          for (let i = 0; i < carousel.items.length; i++) {
+            const item = carousel.items[i];
+            tick(`Render ${size}: ${item.name} Foto`);
+            result[size].push({ label: `${item.name}_foto`, blob: await renderVisualSlide(item, itemImages[i], size) });
+            tick(`Render ${size}: ${item.name} Details`);
+            result[size].push({ label: `${item.name}_details`, blob: await renderDetailsSlide(item, size) });
           }
         }
 
         tick(`Render ${size}: CTA`);
-        const ctaBlob = await renderCtaSlide(size);
-        result[size].push({ label: 'cta', blob: ctaBlob });
+        result[size].push({ label: 'cta', blob: await renderCtaSlide(size) });
       }
 
       setSlides(result);
@@ -199,28 +184,20 @@ export default function App() {
 
       <section>
         <UploadZone onFile={handleFile} disabled={phase === 'extracting' || phase === 'generating'} />
-        {phase === 'extracting' && <p className="status">⏳ PDF wird analysiert…</p>}
+        {phase === 'extracting' && <p className="status">⏳ Datei wird analysiert…</p>}
       </section>
 
       {error && <div className="error">❌ {error}</div>}
 
-      {(phase === 'ready' || phase === 'generating' || phase === 'done') && offers.length > 0 && (
+      {(phase === 'ready' || phase === 'generating' || phase === 'done') && carousel && (
         <section>
-          <h2>Angebote bearbeiten</h2>
-          {offers.map((offer, i) => (
-            <OfferCard
-              key={i}
-              offer={offer}
-              offerIdx={i}
-              customPhotos={customPhotos}
-              onCustomPhoto={handleCustomPhoto}
-              onChange={(updated) => {
-                const next = [...offers];
-                next[i] = updated;
-                setOffers(next);
-              }}
-            />
-          ))}
+          <h2>Inhalt bearbeiten</h2>
+          <OfferCard
+            carousel={carousel}
+            customPhotos={customPhotos}
+            onCustomPhoto={handleCustomPhoto}
+            onChange={setCarousel}
+          />
           <button
             className="btn-gold"
             onClick={generate}

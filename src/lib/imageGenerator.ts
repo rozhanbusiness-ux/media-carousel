@@ -135,8 +135,32 @@ export async function generateImage(prompt: string, apiKey: string): Promise<str
   throw new Error(`Bildgenerierung fehlgeschlagen:\n${msg}`);
 }
 
-export function hookImagePrompt(destination: string): string {
-  return `Luxury travel photography, cinematic aerial wide shot of ${destination} at golden hour, stunning coastline or famous landmark, crystal blue sea, dramatic sky, no text, no watermarks, professional travel magazine style`;
+import { ContentType } from '../types';
+
+export function hookImagePrompt(destination: string, type: ContentType = 'hotel'): string {
+  const scenes: Record<ContentType, string> = {
+    hotel: `stunning coastline or famous landmark of ${destination}, crystal blue sea, luxury resort vibe`,
+    flight: `dramatic airplane wing over ${destination} skyline at golden hour, clouds, sense of travel and departure`,
+    rivercruise: `elegant river cruise ship gliding on a calm river near ${destination}, riverside towns and greenery`,
+    seacruise: `large luxury cruise liner on the open sea near ${destination}, deep blue ocean, sunny sky`,
+    post: `beautiful cinematic travel scenery of ${destination}, inspiring and atmospheric`,
+  };
+  return `Luxury travel photography, cinematic aerial wide shot. ${scenes[type]}. Golden hour, dramatic sky, vivid saturated colors, no text, no watermarks, professional travel magazine style.`;
+}
+
+/** Background prompt for a single carousel item, using the AI-provided imageHint when available */
+export function itemImagePrompt(name: string, subtitle: string, type: ContentType, hint?: string): string {
+  if (hint && hint.trim()) {
+    return `Ultra-realistic professional travel photography. ${hint}. Golden hour lighting, vivid saturated colors, sharp focus, warm cinematic tones, no text, no watermarks, no people in foreground.`;
+  }
+  const fallback: Record<ContentType, string> = {
+    hotel: `beautiful facade and pool view of ${name} resort in ${subtitle}`,
+    flight: `airplane and ${subtitle} destination skyline, aviation travel scene for ${name}`,
+    rivercruise: `river cruise ship ${name} on the river along route ${subtitle}`,
+    seacruise: `ocean cruise liner ${name} at sea near ${subtitle}`,
+    post: `scenic travel photo of ${subtitle || name}`,
+  };
+  return `Ultra-realistic professional travel photography. ${fallback[type]}. Golden hour lighting, vivid saturated colors, sharp focus, warm cinematic tones, no text, no watermarks, no people in foreground.`;
 }
 
 export async function describeHotel(hotelName: string, location: string, apiKey: string): Promise<string> {

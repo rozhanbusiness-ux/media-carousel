@@ -1,22 +1,38 @@
-export interface Hotel {
-  name: string;
-  location: string;      // e.g. "Kos - Kardamena"
-  stars: number;
-  price: string;         // numeric string e.g. "533"
-  dateFrom: string;
-  dateTo: string;
-  airportDeparture: string;
-  airportReturn: string;
-  mealPlan: string;
-  transfer: string;
-  rating: number;        // percentage 0-100, e.g. 94
+export type ContentType = 'hotel' | 'flight' | 'rivercruise' | 'seacruise' | 'post';
+
+export const CONTENT_TYPE_LABELS: Record<ContentType, string> = {
+  hotel: '🏨 Hotel / Urlaub',
+  flight: '✈️ Flug',
+  rivercruise: '🚢 Flusskreuzfahrt',
+  seacruise: '🛳️ Hochseekreuzfahrt',
+  post: '📝 Normaler Post',
+};
+
+/** One label/value line shown on the details slide */
+export interface DetailRow {
+  label: string;
+  value: string;
+  icon: string;     // emoji icon, e.g. "📅"
 }
 
-export interface Offer {
-  destination: string;
+/** A single offer item inside a carousel (a hotel, a flight, a cruise…) */
+export interface CarouselItem {
+  name: string;        // hotel / flight / ship name (main heading)
+  subtitle: string;    // location or route, e.g. "Kos - Kardamena" / "Frankfurt → Antalya"
+  price: string;       // numeric only, '' if none
+  rating: number;      // percentage 0-100, 0 = hide
+  stars: number;       // 0 = hide
+  rows: DetailRow[];   // detail rows for the details slide
+  imageHint: string;   // describes the ideal AI background for this item
+}
+
+export interface Carousel {
+  type: ContentType;
+  destination: string;   // header destination / theme
   hookHeadline: string;  // e.g. "Sommer Angebote"
   hookTagline: string;   // e.g. "Luxus am Meer - Jetzt buchen!"
-  hotels: Hotel[];
+  items: CarouselItem[]; // for 'post' usually empty
+  body?: string;         // free-form body text for regular posts
 }
 
 export type SlideSize = 'story' | 'post' | 'reel';
