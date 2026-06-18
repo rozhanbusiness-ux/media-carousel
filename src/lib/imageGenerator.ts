@@ -34,7 +34,7 @@ async function tryImagen(model: string, prompt: string, apiKey: string): Promise
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         instances: [{ prompt }],
-        parameters: { sampleCount: 1, aspectRatio: '1:1' },
+        parameters: { sampleCount: 1, aspectRatio: '3:4' },
       }),
     }
   );

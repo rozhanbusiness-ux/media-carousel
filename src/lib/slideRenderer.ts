@@ -6,6 +6,44 @@ const WHITE = '#FFFFFF';
 const FOOTER_PHONE = '+491 765 8866 999';
 const FOOTER_EMAIL = 'info@media-travels.com';
 
+/** Normalize ligatures and odd whitespace that PDF extraction can leave behind */
+function clean(text: string): string {
+  return (text ?? '')
+    .replace(/ﬀ/g, 'ff')
+    .replace(/ﬁ/g, 'fi')
+    .replace(/ﬂ/g, 'fl')
+    .replace(/ﬃ/g, 'ffi')
+    .replace(/ﬄ/g, 'ffl')
+    .replace(/ /g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Boost saturation & contrast of the drawn photo so colors pop (matches the vivid template look) */
+function boostContrast(ctx: CanvasRenderingContext2D, w: number, h: number) {
+  const img = ctx.getImageData(0, 0, w, h);
+  const d = img.data;
+  const contrast = 1.12;
+  const sat = 1.28;
+  const intercept = 128 * (1 - contrast);
+  for (let i = 0; i < d.length; i += 4) {
+    let r = d[i], g = d[i + 1], b = d[i + 2];
+    // contrast
+    r = r * contrast + intercept;
+    g = g * contrast + intercept;
+    b = b * contrast + intercept;
+    // saturation around luma
+    const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+    r = lum + (r - lum) * sat;
+    g = lum + (g - lum) * sat;
+    b = lum + (b - lum) * sat;
+    d[i] = r < 0 ? 0 : r > 255 ? 255 : r;
+    d[i + 1] = g < 0 ? 0 : g > 255 ? 255 : g;
+    d[i + 2] = b < 0 ? 0 : b > 255 ? 255 : b;
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -14,6 +52,14 @@ function loadImage(src: string): Promise<HTMLImageElement> {
     img.onerror = reject;
     img.src = src;
   });
+}
+
+/** Draw image to cover the whole canvas (center-crop, no distortion) */
+function coverImage(ctx: CanvasRenderingContext2D, img: HTMLImageElement, w: number, h: number) {
+  const scale = Math.max(w / img.width, h / img.height);
+  const dw = img.width * scale;
+  const dh = img.height * scale;
+  ctx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
 }
 
 function createCanvas(size: SlideSize): HTMLCanvasElement {
@@ -100,7 +146,8 @@ export async function renderHookSlide(
 
   // Background photo
   const bg = await loadImage(bgDataUrl);
-  ctx.drawImage(bg, 0, 0, w, h);
+  coverImage(ctx, bg, w, h);
+  boostContrast(ctx, w, h);
 
   // Full-slide dark gradient (stronger at top and bottom for text readability)
   const vignette = ctx.createLinearGradient(0, 0, 0, h);
@@ -119,7 +166,7 @@ export async function renderHookSlide(
   ctx.fillStyle = WHITE;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
-  ctx.fillText(offer.destination, w / 2, h * 0.48);
+  ctx.fillText(clean(offer.destination), w / 2, h * 0.48);
 
   // Gold divider under destination
   const divW = Math.round(w * 0.45);
@@ -134,14 +181,14 @@ export async function renderHookSlide(
   const hlFs = Math.round(w * 0.065);
   ctx.font = `italic bold ${hlFs}px Georgia, serif`;
   ctx.fillStyle = GOLD;
-  ctx.fillText(offer.hookHeadline, w / 2, h * 0.5 + Math.round(hlFs * 1.6));
+  ctx.fillText(clean(offer.hookHeadline), w / 2, h * 0.5 + Math.round(hlFs * 1.6));
 
   // Tagline (e.g. "Luxus am Meer - Jetzt buchen!") — small white
   const tagFs = Math.round(w * 0.038);
   ctx.font = `${tagFs}px Arial, sans-serif`;
   ctx.fillStyle = WHITE;
   ctx.globalAlpha = 0.9;
-  ctx.fillText(offer.hookTagline, w / 2, h * 0.5 + Math.round(hlFs * 1.6) + Math.round(tagFs * 2));
+  ctx.fillText(clean(offer.hookTagline), w / 2, h * 0.5 + Math.round(hlFs * 1.6) + Math.round(tagFs * 2));
   ctx.globalAlpha = 1;
 
   drawFooter(ctx, w, h);
@@ -161,38 +208,59 @@ export async function renderHotelVisualSlide(
   const { width: w, height: h } = SLIDE_DIMENSIONS[size];
 
   const bg = await loadImage(bgDataUrl);
-  ctx.drawImage(bg, 0, 0, w, h);
+  coverImage(ctx, bg, w, h);
+  boostContrast(ctx, w, h);
   drawBottomGradient(ctx, w, h);
 
   await drawLogo(ctx, w, h);
 
-  // Rating badge (only if we actually have a rating)
-  if (hotel.rating > 0) {
-    const ratingFs = Math.round(w * 0.038);
-    ctx.font = `bold ${ratingFs}px Arial, sans-serif`;
-    ctx.fillStyle = GOLD;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'alphabetic';
-    ctx.fillText(`${hotel.rating}% Bewertung`, w / 2, Math.round(h * 0.88));
-  }
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
 
-  // Hotel name
-  const nameFs = Math.round(w * 0.072);
+  // Hotel name (wrapped, centered) — positioned bottom block
+  const name = clean(hotel.name);
+  const location = clean(hotel.location);
+  const nameFs = Math.round(w * 0.07);
+  ctx.font = `bold ${nameFs}px Georgia, serif`;
+  const nameLines = wrapText(ctx, name, w * 0.86);
+  const lineH = Math.round(nameFs * 1.15);
+
+  const locFs = Math.round(w * 0.036);
+  ctx.font = `${locFs}px Arial, sans-serif`;
+  const locLines = wrapText(ctx, location, w * 0.86);
+  const locLineH = Math.round(locFs * 1.25);
+
+  const hasRating = hotel.rating > 0;
+  const ratingFs = Math.round(w * 0.036);
+  const ratingGap = hasRating ? Math.round(ratingFs * 2.2) : 0;
+
+  // Compute total block height and anchor it near the bottom
+  const blockH = nameLines.length * lineH + Math.round(locFs * 0.6) + locLines.length * locLineH + ratingGap;
+  let cursorY = h * 0.9 - blockH;
+
   ctx.font = `bold ${nameFs}px Georgia, serif`;
   ctx.fillStyle = WHITE;
-  const nameLines = wrapText(ctx, hotel.name, w * 0.88);
-  const nameBaseY = Math.round(h * 0.75);
-  nameLines.forEach((line, i) => {
-    ctx.fillText(line, w / 2, nameBaseY + i * Math.round(nameFs * 1.15));
+  nameLines.forEach((line) => {
+    cursorY += lineH;
+    ctx.fillText(line, w / 2, cursorY);
   });
 
-  // Location subtitle
-  const locFs = Math.round(w * 0.038);
+  cursorY += Math.round(locFs * 0.6);
   ctx.font = `${locFs}px Arial, sans-serif`;
   ctx.fillStyle = WHITE;
   ctx.globalAlpha = 0.85;
-  ctx.fillText(hotel.location, w / 2, nameBaseY + nameLines.length * Math.round(nameFs * 1.15) + Math.round(locFs * 1.2));
+  locLines.forEach((line) => {
+    cursorY += locLineH;
+    ctx.fillText(line, w / 2, cursorY);
+  });
   ctx.globalAlpha = 1;
+
+  if (hasRating) {
+    cursorY += ratingGap;
+    ctx.font = `bold ${ratingFs}px Arial, sans-serif`;
+    ctx.fillStyle = GOLD;
+    ctx.fillText(`${hotel.rating}% Bewertung`, w / 2, cursorY);
+  }
 
   drawFooter(ctx, w, h);
 
@@ -217,7 +285,7 @@ export async function renderHotelDetailsSlide(hotel: Hotel, size: SlideSize): Pr
   ctx.fillStyle = WHITE;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
-  const nameLines = wrapText(ctx, hotel.name, w * 0.82);
+  const nameLines = wrapText(ctx, clean(hotel.name), w * 0.82);
   const nameY = Math.round(h * 0.22);
   nameLines.forEach((line, i) => ctx.fillText(line, w / 2, nameY + i * Math.round(nameFs * 1.2)));
 
@@ -269,11 +337,11 @@ export async function renderHotelDetailsSlide(hotel: Hotel, size: SlideSize): Pr
 
   // Detail rows
   const rows = [
-    { label: 'Reisedatum', value: `${hotel.dateFrom} - ${hotel.dateTo}` },
-    { label: 'Hinflug', value: hotel.airportDeparture },
-    { label: 'Rückflug', value: hotel.airportReturn },
-    { label: 'Verpflegung', value: hotel.mealPlan },
-    { label: 'Transfer', value: hotel.transfer },
+    { label: 'Reisedatum', value: `${clean(hotel.dateFrom)} - ${clean(hotel.dateTo)}` },
+    { label: 'Hinflug', value: clean(hotel.airportDeparture) },
+    { label: 'Rückflug', value: clean(hotel.airportReturn) },
+    { label: 'Verpflegung', value: clean(hotel.mealPlan) },
+    { label: 'Transfer', value: clean(hotel.transfer) },
     ...(hotel.rating > 0 ? [{ label: 'Bewertung', value: `${hotel.rating}%` }] : []),
   ];
 
