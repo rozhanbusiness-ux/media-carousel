@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { Offer, SlideSize, GeneratedSlide, GenerationProgress, SLIDE_DIMENSIONS } from './types';
 import { extractTextFromPDF } from './lib/pdfExtractor';
 import { extractOffersFromText } from './lib/geminiExtractor';
-import { generateImage, hookImagePrompt, hotelImagePrompt } from './lib/imageGenerator';
+import { generateImage, hookImagePrompt, hotelImagePrompt, describeHotel } from './lib/imageGenerator';
 import { renderHookSlide, renderHotelVisualSlide, renderHotelDetailsSlide, renderCtaSlide } from './lib/slideRenderer';
 import { exportZip } from './lib/exporter';
 import { UploadZone } from './components/UploadZone';
@@ -87,8 +87,9 @@ export default function App() {
         hotelImages[offer.destination] = {};
         for (const hotel of offer.hotels) {
           tick(`Generiere Bild: ${hotel.name}`);
+          const desc = await describeHotel(hotel.name, hotel.location, apiKey);
           hotelImages[offer.destination][hotel.name] = await generateImage(
-            hotelImagePrompt(hotel.name, hotel.location),
+            hotelImagePrompt(hotel.name, hotel.location, desc),
             apiKey
           );
         }

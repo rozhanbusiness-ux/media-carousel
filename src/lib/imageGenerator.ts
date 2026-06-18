@@ -92,6 +92,38 @@ export function hookImagePrompt(destination: string): string {
   return `Luxury travel photography, cinematic aerial wide shot of ${destination} at golden hour, stunning coastline or famous landmark, crystal blue sea, dramatic sky, no text, no watermarks, professional travel magazine style`;
 }
 
-export function hotelImagePrompt(hotelName: string, location: string): string {
-  return `Luxury hotel photography, beautiful facade and pool view of ${hotelName} resort in ${location}, golden hour lighting, warm cinematic tones, no text, no watermarks, professional architectural photography`;
+/**
+ * Ask the Gemini text model to describe what the REAL hotel actually looks like,
+ * so the generated image is as close as possible to reality.
+ * Falls back to a generic description if the lookup fails.
+ */
+export async function describeHotel(hotelName: string, location: string, apiKey: string): Promise<string> {
+  const q = `You are a travel photographer. Describe in ONE vivid English paragraph (max 70 words) the real visual appearance of the hotel "${hotelName}" in ${location}: its architecture style, building colors, number of floors, the pool, gardens, beach/sea or mountains around it, and overall atmosphere. If you are not certain of the exact hotel, describe a typical real resort of that name and region. Output only the description, no preamble.`;
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: q }] }],
+          generationConfig: { temperature: 0.4 },
+        }),
+      }
+    );
+    if (!response.ok) throw new Error(await response.text());
+    const data = await response.json();
+    const desc = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+    if (desc) return desc;
+  } catch (_e) {
+    // fall through to generic
+  }
+  return `a luxury resort named ${hotelName} in ${location} with elegant architecture, a large pool and palm gardens`;
+}
+
+export function hotelImagePrompt(hotelName: string, location: string, description?: string): string {
+  const detail = description
+    ? description
+    : `beautiful facade and pool view of ${hotelName} resort in ${location}`;
+  return `Ultra-realistic professional hotel photography. ${detail}. Golden hour lighting, vivid saturated colors, sharp focus, warm cinematic tones, real architectural photo, no text, no watermarks, no people in foreground.`;
 }
