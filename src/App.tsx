@@ -83,8 +83,9 @@ export default function App() {
 
     const isPost = carousel.type === 'post';
     const isFlight = carousel.type === 'flight';
-    const totalImages = 1 + (isPost || isFlight ? 0 : carousel.items.length); // hook + per-item
-    const totalSlides = (isPost ? 2 : isFlight ? 2 : 1 + carousel.items.length * 2) + 1; // +CTA
+    const flights = carousel.flights ?? [];
+    const totalImages = isPost ? 1 : isFlight ? flights.length : 1 + carousel.items.length; // backgrounds
+    const totalSlides = (isPost ? 2 : isFlight ? flights.length * 2 : 1 + carousel.items.length * 2) + 1; // +CTA
     const totalSteps = totalImages + totalSlides * SIZES.length;
     let step = 0;
     const tick = (label: string) => { step++; setProgress({ current: step, total: totalSteps, label }); };
@@ -97,11 +98,26 @@ export default function App() {
 
     try {
       // ── Generate background images ──
-      tick(`Generiere Bild: ${carousel.destination}`);
-      const hookImage = await safeGen(hookImagePrompt(carousel.destination, carousel.type), carousel.destination);
+      let hookImage = '';
+      const flightImages: string[] = [];
 
-      // Flight visual background: use a custom uploaded photo if provided, else the AI hook image
-      const flightBg = isFlight ? (customPhotos['0'] ?? hookImage) : hookImage;
+      if (isFlight) {
+        // One airplane background per flight option (custom photo overrides)
+        for (let i = 0; i < flights.length; i++) {
+          const r = flights[i];
+          const dest = r.title || carousel.destination;
+          if (customPhotos[String(i)]) {
+            tick(`Foto: ${dest} (eigenes Bild)`);
+            flightImages[i] = customPhotos[String(i)];
+          } else {
+            tick(`Generiere Bild: ${dest}`);
+            flightImages[i] = await safeGen(hookImagePrompt(dest, 'flight'), dest);
+          }
+        }
+      } else {
+        tick(`Generiere Bild: ${carousel.destination}`);
+        hookImage = await safeGen(hookImagePrompt(carousel.destination, carousel.type), carousel.destination);
+      }
 
       const itemImages: string[] = [];
       if (!isPost && !isFlight) {
@@ -132,10 +148,14 @@ export default function App() {
       const result: Record<SlideSize, GeneratedSlide[]> = { story: [], post: [], reel: [] };
       for (const size of SIZES) {
         if (isFlight) {
-          tick(`Render ${size}: Flug Visual`);
-          result[size].push({ label: `flug_${carousel.destination}`, blob: await renderFlightVisualSlide(carousel, flightBg, size) });
-          tick(`Render ${size}: Flug Details`);
-          result[size].push({ label: 'flug_details', blob: await renderFlightDetailsSlide(carousel, size) });
+          for (let i = 0; i < flights.length; i++) {
+            const r = flights[i];
+            const dest = r.title || carousel.destination;
+            tick(`Render ${size}: ${dest} Visual`);
+            result[size].push({ label: `flug_${i + 1}_visual`, blob: await renderFlightVisualSlide(carousel, r, flightImages[i], size) });
+            tick(`Render ${size}: ${dest} Details`);
+            result[size].push({ label: `flug_${i + 1}_details`, blob: await renderFlightDetailsSlide(r, size) });
+          }
           tick(`Render ${size}: CTA`);
           result[size].push({ label: 'cta', blob: await renderCtaSlide(size) });
           continue;

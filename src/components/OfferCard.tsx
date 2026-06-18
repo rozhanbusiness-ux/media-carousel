@@ -173,12 +173,14 @@ export function OfferCard({ carousel, customPhotos, onCustomPhoto, onChange }: P
 
       {isFlight && (
         <>
-          <PhotoUpload itemIdx={0} customPhotos={customPhotos} onCustomPhoto={onCustomPhoto} />
           <h4 style={{ color: '#D4AF37', marginTop: 16 }}>Flugoptionen ({flights.length})</h4>
           {flights.map((r, i) => (
-            <RouteEditor key={i} route={r}
-              onChange={(nr) => { const next = [...flights]; next[i] = nr; onChange({ ...carousel, flights: next }); }}
-              onRemove={() => onChange({ ...carousel, flights: flights.filter((_, j) => j !== i) })} />
+            <div key={i}>
+              <RouteEditor route={r}
+                onChange={(nr) => { const next = [...flights]; next[i] = nr; onChange({ ...carousel, flights: next }); }}
+                onRemove={() => onChange({ ...carousel, flights: flights.filter((_, j) => j !== i) })} />
+              <PhotoUpload itemIdx={i} customPhotos={customPhotos} onCustomPhoto={onCustomPhoto} />
+            </div>
           ))}
           <button className="btn-outline" style={{ fontSize: '0.85em', padding: '6px 12px', marginTop: 8 }}
             onClick={() => onChange({ ...carousel, flights: [...flights, emptyRoute()] })}>
