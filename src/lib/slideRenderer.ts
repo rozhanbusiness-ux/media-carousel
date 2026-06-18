@@ -166,13 +166,15 @@ export async function renderHotelVisualSlide(
 
   await drawLogo(ctx, w, h);
 
-  // Rating badge top-right area
-  const ratingFs = Math.round(w * 0.038);
-  ctx.font = `bold ${ratingFs}px Arial, sans-serif`;
-  ctx.fillStyle = GOLD;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'alphabetic';
-  ctx.fillText(`${hotel.rating}% Bewertung`, w / 2, Math.round(h * 0.88));
+  // Rating badge (only if we actually have a rating)
+  if (hotel.rating > 0) {
+    const ratingFs = Math.round(w * 0.038);
+    ctx.font = `bold ${ratingFs}px Arial, sans-serif`;
+    ctx.fillStyle = GOLD;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText(`${hotel.rating}% Bewertung`, w / 2, Math.round(h * 0.88));
+  }
 
   // Hotel name
   const nameFs = Math.round(w * 0.072);
@@ -219,24 +221,42 @@ export async function renderHotelDetailsSlide(hotel: Hotel, size: SlideSize): Pr
   const nameY = Math.round(h * 0.22);
   nameLines.forEach((line, i) => ctx.fillText(line, w / 2, nameY + i * Math.round(nameFs * 1.2)));
 
-  // Price block: "ab" + big number + "€"
-  const priceBlockY = nameY + nameLines.length * Math.round(nameFs * 1.2) + Math.round(h * 0.025);
+  // Price block: "ab" + big number + "€" — measured and centered as one group
+  const priceBlockY = nameY + nameLines.length * Math.round(nameFs * 1.2) + Math.round(h * 0.05);
   const abFs = Math.round(w * 0.042);
   const numFs = Math.round(w * 0.11);
   const eurFs = Math.round(w * 0.055);
+  const gap = Math.round(w * 0.018);
+
+  const abText = 'ab ';
+  ctx.font = `${abFs}px Arial, sans-serif`;
+  const abW = ctx.measureText(abText).width;
+  ctx.font = `bold ${numFs}px Georgia, serif`;
+  const numW = ctx.measureText(hotel.price).width;
+  ctx.font = `bold ${eurFs}px Georgia, serif`;
+  const eurW = ctx.measureText(' €').width;
+
+  const totalW = abW + gap + numW + gap + eurW;
+  let cursorX = (w - totalW) / 2;
+
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
 
   ctx.font = `${abFs}px Arial, sans-serif`;
   ctx.fillStyle = WHITE;
-  ctx.textAlign = 'center';
-  ctx.fillText('ab', w / 2 - Math.round(w * 0.12), priceBlockY);
+  ctx.fillText(abText, cursorX, priceBlockY);
+  cursorX += abW + gap;
 
   ctx.font = `bold ${numFs}px Georgia, serif`;
   ctx.fillStyle = GOLD;
-  ctx.fillText(hotel.price, w / 2 + Math.round(w * 0.02), priceBlockY);
+  ctx.fillText(hotel.price, cursorX, priceBlockY);
+  cursorX += numW + gap;
 
   ctx.font = `bold ${eurFs}px Georgia, serif`;
   ctx.fillStyle = WHITE;
-  ctx.fillText('€', w / 2 + Math.round(w * 0.16), priceBlockY);
+  ctx.fillText('€', cursorX, priceBlockY);
+
+  ctx.textAlign = 'center';
 
   // Gold divider under price
   const divY = priceBlockY + Math.round(h * 0.02);
@@ -254,7 +274,7 @@ export async function renderHotelDetailsSlide(hotel: Hotel, size: SlideSize): Pr
     { label: 'Rückflug', value: hotel.airportReturn },
     { label: 'Verpflegung', value: hotel.mealPlan },
     { label: 'Transfer', value: hotel.transfer },
-    { label: 'Bewertung', value: `${hotel.rating}%` },
+    ...(hotel.rating > 0 ? [{ label: 'Bewertung', value: `${hotel.rating}%` }] : []),
   ];
 
   const rowsStartY = divY + Math.round(h * 0.03);
