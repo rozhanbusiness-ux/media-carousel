@@ -31,21 +31,14 @@ export default function App() {
     if (!apiKey) { setError('Bitte Gemini API Key eingeben.'); return; }
     setError(null);
     setPhase('extracting');
-    // First: discover available image models
     const available = await listAvailableImageModels(apiKey);
-    if (available.length > 0) {
-      setError(`🔍 Verfügbare Bildmodelle für deinen Key:\n${available.join('\n')}`);
-      setPhase('idle');
-      return;
-    }
-    // If none discovered, try generation anyway
     try {
       const result = await generateImage('A luxury hotel pool in Turkey at sunset', apiKey);
       if (result.startsWith('data:image')) {
-        setError('✅ Bildgenerierung funktioniert!');
+        setError(`✅ Bildgenerierung funktioniert! Verfügbare Modelle: ${available.join(', ')}`);
       }
     } catch (e: any) {
-      setError(`❌ Keine Bildmodelle gefunden. Fehler:\n${e.message}`);
+      setError(`❌ Fehler (Modelle: ${available.join(', ')}):\n${e.message}`);
     }
     setPhase('idle');
   };

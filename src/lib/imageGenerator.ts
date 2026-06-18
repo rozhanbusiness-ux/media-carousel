@@ -48,21 +48,35 @@ async function tryImagen(model: string, prompt: string, apiKey: string): Promise
   throw new Error(`[${model}] No bytesBase64Encoded: ${JSON.stringify(data).slice(0, 200)}`);
 }
 
-/** Query the Gemini API to discover which image-generation models are available for this key */
+/** Query the Gemini API to discover which image-generation models are available for this key.
+ * Returns them ordered best-first: pro > flash, stable > preview. */
 export async function listAvailableImageModels(apiKey: string): Promise<string[]> {
   try {
     const resp = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}&pageSize=100`
+      `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}&pageSize=200`
     );
     if (!resp.ok) return [];
     const data = await resp.json();
     const models: Array<{ name: string; supportedGenerationMethods?: string[] }> = data.models ?? [];
-    return models
+    const names = models
       .filter(m =>
         m.supportedGenerationMethods?.includes('generateContent') &&
-        (m.name.toLowerCase().includes('image') || m.name.toLowerCase().includes('imagen'))
+        m.name.toLowerCase().includes('image') &&
+        !m.name.toLowerCase().includes('embedding')
       )
       .map(m => m.name.replace('models/', ''));
+
+    // Rank: pro-image highest, then flash-image; stable before preview; higher version first
+    const score = (n: string) => {
+      let s = 0;
+      if (n.includes('pro')) s += 1000;
+      else if (n.includes('flash')) s += 500;
+      if (!n.includes('preview')) s += 100;
+      const ver = parseFloat((n.match(/(\d+\.?\d*)/) || [])[1] ?? '0');
+      s += ver;
+      return s;
+    };
+    return names.sort((a, b) => score(b) - score(a));
   } catch {
     return [];
   }
@@ -92,12 +106,12 @@ export async function generateImage(prompt: string, apiKey: string): Promise<str
   // Discover available image models, then try known hardcoded ones as fallback
   const discovered = await listAvailableImageModels(apiKey);
   const knownModels = [
-    'gemini-2.0-flash-preview-image-generation',
-    'gemini-2.5-flash-preview-image-generation',
-    'gemini-2.0-flash-exp',
+    'gemini-3-pro-image',
+    'gemini-3.1-flash-image',
     'gemini-2.5-flash-image',
-    'imagen-3.0-generate-002',
+    'gemini-2.0-flash-preview-image-generation',
     'imagen-4.0-generate-001',
+    'imagen-3.0-generate-002',
   ];
 
   // Deduplicate: discovered first, then known
