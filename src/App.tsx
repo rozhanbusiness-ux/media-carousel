@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { Offer, SlideSize, GeneratedSlide, GenerationProgress, SLIDE_DIMENSIONS } from './types';
 import { extractTextFromPDF } from './lib/pdfExtractor';
-import { extractOffersFromText } from './lib/geminiExtractor';
+import { extractOffersFromText, extractOffersFromImage } from './lib/geminiExtractor';
 import { generateImage, hookImagePrompt, hotelImagePrompt, describeHotel, gradientFallback, listAvailableImageModels } from './lib/imageGenerator';
 import { renderHookSlide, renderHotelVisualSlide, renderHotelDetailsSlide, renderCtaSlide } from './lib/slideRenderer';
 import { exportZip } from './lib/exporter';
@@ -16,6 +16,8 @@ const SIZES: SlideSize[] = ['story', 'post', 'reel'];
 export default function App() {
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('gemini_api_key') ?? '');
   const [offers, setOffers] = useState<Offer[]>([]);
+  // customPhotos[offerIdx][hotelIdx] = data URL of user-uploaded photo
+  const [customPhotos, setCustomPhotos] = useState<Record<string, string>>({});
   const [slides, setSlides] = useState<Record<SlideSize, GeneratedSlide[]> | null>(null);
   const [activeSize, setActiveSize] = useState<SlideSize>('story');
   const [progress, setProgress] = useState<GenerationProgress | null>(null);
@@ -48,15 +50,33 @@ export default function App() {
     setError(null);
     setPhase('extracting');
     try {
-      const text = await extractTextFromPDF(file);
-      const extracted = await extractOffersFromText(text, apiKey);
+      let extracted: Offer[];
+      if (file.type === 'application/pdf') {
+        const text = await extractTextFromPDF(file);
+        extracted = await extractOffersFromText(text, apiKey);
+      } else if (file.type.startsWith('image/')) {
+        extracted = await extractOffersFromImage(file, apiKey);
+      } else {
+        throw new Error('Nur PDF oder Bild-Dateien werden unterstützt.');
+      }
       setOffers(extracted);
+      setCustomPhotos({});
       setPhase('ready');
     } catch (e: any) {
       setError(e.message);
       setPhase('idle');
     }
   }, [apiKey]);
+
+  const photoKey = (offerIdx: number, hotelIdx: number) => `${offerIdx}_${hotelIdx}`;
+
+  const handleCustomPhoto = (offerIdx: number, hotelIdx: number, file: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCustomPhotos(prev => ({ ...prev, [photoKey(offerIdx, hotelIdx)]: reader.result as string }));
+    };
+    reader.readAsDataURL(file);
+  };
 
   const generate = async () => {
     if (!apiKey || offers.length === 0) return;
@@ -95,13 +115,20 @@ export default function App() {
         hookImages[offer.destination] = await safeGen(hookImagePrompt(offer.destination), offer.destination);
 
         hotelImages[offer.destination] = {};
-        for (const hotel of offer.hotels) {
-          tick(`Generiere Bild: ${hotel.name}`);
-          const desc = await describeHotel(hotel.name, hotel.location, apiKey);
-          hotelImages[offer.destination][hotel.name] = await safeGen(
-            hotelImagePrompt(hotel.name, hotel.location, desc),
-            hotel.name
-          );
+        for (let hi = 0; hi < offer.hotels.length; hi++) {
+          const hotel = offer.hotels[hi];
+          const key = photoKey(offers.indexOf(offer), hi);
+          if (customPhotos[key]) {
+            tick(`Foto: ${hotel.name} (eigenes Bild)`);
+            hotelImages[offer.destination][hotel.name] = customPhotos[key];
+          } else {
+            tick(`Generiere Bild: ${hotel.name}`);
+            const desc = await describeHotel(hotel.name, hotel.location, apiKey);
+            hotelImages[offer.destination][hotel.name] = await safeGen(
+              hotelImagePrompt(hotel.name, hotel.location, desc),
+              hotel.name
+            );
+          }
         }
       }
 
@@ -184,6 +211,9 @@ export default function App() {
             <OfferCard
               key={i}
               offer={offer}
+              offerIdx={i}
+              customPhotos={customPhotos}
+              onCustomPhoto={handleCustomPhoto}
               onChange={(updated) => {
                 const next = [...offers];
                 next[i] = updated;

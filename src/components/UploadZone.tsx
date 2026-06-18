@@ -5,13 +5,15 @@ interface Props {
   disabled?: boolean;
 }
 
+const ACCEPTED = 'application/pdf,image/jpeg,image/jpg,image/png,image/webp,image/gif';
+
 export function UploadZone({ onFile, disabled }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     const file = e.dataTransfer.files[0];
-    if (file?.type === 'application/pdf') onFile(file);
+    if (file && (file.type === 'application/pdf' || file.type.startsWith('image/'))) onFile(file);
   };
 
   return (
@@ -22,11 +24,12 @@ export function UploadZone({ onFile, disabled }: Props) {
       onDrop={handleDrop}
       style={{ opacity: disabled ? 0.5 : 1, cursor: disabled ? 'not-allowed' : 'pointer' }}
     >
-      <span>📄 PDF hier ablegen oder klicken zum Auswählen</span>
+      <span>📄 PDF oder 🖼️ Screenshot hier ablegen oder klicken</span>
+      <small style={{ display: 'block', opacity: 0.6, marginTop: 4 }}>PDF, JPG, PNG, WEBP</small>
       <input
         ref={inputRef}
         type="file"
-        accept="application/pdf"
+        accept={ACCEPTED}
         hidden
         disabled={disabled}
         onChange={(e) => {
