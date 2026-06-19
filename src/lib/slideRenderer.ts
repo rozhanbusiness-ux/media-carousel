@@ -6,6 +6,34 @@ const WHITE = '#FFFFFF';
 const FOOTER_PHONE = '+491 765 8866 999';
 const FOOTER_EMAIL = 'info@media-travels.com';
 
+// Elegant display fonts to match the brand template
+const SERIF = "'Playfair Display', Georgia, serif";   // high-contrast serif (titles, city names)
+const SCRIPT = "'Great Vibes', cursive";               // flowing gold script (headline)
+const SANS = "'Montserrat', Arial, sans-serif";        // heavy sans (price numbers, body)
+
+let fontsReady: Promise<void> | null = null;
+/** Make sure the web fonts are actually loaded before we draw to canvas
+ *  (canvas does not wait for CSS font loading). Idempotent + cached. */
+function ensureFonts(): Promise<void> {
+  if (fontsReady) return fontsReady;
+  fontsReady = (async () => {
+    if (!('fonts' in document)) return;
+    const specs = [
+      `700 80px ${SERIF}`, `800 80px ${SERIF}`, `900 80px ${SERIF}`,
+      `italic 400 80px ${SERIF}`, `400 80px ${SERIF}`,
+      `400 80px ${SCRIPT}`,
+      `700 80px ${SANS}`, `800 80px ${SANS}`, `900 80px ${SANS}`,
+    ];
+    try {
+      await Promise.all(specs.map((s) => (document as any).fonts.load(s).catch(() => {})));
+      await (document as any).fonts.ready;
+    } catch {
+      // fall back to system fonts
+    }
+  })();
+  return fontsReady;
+}
+
 /** Normalize ligatures and odd whitespace that PDF extraction can leave behind */
 function clean(text: string): string {
   // NFKD normalization splits ligatures; then explicit replacements for any that survive
@@ -533,6 +561,7 @@ export async function renderFlightCoverSlide(
   const canvas = createCanvas(size);
   const ctx = canvas.getContext('2d')!;
   const { width: w, height: h } = SLIDE_DIMENSIONS[size];
+  await ensureFonts();
 
   const bg = await loadImage(bgDataUrl);
   coverImage(ctx, bg, w, h);
@@ -552,21 +581,21 @@ export async function renderFlightCoverSlide(
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
 
-  // Fixed cover title — large bold caps
-  const destFs = Math.round(w * 0.115);
-  ctx.font = `bold ${destFs}px Arial Black, Arial, sans-serif`;
+  // Fixed cover title — elegant high-contrast serif caps
+  const destFs = Math.round(w * 0.125);
+  ctx.font = `700 ${destFs}px ${SERIF}`;
   ctx.fillStyle = WHITE;
-  ctx.fillText('DIREKTE FLÜGE', w / 2, h * 0.34);
+  ctx.fillText('DIREKTE FLÜGE', w / 2, h * 0.345);
 
-  // hookHeadline — italic bold gold script (e.g. "Juli Angebote")
-  const hlFs = Math.round(w * 0.095);
-  ctx.font = `italic bold ${hlFs}px Georgia, serif`;
+  // hookHeadline — flowing gold script (e.g. "Juli Angebote")
+  const hlFs = Math.round(w * 0.16);
+  ctx.font = `400 ${hlFs}px ${SCRIPT}`;
   ctx.fillStyle = GOLD;
-  ctx.fillText(clean(carousel.hookHeadline || 'Flugangebote'), w / 2, h * 0.62);
+  ctx.fillText(clean(carousel.hookHeadline || 'Flugangebote'), w / 2, h * 0.64);
 
-  // Tagline
-  const tagFs = Math.round(w * 0.046);
-  ctx.font = `bold ${tagFs}px Arial, sans-serif`;
+  // Tagline — bold serif
+  const tagFs = Math.round(w * 0.05);
+  ctx.font = `700 ${tagFs}px ${SERIF}`;
   ctx.fillStyle = WHITE;
   ctx.fillText(clean(carousel.hookTagline || 'Luxus & Komfort - Jetzt buchen!'), w / 2, h * 0.82);
 
@@ -623,6 +652,7 @@ export async function renderFlightRouteSlide(
   const canvas = createCanvas(size);
   const ctx = canvas.getContext('2d')!;
   const { width: w, height: h } = SLIDE_DIMENSIONS[size];
+  await ensureFonts();
 
   const bg = await loadImage(bgDataUrl);
   coverImage(ctx, bg, w, h);
@@ -659,19 +689,19 @@ export async function renderFlightRouteSlide(
   const fromCity = dep.toUpperCase();
   const toCity = arr;
 
-  // Departure city — HUGE white bold
-  const cityFs = Math.round(w * 0.165);
-  ctx.font = `900 ${cityFs}px Arial Black, Arial, sans-serif`;
+  // Departure city — HUGE white high-contrast serif
+  const cityFs = Math.round(w * 0.17);
+  ctx.font = `800 ${cityFs}px ${SERIF}`;
   ctx.fillStyle = WHITE;
-  const cityLines = wrapText(ctx, fromCity, w * 0.9);
+  const cityLines = wrapText(ctx, fromCity, w * 0.92);
   let y = h * photoFrac - Math.round(cityFs * 0.1);
   cityLines.forEach((line) => { ctx.fillText(line, w / 2, y); y += cityFs * 1.0; });
 
-  // Destination city — smaller gold italic
-  const destFs = Math.round(w * 0.055);
-  ctx.font = `italic ${destFs}px Georgia, serif`;
+  // Destination city — smaller gold serif
+  const destFs = Math.round(w * 0.06);
+  ctx.font = `400 ${destFs}px ${SERIF}`;
   ctx.fillStyle = GOLD;
-  y += Math.round(destFs * 0.3);
+  y += Math.round(destFs * 0.4);
   ctx.fillText(clean(toCity), w / 2, y);
   y += Math.round(destFs * 1.4);
 
@@ -705,25 +735,25 @@ export async function renderFlightRouteSlide(
     const eurFs = Math.round(w * 0.075);
     const gap = Math.round(w * 0.02);
 
-    ctx.font = `${abFs}px Arial, sans-serif`;
+    ctx.font = `400 ${abFs}px ${SERIF}`;
     const abW = ctx.measureText(abText).width;
-    ctx.font = `bold ${numFs}px Georgia, serif`;
+    ctx.font = `900 ${numFs}px ${SANS}`;
     const numW = ctx.measureText(clean(route.price)).width;
-    ctx.font = `bold ${eurFs}px Georgia, serif`;
+    ctx.font = `400 ${eurFs}px ${SERIF}`;
     const eurW = ctx.measureText('€').width;
     const totalW = abW + gap + numW + gap + eurW;
     let cx = (w - totalW) / 2;
 
     ctx.textAlign = 'left';
-    ctx.font = `${abFs}px Arial, sans-serif`;
+    ctx.font = `400 ${abFs}px ${SERIF}`;
     ctx.fillStyle = WHITE;
     ctx.fillText(abText, cx, y);
     cx += abW + gap;
-    ctx.font = `bold ${numFs}px Georgia, serif`;
+    ctx.font = `900 ${numFs}px ${SANS}`;
     ctx.fillStyle = GOLD;
     ctx.fillText(clean(route.price), cx, y);
     cx += numW + gap;
-    ctx.font = `bold ${eurFs}px Georgia, serif`;
+    ctx.font = `400 ${eurFs}px ${SERIF}`;
     ctx.fillStyle = WHITE;
     ctx.fillText('€', cx, y);
     ctx.textAlign = 'center';
@@ -745,7 +775,7 @@ export async function renderFlightRouteSlide(
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
     ctx.fillText(icon, colX, cellY);
-    ctx.font = `bold ${infoFs}px Arial, sans-serif`;
+    ctx.font = `700 ${infoFs}px ${SERIF}`;
     ctx.fillStyle = WHITE;
     ctx.fillText(text, colX + w * 0.065, cellY);
     ctx.textBaseline = 'alphabetic';
@@ -822,6 +852,7 @@ export async function renderCtaSlide(size: SlideSize): Promise<Blob> {
   const canvas = createCanvas(size);
   const ctx = canvas.getContext('2d')!;
   const { width: w, height: h } = SLIDE_DIMENSIONS[size];
+  await ensureFonts();
 
   ctx.fillStyle = NAVY;
   ctx.fillRect(0, 0, w, h);
@@ -839,9 +870,9 @@ export async function renderCtaSlide(size: SlideSize): Promise<Blob> {
   ctx.textBaseline = 'alphabetic';
   const leftX = w * 0.1;
 
-  // "Jetzt" huge white LEFT-ALIGNED
+  // "Jetzt" huge white LEFT-ALIGNED — elegant serif
   ctx.textAlign = 'left';
-  ctx.font = `900 ${bigFs}px Arial Black, Arial, sans-serif`;
+  ctx.font = `900 ${bigFs}px ${SERIF}`;
   ctx.fillStyle = WHITE;
   ctx.fillText('Jetzt', leftX, h * 0.41);
 
@@ -854,14 +885,14 @@ export async function renderCtaSlide(size: SlideSize): Promise<Blob> {
 
   // "buchen!" huge GOLD LEFT-ALIGNED
   ctx.textAlign = 'left';
-  ctx.font = `900 ${bigFs}px Arial Black, Arial, sans-serif`;
+  ctx.font = `900 ${bigFs}px ${SERIF}`;
   ctx.fillStyle = GOLD;
   ctx.fillText('buchen!', leftX, h * 0.41 + bigFs * 1.08);
 
   // "Kontaktiere uns heute"
   ctx.textAlign = 'center';
-  const subFs = Math.round(w * 0.042);
-  ctx.font = `${subFs}px Arial, sans-serif`;
+  const subFs = Math.round(w * 0.044);
+  ctx.font = `700 ${subFs}px ${SERIF}`;
   ctx.fillStyle = WHITE;
   ctx.fillText('Kontaktiere uns heute', w / 2, h * 0.60);
 
@@ -874,8 +905,8 @@ export async function renderCtaSlide(size: SlideSize): Promise<Blob> {
   // Sparkle divider at h*0.785
   drawSparkleDivider(ctx, w, h * 0.785);
 
-  // "Dein Traumurlaub wartet!" gold italic script
-  ctx.font = `italic bold ${Math.round(w * 0.062)}px Georgia, serif`;
+  // "Dein Traumurlaub wartet!" flowing gold script
+  ctx.font = `400 ${Math.round(w * 0.092)}px ${SCRIPT}`;
   ctx.fillStyle = GOLD;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
