@@ -471,23 +471,57 @@ function isCode(s: string): boolean {
   return /^[A-Z]{2,4}$/.test(s.trim());
 }
 
+const AIRPORT_CITIES: Record<string, string> = {
+  // Germany
+  DUS: 'Düsseldorf', FRA: 'Frankfurt', BER: 'Berlin', STR: 'Stuttgart',
+  MUC: 'München', HAM: 'Hamburg', CGN: 'Köln', NUE: 'Nürnberg',
+  HAJ: 'Hannover', LEJ: 'Leipzig', DRS: 'Dresden', FMO: 'Münster',
+  SCN: 'Saarbrücken', PAD: 'Paderborn', FDH: 'Friedrichshafen',
+  // Iraq / Kurdistan
+  EBL: 'Erbil', BGW: 'Bagdad', BSR: 'Basra', OSM: 'Mossul', NJF: 'Najaf',
+  // Turkey
+  IST: 'Istanbul', SAW: 'Istanbul', AYT: 'Antalya', ESB: 'Ankara',
+  ADB: 'Izmir', DLM: 'Dalaman', BJV: 'Bodrum', TZX: 'Trabzon',
+  // Middle East / popular destinations
+  DXB: 'Dubai', AUH: 'Abu Dhabi', DOH: 'Doha', AMM: 'Amman',
+  BEY: 'Beirut', CAI: 'Kairo', TLV: 'Tel Aviv', KWI: 'Kuwait',
+  BAH: 'Bahrain', MCT: 'Muskat', RUH: 'Riad', JED: 'Dschidda',
+  // Greece
+  ATH: 'Athen', HER: 'Heraklion', RHO: 'Rhodos', CFU: 'Korfu',
+  MJT: 'Mytilini', JMK: 'Mykonos', JTR: 'Santorini', KGS: 'Kos',
+  // Spain / Canaries
+  MAD: 'Madrid', BCN: 'Barcelona', PMI: 'Palma', LPA: 'Gran Canaria',
+  TFS: 'Teneriffa', ACE: 'Lanzarote', FUE: 'Fuerteventura',
+  // Egypt
+  HRG: 'Hurghada', SSH: 'Sharm el-Sheikh', LXR: 'Luxor', ASW: 'Assuan',
+  // Other popular
+  VIE: 'Wien', ZRH: 'Zürich', GVA: 'Genf', PRG: 'Prag', WAW: 'Warschau',
+  BUD: 'Budapest', FCO: 'Rom', MXP: 'Mailand', NAP: 'Neapel',
+  CDG: 'Paris', LHR: 'London', AMS: 'Amsterdam', CPH: 'Kopenhagen',
+};
+
+/** Resolve an airport code string to a full city name */
+function resolveCity(s: string): string {
+  const stripped = cityShort(s);
+  if (isCode(stripped)) {
+    return AIRPORT_CITIES[stripped.toUpperCase()] ?? stripped;
+  }
+  return stripped;
+}
+
 /** Resolve full departure & arrival city names for a route, preferring the title,
- * falling back to the outbound leg. Avoids showing bare airport codes. */
+ * falling back to the outbound leg, then the airport lookup table. */
 function routeCities(route: FlightRoute): { dep: string; arr: string } {
   const parts = (route.title || '')
     .split(/→|⇌|⇄|»|–|nach/i)
-    .map((s) => cityShort(s))
+    .map((s) => resolveCity(s))
     .filter(Boolean);
   let dep = parts[0] ?? '';
   let arr = parts[1] ?? '';
 
   const outLeg = route.legs.find((l) => /hin/i.test(l.direction)) ?? route.legs[0];
-  const legFrom = cityShort(outLeg?.from || '');
-  const legTo = cityShort(outLeg?.to || '');
-
-  // Prefer a non-code value
-  if (!dep || isCode(dep)) dep = (!isCode(legFrom) && legFrom) || dep || legFrom;
-  if (!arr || isCode(arr)) arr = (!isCode(legTo) && legTo) || arr || legTo;
+  if (!dep || isCode(dep)) dep = resolveCity(outLeg?.from || '') || dep;
+  if (!arr || isCode(arr)) arr = resolveCity(outLeg?.to || '') || arr;
   return { dep, arr };
 }
 

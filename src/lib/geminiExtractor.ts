@@ -51,13 +51,69 @@ Choose the correct "type" yourself by reading the content:
 
 Fill rows with whatever relevant fields the source actually contains; omit rows with no data.`;
 
+/** Strip "City (CODE)" → "City", uppercase trim for comparison */
+function normCity(s: string): string {
+  return s.replace(/\s*\(.*\)/, '').trim().toUpperCase();
+}
+
+/** Merge routes where Gemini split a round-trip into two objects (one per direction).
+ * Detects pairs whose titles are inverse of each other (A→B and B→A),
+ * keeps the Hinflug-first one as the base and absorbs the return leg from the other. */
+function deduplicateRoutes(flights: import('../types').FlightRoute[]): import('../types').FlightRoute[] {
+  const used = new Set<number>();
+  const result: import('../types').FlightRoute[] = [];
+
+  for (let i = 0; i < flights.length; i++) {
+    if (used.has(i)) continue;
+    const a = flights[i];
+    const [aFrom, aTo] = (a.title || '').split(/→|⇌|⇄|»|–|nach/i).map(normCity);
+
+    let merged = false;
+    for (let j = i + 1; j < flights.length; j++) {
+      if (used.has(j)) continue;
+      const b = flights[j];
+      const [bFrom, bTo] = (b.title || '').split(/→|⇌|⇄|»|–|nach/i).map(normCity);
+
+      // Inverse pair: a is A→B and b is B→A
+      if (aFrom && aTo && aFrom === bTo && aTo === bFrom) {
+        // Identify which is the outbound (Hinflug) route
+        const aHasHin = a.legs.some((l) => /hin/i.test(l.direction));
+        const base = aHasHin ? a : b;
+        const other = aHasHin ? b : a;
+        // Merge return legs from `other` into `base` if not already present
+        const retLegs = other.legs.filter((l) => /rück/i.test(l.direction));
+        if (retLegs.length > 0 && !base.legs.some((l) => /rück/i.test(l.direction))) {
+          base.legs.push(...retLegs);
+        }
+        // Take price/baggage from base (outbound), fallback to other
+        if (!base.price && other.price) base.price = other.price;
+        if (!base.baggage && other.baggage) base.baggage = other.baggage;
+        if (!base.baggageCabin && other.baggageCabin) base.baggageCabin = other.baggageCabin;
+        result.push(base);
+        used.add(i);
+        used.add(j);
+        merged = true;
+        break;
+      }
+    }
+    if (!merged) {
+      result.push(a);
+      used.add(i);
+    }
+  }
+  return result;
+}
+
 function parseCarousel(raw: string): Carousel {
   const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
   const c = JSON.parse(cleaned) as Carousel;
   if (!c.items) c.items = [];
   if (!c.type) c.type = 'hotel';
   c.items.forEach((it) => { if (!it.rows) it.rows = []; });
-  if (c.flights) c.flights.forEach((f) => { if (!f.legs) f.legs = []; if (f.baggageCabin === undefined) f.baggageCabin = ''; });
+  if (c.flights) {
+    c.flights.forEach((f) => { if (!f.legs) f.legs = []; if (f.baggageCabin === undefined) f.baggageCabin = ''; });
+    if (c.flights.length > 1) c.flights = deduplicateRoutes(c.flights);
+  }
   return c;
 }
 
