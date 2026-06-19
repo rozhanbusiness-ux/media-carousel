@@ -553,6 +553,17 @@ function routeCities(route: FlightRoute): { dep: string; arr: string } {
   return { dep, arr };
 }
 
+/** Auto-fit text: reduce font size until it fits within maxW */
+function fitText(ctx: CanvasRenderingContext2D, text: string, maxW: number, font: (fs: number) => string, startFs: number): number {
+  let fs = startFs;
+  ctx.font = font(fs);
+  while (ctx.measureText(text).width > maxW && fs > 20) {
+    fs -= 2;
+    ctx.font = font(fs);
+  }
+  return fs;
+}
+
 export async function renderFlightCoverSlide(
   carousel: Pick<Carousel, 'destination' | 'hookHeadline' | 'hookTagline'>,
   bgDataUrl: string,
@@ -563,46 +574,65 @@ export async function renderFlightCoverSlide(
   const { width: w, height: h } = SLIDE_DIMENSIONS[size];
   await ensureFonts();
 
+  // ── Photo occupies top 65% ──
+  const photoH = h * 0.65;
   const bg = await loadImage(bgDataUrl);
   coverImage(ctx, bg, w, h);
   boostContrast(ctx, w, h);
 
-  // Vignette: top 30% light, bottom 28% very dark
-  const vignette = ctx.createLinearGradient(0, 0, 0, h);
-  vignette.addColorStop(0, 'rgba(0,10,30,0.55)');
-  vignette.addColorStop(0.3, 'rgba(0,10,30,0.10)');
-  vignette.addColorStop(0.72, 'rgba(0,10,30,0.15)');
-  vignette.addColorStop(1, 'rgba(0,10,30,0.95)');
-  ctx.fillStyle = vignette;
-  ctx.fillRect(0, 0, w, h);
+  // Top dark vignette for logo readability
+  const topV = ctx.createLinearGradient(0, 0, 0, h * 0.22);
+  topV.addColorStop(0, 'rgba(0,10,30,0.65)');
+  topV.addColorStop(1, 'rgba(0,10,30,0)');
+  ctx.fillStyle = topV;
+  ctx.fillRect(0, 0, w, h * 0.22);
+
+  // ── Solid navy panel for bottom 35% ──
+  ctx.fillStyle = NAVY;
+  ctx.fillRect(0, photoH, w, h - photoH);
+
+  // Smooth photo→navy gradient transition (20% overlap)
+  const blend = ctx.createLinearGradient(0, photoH * 0.82, 0, photoH);
+  blend.addColorStop(0, 'rgba(0,31,63,0)');
+  blend.addColorStop(1, 'rgba(0,31,63,1)');
+  ctx.fillStyle = blend;
+  ctx.fillRect(0, photoH * 0.82, w, photoH * 0.18 + 2);
 
   await drawLogo(ctx, w, h);
 
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
 
-  // Fixed cover title — elegant high-contrast serif caps
-  const destFs = Math.round(w * 0.125);
-  ctx.font = `700 ${destFs}px ${SERIF}`;
+  // "DIREKTE FLÜGE" — auto-fit bold serif, in photo area
+  const titleFs = fitText(ctx, 'DIREKTE FLÜGE', w * 0.92, (fs) => `700 ${fs}px ${SERIF}`, Math.round(w * 0.115));
+  ctx.font = `700 ${titleFs}px ${SERIF}`;
   ctx.fillStyle = WHITE;
-  ctx.fillText('DIREKTE FLÜGE', w / 2, h * 0.345);
+  ctx.fillText('DIREKTE FLÜGE', w / 2, h * 0.34);
 
-  // hookHeadline — flowing gold script (e.g. "Juli Angebote")
-  const hlFs = Math.round(w * 0.16);
+  // hookHeadline — flowing script (e.g. "Juli Angebote"), in photo area
+  const hlFs = fitText(ctx, clean(carousel.hookHeadline || 'Flugangebote'), w * 0.88, (fs) => `400 ${fs}px ${SCRIPT}`, Math.round(w * 0.155));
   ctx.font = `400 ${hlFs}px ${SCRIPT}`;
   ctx.fillStyle = GOLD;
-  ctx.fillText(clean(carousel.hookHeadline || 'Flugangebote'), w / 2, h * 0.64);
+  ctx.fillText(clean(carousel.hookHeadline || 'Flugangebote'), w / 2, h * 0.61);
 
-  // Tagline — bold serif
-  const tagFs = Math.round(w * 0.05);
+  // Gold sparkle divider at panel top
+  const divY = photoH + Math.round(h * 0.02);
+  ctx.strokeStyle = GOLD; ctx.lineWidth = 1.5; ctx.globalAlpha = 0.9;
+  ctx.beginPath(); ctx.moveTo(w * 0.08, divY); ctx.lineTo(w * 0.43, divY); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(w * 0.57, divY); ctx.lineTo(w * 0.92, divY); ctx.stroke();
+  ctx.globalAlpha = 1;
+  ctx.font = `${Math.round(w * 0.042)}px Arial`; ctx.fillStyle = GOLD;
+  ctx.textBaseline = 'middle'; ctx.fillText('✦', w / 2, divY); ctx.textBaseline = 'alphabetic';
+
+  // Tagline in navy panel
+  const tagline = clean(carousel.hookTagline || 'Luxus & Komfort - Jetzt buchen!');
+  const tagFs = fitText(ctx, tagline, w * 0.88, (fs) => `700 ${fs}px ${SERIF}`, Math.round(w * 0.052));
   ctx.font = `700 ${tagFs}px ${SERIF}`;
   ctx.fillStyle = WHITE;
-  ctx.fillText(clean(carousel.hookTagline || 'Luxus & Komfort - Jetzt buchen!'), w / 2, h * 0.82);
+  ctx.fillText(tagline, w / 2, photoH + Math.round(h * 0.1));
 
-  // Contact row: phone anchored left, email anchored right (no overlap)
-  drawCornerContacts(ctx, w, h * 0.88);
-
-  ctx.textBaseline = 'alphabetic';
+  // Contacts in navy panel
+  drawCornerContacts(ctx, w, photoH + Math.round(h * 0.19));
 
   return new Promise((res) => canvas.toBlob((b) => res(b!), 'image/png'));
 }
@@ -642,7 +672,12 @@ function drawCornerContacts(ctx: CanvasRenderingContext2D, w: number, y: number)
   ctx.textBaseline = 'alphabetic';
 }
 
-// ─── Flight Slide 2: Route slide (city photo + departure/arrival + price/info) ─
+// ─── Flight Slide 2: Route slide ──────────────────────────────────────────────
+
+/** Strip trailing .00 or .0 from price strings like "744.00" → "744" */
+function cleanPrice(p: string): string {
+  return p.replace(/\.0+$/, '').trim();
+}
 
 export async function renderFlightRouteSlide(
   route: FlightRoute,
@@ -654,27 +689,30 @@ export async function renderFlightRouteSlide(
   const { width: w, height: h } = SLIDE_DIMENSIONS[size];
   await ensureFonts();
 
+  // ── Photo occupies top 62% ──
+  const photoH = h * 0.62;
+
   const bg = await loadImage(bgDataUrl);
   coverImage(ctx, bg, w, h);
   boostContrast(ctx, w, h);
 
-  const aspect = h / w;
-  const photoFrac = Math.min(0.65, 0.38 + aspect * 0.155);
+  // Top dark vignette for logo
+  const topV = ctx.createLinearGradient(0, 0, 0, h * 0.2);
+  topV.addColorStop(0, 'rgba(0,10,30,0.65)');
+  topV.addColorStop(1, 'rgba(0,10,30,0)');
+  ctx.fillStyle = topV;
+  ctx.fillRect(0, 0, w, h * 0.2);
 
-  // Top vignette so the gold logo stays legible over bright skies
-  const topGrad = ctx.createLinearGradient(0, 0, 0, h * 0.18);
-  topGrad.addColorStop(0, 'rgba(0,15,45,0.55)');
-  topGrad.addColorStop(1, 'rgba(0,15,45,0)');
-  ctx.fillStyle = topGrad;
-  ctx.fillRect(0, 0, w, h * 0.18);
+  // ── Solid navy panel for bottom 38% ──
+  ctx.fillStyle = NAVY;
+  ctx.fillRect(0, photoH, w, h - photoH);
 
-  // Bottom dark gradient
-  const gradStart = photoFrac * 0.85;
-  const grad = ctx.createLinearGradient(0, gradStart * h, 0, h);
-  grad.addColorStop(0, 'rgba(0,15,45,0)');
-  grad.addColorStop(1, 'rgba(0,15,45,0.97)');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, gradStart * h, w, h - gradStart * h);
+  // Smooth photo→navy transition
+  const blend = ctx.createLinearGradient(0, photoH * 0.78, 0, photoH);
+  blend.addColorStop(0, 'rgba(0,31,63,0)');
+  blend.addColorStop(1, 'rgba(0,31,63,1)');
+  ctx.fillStyle = blend;
+  ctx.fillRect(0, photoH * 0.78, w, photoH * 0.22 + 2);
 
   await drawLogo(ctx, w, h);
 
@@ -689,95 +727,72 @@ export async function renderFlightRouteSlide(
   const fromCity = dep.toUpperCase();
   const toCity = arr;
 
-  // Departure city — HUGE white high-contrast serif
-  const cityFs = Math.round(w * 0.17);
+  // ── City name — auto-fit, overlaps photo/panel boundary ──
+  const cityMaxW = w * 0.94;
+  const cityFs = fitText(ctx, fromCity, cityMaxW, (fs) => `800 ${fs}px ${SERIF}`, Math.round(w * 0.175));
   ctx.font = `800 ${cityFs}px ${SERIF}`;
   ctx.fillStyle = WHITE;
-  const cityLines = wrapText(ctx, fromCity, w * 0.92);
-  let y = h * photoFrac - Math.round(cityFs * 0.1);
-  cityLines.forEach((line) => { ctx.fillText(line, w / 2, y); y += cityFs * 1.0; });
+  // Position: baseline sits at the photo/panel boundary
+  ctx.fillText(fromCity, w / 2, photoH - Math.round(cityFs * 0.05));
 
-  // Destination city — smaller gold serif
-  const destFs = Math.round(w * 0.06);
+  // ── Destination city — gold, below boundary ──
+  const destFs = Math.round(w * 0.062);
   ctx.font = `400 ${destFs}px ${SERIF}`;
   ctx.fillStyle = GOLD;
-  y += Math.round(destFs * 0.4);
-  ctx.fillText(clean(toCity), w / 2, y);
-  y += Math.round(destFs * 1.4);
+  ctx.fillText(clean(toCity), w / 2, photoH + Math.round(destFs * 1.1));
 
-  // Sparkle divider
-  const sparkY = y + Math.round(h * 0.01);
-  ctx.strokeStyle = GOLD;
-  ctx.lineWidth = 1.5;
-  ctx.globalAlpha = 0.8;
-  ctx.beginPath();
-  ctx.moveTo(w * 0.12, sparkY);
-  ctx.lineTo(w * 0.42, sparkY);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(w * 0.58, sparkY);
-  ctx.lineTo(w * 0.88, sparkY);
-  ctx.stroke();
+  // ── Gold sparkle divider ──
+  const sparkY = photoH + Math.round(destFs * 2.4);
+  ctx.strokeStyle = GOLD; ctx.lineWidth = 1.5; ctx.globalAlpha = 0.9;
+  ctx.beginPath(); ctx.moveTo(w * 0.1, sparkY); ctx.lineTo(w * 0.43, sparkY); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(w * 0.57, sparkY); ctx.lineTo(w * 0.9, sparkY); ctx.stroke();
   ctx.globalAlpha = 1;
-  const sparkFs = Math.round(w * 0.042);
-  ctx.font = `${sparkFs}px Arial`;
-  ctx.fillStyle = GOLD;
-  ctx.textBaseline = 'middle';
-  ctx.fillText('✦', w / 2, sparkY);
-  ctx.textBaseline = 'alphabetic';
-  y = sparkY + Math.round(h * 0.04);
+  ctx.font = `${Math.round(w * 0.04)}px Arial`; ctx.fillStyle = GOLD;
+  ctx.textBaseline = 'middle'; ctx.fillText('✦', w / 2, sparkY); ctx.textBaseline = 'alphabetic';
 
-  // Price block: "ab [N] €"
+  // ── Price block: "ab 599 €" ──
   if (route.price) {
+    const price = cleanPrice(route.price);
+    const priceY = sparkY + Math.round(h * 0.16);
     const abText = 'ab ';
     const abFs = Math.round(w * 0.052);
-    const numFs = Math.round(w * 0.20);
-    const eurFs = Math.round(w * 0.075);
-    const gap = Math.round(w * 0.02);
+    const numFs = fitText(ctx, price, w * 0.56, (fs) => `900 ${fs}px ${SANS}`, Math.round(w * 0.22));
+    const eurFs = Math.round(w * 0.072);
+    const gap = Math.round(w * 0.018);
 
-    ctx.font = `400 ${abFs}px ${SERIF}`;
-    const abW = ctx.measureText(abText).width;
-    ctx.font = `900 ${numFs}px ${SANS}`;
-    const numW = ctx.measureText(clean(route.price)).width;
-    ctx.font = `400 ${eurFs}px ${SERIF}`;
-    const eurW = ctx.measureText('€').width;
-    const totalW = abW + gap + numW + gap + eurW;
-    let cx = (w - totalW) / 2;
+    ctx.font = `400 ${abFs}px ${SERIF}`; const abW = ctx.measureText(abText).width;
+    ctx.font = `900 ${numFs}px ${SANS}`; const numW = ctx.measureText(price).width;
+    ctx.font = `400 ${eurFs}px ${SERIF}`; const eurW = ctx.measureText('€').width;
+    let cx = (w - abW - gap - numW - gap - eurW) / 2;
 
     ctx.textAlign = 'left';
-    ctx.font = `400 ${abFs}px ${SERIF}`;
-    ctx.fillStyle = WHITE;
-    ctx.fillText(abText, cx, y);
-    cx += abW + gap;
-    ctx.font = `900 ${numFs}px ${SANS}`;
-    ctx.fillStyle = GOLD;
-    ctx.fillText(clean(route.price), cx, y);
-    cx += numW + gap;
-    ctx.font = `400 ${eurFs}px ${SERIF}`;
-    ctx.fillStyle = WHITE;
-    ctx.fillText('€', cx, y);
+    ctx.font = `400 ${abFs}px ${SERIF}`; ctx.fillStyle = WHITE;
+    ctx.fillText(abText, cx, priceY); cx += abW + gap;
+    ctx.font = `900 ${numFs}px ${SANS}`; ctx.fillStyle = GOLD;
+    ctx.fillText(price, cx, priceY); cx += numW + gap;
+    ctx.font = `400 ${eurFs}px ${SERIF}`; ctx.fillStyle = WHITE;
+    ctx.fillText('€', cx, priceY);
     ctx.textAlign = 'center';
-    y += Math.round(numFs * 0.2);
   }
 
-  // 2x2 info grid
-  const gridY1 = h * (photoFrac + (1 - photoFrac) * 0.78);
-  const gridY2 = h * (photoFrac + (1 - photoFrac) * 0.91);
-  const col1X = w * 0.20;
-  const col2X = w * 0.62;
-  const iconFs = Math.round(w * 0.042);
-  const infoFs = Math.round(w * 0.038);
+  // ── 2×2 info grid: dates top row, baggage bottom row ──
+  const gridY1 = h * 0.865;
+  const gridY2 = h * 0.935;
+  const col1X = w * 0.13;
+  const col2X = w * 0.58;
+  const iconFs = Math.round(w * 0.048);
+  const infoFs = Math.round(w * 0.042);
 
   const drawInfoCell = (cellY: number, colX: number, icon: string, text: string) => {
     if (!text) return;
     ctx.font = `${iconFs}px Arial`;
-    ctx.fillStyle = WHITE;
+    ctx.fillStyle = GOLD;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
     ctx.fillText(icon, colX, cellY);
     ctx.font = `700 ${infoFs}px ${SERIF}`;
     ctx.fillStyle = WHITE;
-    ctx.fillText(text, colX + w * 0.065, cellY);
+    ctx.fillText(text, colX + w * 0.072, cellY);
     ctx.textBaseline = 'alphabetic';
   };
 
