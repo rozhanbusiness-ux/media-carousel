@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<style>
+@font-face{ font-family:'Anton'; src:url('../fonts/Anton.ttf') format('truetype'); font-weight:400; }
+@font-face{ font-family:'Playfair Display'; src:url('../fonts/PlayfairDisplay-Bold.ttf') format('truetype'); font-weight:400 900; }
+@font-face{ font-family:'Montserrat'; src:url('../fonts/Montserrat-Bold.ttf') format('truetype'); font-weight:400 900; }
+@font-face{ font-family:'DM Serif Display'; src:url('../fonts/DMSerifDisplay-Regular.ttf') format('truetype'); font-weight:400; }
+
+:root{ --navy:#0F2359; --navy-deep:#0a1838; --gold:#C9A227; --gold-bright:#E6C25A; --white:#FFFFFF; }
+*{ margin:0; padding:0; box-sizing:border-box; }
+html,body{ width:1080px; height:1920px; }
+.slide{ position:relative; width:1080px; height:1920px; overflow:hidden; background:var(--navy); font-family:'Playfair Display',serif; }
+.bg{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:1; }
+.overlay{ position:absolute; inset:0; z-index:2;
+  background:linear-gradient(to bottom,
+    rgba(15,35,89,0) 0%, rgba(15,35,89,0) 58%,
+    rgba(15,35,89,0.25) 66%, rgba(15,35,89,0.75) 74%,
+    var(--navy) 80%, var(--navy-deep) 100%); }
+.content{ position:absolute; inset:0; z-index:3; }
+.logo{ position:absolute; top:86px; left:0; width:100%; display:flex; justify-content:center; }
+.logo img{ width:359px; height:auto; }
+.origin{ position:absolute; top:1015px; left:0; width:100%; text-align:center;
+  font-family:'Playfair Display',serif; font-weight:800; font-size:128px; line-height:1; letter-spacing:1px;
+  color:var(--white); text-shadow:0 4px 22px rgba(0,0,0,0.5); }
+.destination{ position:absolute; top:1170px; left:0; width:100%; text-align:center;
+  font-family:'Playfair Display',serif; font-weight:700; font-size:84px; line-height:1;
+  color:var(--gold); text-shadow:0 3px 16px rgba(0,0,0,0.45); }
+.divider{ position:absolute; top:1295px; left:5%; width:90%; display:flex; align-items:center; justify-content:center; }
+.divider .line{ flex:1; height:30px; }
+.divider .star{ width:130px; height:90px; flex:none; display:flex; align-items:center; justify-content:center; margin:0 -10px; }
+.price{ position:absolute; top:1395px; left:0; width:100%; display:flex; align-items:center; justify-content:center; gap:22px; }
+.price .ab{ font-family:'Playfair Display',serif; font-style:normal; font-weight:700; font-size:78px; color:var(--white); align-self:flex-end; margin-bottom:34px; }
+.price .num{ font-family:'Anton',sans-serif; font-size:210px; line-height:0.85; color:var(--white);
+  -webkit-text-stroke:7px var(--gold); paint-order:stroke fill; text-shadow:0 6px 26px rgba(0,0,0,0.45); }
+.price .cur{ font-family:'Playfair Display',serif; font-weight:700; font-size:84px; color:var(--white); align-self:flex-end; margin-bottom:30px; }
+.info{ position:absolute; top:1650px; left:11%; width:78%; display:grid; grid-template-columns:1fr 1fr; row-gap:42px; column-gap:70px; }
+.info .cell{ display:flex; align-items:center; gap:24px; font-family:'DM Serif Display',serif; font-weight:400; font-size:52px; color:var(--white); }
+.info .ic{ width:76px; height:76px; flex:none; }
+.info .ic svg{ width:76px; height:76px; display:block; }
+</style>
+</head>
+<body>
+  <div class="slide">
+    <img class="bg" src="{{bg_image}}" alt="">
+    <div class="overlay"></div>
+    <div class="content">
+      <div class="logo"><img src="logo.png" alt="MEDIA"></div>
+      <div class="origin">{{origin}}</div>
+      <div class="destination">{{destination}}</div>
+      <div class="divider">
+        <div class="line">
+          <svg viewBox="0 0 500 30" preserveAspectRatio="none" width="100%" height="30"><path d="M2,15 L480,9 a6,6 0 0 1 0,12 L2,15 Z" fill="#C9A227"/></svg>
+        </div>
+        <div class="star">
+          <svg viewBox="0 0 130 90"><path d="M78 12 C80 32, 86 40, 110 43 C86 46, 80 54, 78 74 C76 54, 70 46, 46 43 C70 40, 76 32, 78 12 Z" fill="#E6C25A"/><path d="M48 54 C49 62, 52 65, 60 66 C52 67, 49 70, 48 78 C47 70, 44 67, 36 66 C44 65, 47 62, 48 54 Z" fill="#C9A227"/></svg>
+        </div>
+        <div class="line">
+          <svg viewBox="0 0 500 30" preserveAspectRatio="none" width="100%" height="30"><path d="M498,15 L20,9 a6,6 0 0 0 0,12 L498,15 Z" fill="#C9A227"/></svg>
+        </div>
+      </div>
+      <div class="price">
+        <span class="ab">ab</span>
+        <span class="num">{{price}}</span>
+        <span class="cur">&euro;</span>
+      </div>
+      <div class="info">
+        <div class="cell"><span class="ic"><svg viewBox="0 0 76 76"><rect x="4" y="4" width="68" height="68" rx="16" fill="#C9A227"/><rect x="4" y="4" width="68" height="68" rx="16" fill="none" stroke="#E6C25A" stroke-width="1.5"/><rect x="19" y="22" width="38" height="34" rx="4" fill="none" stroke="#fff" stroke-width="3.5"/><line x1="19" y1="32" x2="57" y2="32" stroke="#fff" stroke-width="3.5"/><line x1="28" y1="16" x2="28" y2="26" stroke="#fff" stroke-width="4" stroke-linecap="round"/><line x1="48" y1="16" x2="48" y2="26" stroke="#fff" stroke-width="4" stroke-linecap="round"/><circle cx="29" cy="41" r="2.6" fill="#fff"/><circle cx="38" cy="41" r="2.6" fill="#fff"/><circle cx="47" cy="41" r="2.6" fill="#fff"/></svg></span>{{date_out}}</div>
+        <div class="cell"><span class="ic"><svg viewBox="0 0 76 76"><rect x="4" y="4" width="68" height="68" rx="16" fill="#C9A227"/><rect x="4" y="4" width="68" height="68" rx="16" fill="none" stroke="#E6C25A" stroke-width="1.5"/><rect x="19" y="22" width="38" height="34" rx="4" fill="none" stroke="#fff" stroke-width="3.5"/><line x1="19" y1="32" x2="57" y2="32" stroke="#fff" stroke-width="3.5"/><line x1="28" y1="16" x2="28" y2="26" stroke="#fff" stroke-width="4" stroke-linecap="round"/><line x1="48" y1="16" x2="48" y2="26" stroke="#fff" stroke-width="4" stroke-linecap="round"/><circle cx="29" cy="41" r="2.6" fill="#fff"/><circle cx="38" cy="41" r="2.6" fill="#fff"/><circle cx="47" cy="41" r="2.6" fill="#fff"/></svg></span>{{date_return}}</div>
+        <div class="cell"><span class="ic"><svg viewBox="0 0 76 76"><rect x="4" y="4" width="68" height="68" rx="16" fill="#C9A227"/><rect x="4" y="4" width="68" height="68" rx="16" fill="none" stroke="#E6C25A" stroke-width="1.5"/><rect x="22" y="28" width="32" height="30" rx="5" fill="none" stroke="#fff" stroke-width="3.5"/><path d="M30 28 v-5 a3 3 0 0 1 3-3 h10 a3 3 0 0 1 3 3 v5" fill="none" stroke="#fff" stroke-width="3.5"/><line x1="32" y1="34" x2="32" y2="52" stroke="#fff" stroke-width="3" stroke-linecap="round"/><line x1="44" y1="34" x2="44" y2="52" stroke="#fff" stroke-width="3" stroke-linecap="round"/></svg></span>{{baggage_1}}</div>
+        <div class="cell"><span class="ic"><svg viewBox="0 0 76 76"><rect x="4" y="4" width="68" height="68" rx="16" fill="#C9A227"/><rect x="4" y="4" width="68" height="68" rx="16" fill="none" stroke="#E6C25A" stroke-width="1.5"/><rect x="20" y="32" width="36" height="26" rx="4" fill="none" stroke="#fff" stroke-width="3.5"/><path d="M30 32 v-4 a3 3 0 0 1 3-3 h10 a3 3 0 0 1 3 3 v4" fill="none" stroke="#fff" stroke-width="3.5"/><line x1="20" y1="43" x2="56" y2="43" stroke="#fff" stroke-width="3"/><rect x="34" y="40" width="8" height="6" rx="1.5" fill="#fff"/></svg></span>{{baggage_2}}</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

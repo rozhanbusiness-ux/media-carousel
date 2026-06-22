@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MEDIA — Offer Slide Generator</title>
+<style>
+  :root{ --navy:#0F2359; --gold:#C9A227; --bg:#f4f5f7; }
+  *{ box-sizing:border-box; margin:0; padding:0; font-family:'Segoe UI',Tahoma,sans-serif; }
+  body{ background:var(--bg); color:#1a1a2e; display:flex; min-height:100vh; }
+
+  .panel{ width:440px; flex:none; background:#fff; padding:28px 26px; overflow-y:auto;
+          box-shadow:2px 0 14px rgba(0,0,0,.06); height:100vh; }
+  .panel h1{ font-size:22px; color:var(--navy); margin-bottom:4px; }
+  .panel .sub{ font-size:13px; color:#777; margin-bottom:22px; }
+  .field{ margin-bottom:16px; }
+  .field label{ display:block; font-size:13px; font-weight:600; margin-bottom:6px; color:#333; }
+  .field input{ width:100%; padding:11px 13px; border:1.5px solid #dfe3e8; border-radius:9px;
+                font-size:15px; transition:border .15s; }
+  .field input:focus{ outline:none; border-color:var(--gold); }
+  .row{ display:flex; gap:12px; }
+  .row .field{ flex:1; }
+
+  .btn{ width:100%; padding:13px; border:none; border-radius:10px; font-size:15px;
+        font-weight:700; cursor:pointer; transition:.15s; margin-top:6px; }
+  .btn-gold{ background:var(--gold); color:#fff; }
+  .btn-gold:hover{ filter:brightness(1.07); }
+  .btn-navy{ background:var(--navy); color:#fff; }
+  .btn-navy:hover{ filter:brightness(1.15); }
+  .btn:disabled{ opacity:.5; cursor:not-allowed; }
+  .hint{ font-size:12px; color:#999; margin-top:6px; line-height:1.5; }
+  .status{ font-size:13px; margin-top:12px; padding:10px 12px; border-radius:8px; display:none; }
+  .status.show{ display:block; }
+  .status.err{ background:#fde8e8; color:#c0392b; }
+  .status.ok{ background:#e8f5e9; color:#2e7d32; }
+  .status.load{ background:#fff8e1; color:#b8860b; }
+
+  .preview-wrap{ flex:1; display:flex; align-items:center; justify-content:center; padding:30px; }
+  .preview{ width:360px; height:640px; border-radius:14px; overflow:hidden;
+            box-shadow:0 12px 40px rgba(0,0,0,.25); background:var(--navy); position:relative; }
+  .preview iframe{ width:1080px; height:1920px; border:0; transform:scale(0.3333);
+                   transform-origin:top left; position:absolute; top:0; left:0; }
+  .divider-h{ height:1px; background:#eee; margin:20px 0; }
+</style>
+</head>
+<body>
+  <div class="panel">
+    <h1>Offer Slide Generator</h1>
+    <div class="sub">MEDIA Travel — Story 1080x1920</div>
+
+    <div class="row">
+      <div class="field"><label>Origin city</label><input id="origin" value="STUTTGART"></div>
+      <div class="field"><label>Destination</label><input id="destination" value="Barcelona"></div>
+    </div>
+
+    <div class="field"><label>Price (EUR)</label><input id="price" value="139"></div>
+
+    <div class="row">
+      <div class="field"><label>Departure date</label><input id="date_out" value="09.07.2026"></div>
+      <div class="field"><label>Return date</label><input id="date_return" value="15.07.2026"></div>
+    </div>
+
+    <div class="row">
+      <div class="field"><label>Baggage 1</label><input id="baggage_1" value="15 KG"></div>
+      <div class="field"><label>Baggage 2</label><input id="baggage_2" value="8 KG"></div>
+    </div>
+
+    <div class="divider-h"></div>
+
+    <div class="field">
+      <label>Background image subject (for AI)</label>
+      <input id="image_subject" value="Barcelona Spain city panorama Sagrada Familia">
+      <div class="hint">Describe the destination. Rule: sky &lt;= 10%, rest is city/landmarks.</div>
+    </div>
+
+    <button class="btn btn-navy" id="btnGen">Generate background image</button>
+    <button class="btn btn-gold" id="btnRender" disabled>Export final PNG</button>
+
+    <div class="status" id="status"></div>
+  </div>
+
+  <div class="preview-wrap">
+    <div class="preview">
+      <iframe id="previewFrame"></iframe>
+    </div>
+  </div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const fields = ['origin','destination','price','date_out','date_return','baggage_1','baggage_2','image_subject'];
+let bgImage = '';
+
+function collect(){
+  const d = {};
+  fields.forEach(f => d[f] = $(f).value);
+  return d;
+}
+
+function setStatus(msg, type){
+  const s = $('status');
+  s.textContent = msg;
+  s.className = 'status show ' + type;
+}
+
+async function updatePreview(){
+  const d = collect();
+  const res = await fetch('/templates/offer-slide.html');
+  let html = await res.text();
+  html = html.replace('<head>', '<head><base href="/templates/">');
+  const map = {
+    bg_image: bgImage || '/templates/test-city.png',
+    origin: d.origin.toUpperCase(),
+    destination: d.destination,
+    price: d.price.replace(/[^0-9]/g,''),
+    date_out: d.date_out, date_return: d.date_return,
+    baggage_1: d.baggage_1, baggage_2: d.baggage_2,
+  };
+  for (const [k,v] of Object.entries(map)) html = html.replaceAll('{{'+k+'}}', v);
+  $('previewFrame').srcdoc = html;
+}
+
+fields.forEach(f => $(f).addEventListener('input', updatePreview));
+
+$('btnGen').addEventListener('click', async () => {
+  setStatus('Generating image via Gemini...', 'load');
+  $('btnGen').disabled = true;
+  try{
+    const res = await fetch('/api/generate-bg', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ image_subject: $('image_subject').value })
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || 'generation failed');
+    bgImage = data.image;
+    await updatePreview();
+    setStatus('Image generated. You can export now.', 'ok');
+    $('btnRender').disabled = false;
+  }catch(e){
+    setStatus('Error: ' + e.message, 'err');
+  }finally{
+    $('btnGen').disabled = false;
+  }
+});
+
+$('btnRender').addEventListener('click', async () => {
+  setStatus('Exporting...', 'load');
+  $('btnRender').disabled = true;
+  try{
+    const d = collect();
+    d.bg_image = bgImage;
+    const res = await fetch('/api/render', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(d)
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || 'export failed');
+    const a = document.createElement('a');
+    a.href = data.image; a.download = data.file || 'offer.png'; a.click();
+    setStatus('Exported: ' + data.file, 'ok');
+  }catch(e){
+    setStatus('Error: ' + e.message, 'err');
+  }finally{
+    $('btnRender').disabled = false;
+  }
+});
+
+updatePreview();
+</script>
+</body>
+</html>
