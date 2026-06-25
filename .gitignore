@@ -5,3 +5,4 @@ output/*.png
 test-render.js
 test-output.png
 dates-app.png
+cache/*.txt

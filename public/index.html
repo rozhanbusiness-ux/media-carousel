@@ -96,6 +96,7 @@
 const $ = (id) => document.getElementById(id);
 const fields = ['origin','destination','price','date_out','date_return','baggage_1','baggage_2','image_subject'];
 let bgImage = '';
+let bgId = '';
 let currentSize = 'story';
 
 function collect(){
@@ -167,6 +168,7 @@ $('btnGen').addEventListener('click', async () => {
     const data = await res.json();
     if(!res.ok) throw new Error(data.error || 'generation failed');
     bgImage = data.image;
+    bgId = data.bgId || '';
     await updatePreview();
     setStatus('Image generated. You can export now.', 'ok');
     $('btnRender').disabled = false;
@@ -182,7 +184,7 @@ $('btnRender').addEventListener('click', async () => {
   $('btnRender').disabled = true;
   try{
     const d = collect();
-    d.bg_image = bgImage;
+    d.bgId = bgId;
     d.size = currentSize;
     const res = await fetch('/api/render', {
       method:'POST', headers:{'Content-Type':'application/json'},

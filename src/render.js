@@ -42,7 +42,7 @@ async function renderToPng(html, size) {
     await page.setViewport({
       width: dims.width,
       height: dims.height,
-      deviceScaleFactor: 1,
+      deviceScaleFactor: 2,
     });
     // inject <base> so relative assets (fonts/logo) resolve if not embedded
     const templatesDir = 'file://' + path.join(__dirname, '..', 'templates') + '/';

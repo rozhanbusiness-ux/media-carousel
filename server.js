@@ -31,7 +31,12 @@ app.post('/api/generate-bg', async (req, res) => {
     if (!subject) return res.status(400).json({ error: 'image_subject is required' });
     const size = req.body.size || 'story';
     const dataUri = await generateBackground(subject, size);
-    res.json({ image: dataUri });
+    // Save the generated background on the server itself, return only a small id
+    // so the heavy image never needs to travel back and forth over the network.
+    const bgId = 'bg_' + Date.now();
+    const base64Data = dataUri.split(',')[1];
+    fs.writeFileSync(path.join(__dirname, 'cache', bgId + '.txt'), dataUri);
+    res.json({ image: dataUri, bgId: bgId });
   } catch (err) {
     console.error('generate-bg:', err.message);
     res.status(500).json({ error: err.message });
@@ -45,7 +50,18 @@ app.post('/api/render', async (req, res) => {
     const errors = validate(data);
     if (errors.length) return res.status(400).json({ error: errors.join(' | ') });
 
-    data.bg_image = req.body.bg_image || '';
+    // If the request includes a cached background id, read the large image
+    // directly from the server's own disk instead of waiting for the browser
+    // to upload it again over the network.
+    if (req.body.bgId) {
+      const cachedPath = path.join(__dirname, 'cache', req.body.bgId + '.txt');
+      if (fs.existsSync(cachedPath)) {
+        data.bg_image = fs.readFileSync(cachedPath, 'utf8');
+      }
+    }
+    if (!data.bg_image) {
+      data.bg_image = req.body.bg_image || '';
+    }
     if (!data.bg_image) return res.status(400).json({ error: 'background image is missing' });
 
     const size = req.body.size || 'story';
