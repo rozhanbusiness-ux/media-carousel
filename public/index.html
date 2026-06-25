@@ -73,6 +73,13 @@
       <div class="hint">Describe the destination. Rule: sky &lt;= 10%, rest is city/landmarks.</div>
     </div>
 
+    <div class="field">
+      <label>Output size</label>
+      <div style="display:flex; gap:10px;">
+        <button class="btn" id="sizeStory" style="flex:1; background:#0F2359; color:#fff;">Story 9:16</button>
+        <button class="btn" id="sizeSquare" style="flex:1; background:#e9ecef; color:#333;">Post 1:1</button>
+      </div>
+    </div>
     <button class="btn btn-navy" id="btnGen">Generate background image</button>
     <button class="btn btn-gold" id="btnRender" disabled>Export final PNG</button>
 
@@ -89,6 +96,7 @@
 const $ = (id) => document.getElementById(id);
 const fields = ['origin','destination','price','date_out','date_return','baggage_1','baggage_2','image_subject'];
 let bgImage = '';
+let currentSize = 'story';
 
 function collect(){
   const d = {};
@@ -104,7 +112,8 @@ function setStatus(msg, type){
 
 async function updatePreview(){
   const d = collect();
-  const res = await fetch('/templates/offer-slide.html');
+  const tpl = currentSize === 'square' ? 'offer-slide-square.html' : 'offer-slide.html';
+  const res = await fetch('/templates/' + tpl);
   let html = await res.text();
   html = html.replace('<head>', '<head><base href="/templates/">');
   const map = {
@@ -119,6 +128,32 @@ async function updatePreview(){
   $('previewFrame').srcdoc = html;
 }
 
+function applyPreviewSize(){
+  const frame = $('previewFrame');
+  const box = document.querySelector('.preview');
+  if(currentSize === 'square'){
+    box.style.width = '480px'; box.style.height = '480px';
+    frame.style.width = '1080px'; frame.style.height = '1080px';
+    frame.style.transform = 'scale(0.4444)';
+  } else {
+    box.style.width = '360px'; box.style.height = '640px';
+    frame.style.width = '1080px'; frame.style.height = '1920px';
+    frame.style.transform = 'scale(0.3333)';
+  }
+}
+
+function selectSize(size){
+  currentSize = size;
+  $('sizeStory').style.background = size==='story' ? '#0F2359' : '#e9ecef';
+  $('sizeStory').style.color = size==='story' ? '#fff' : '#333';
+  $('sizeSquare').style.background = size==='square' ? '#0F2359' : '#e9ecef';
+  $('sizeSquare').style.color = size==='square' ? '#fff' : '#333';
+  applyPreviewSize();
+  updatePreview();
+}
+$('sizeStory').addEventListener('click', () => selectSize('story'));
+$('sizeSquare').addEventListener('click', () => selectSize('square'));
+
 fields.forEach(f => $(f).addEventListener('input', updatePreview));
 
 $('btnGen').addEventListener('click', async () => {
@@ -127,7 +162,7 @@ $('btnGen').addEventListener('click', async () => {
   try{
     const res = await fetch('/api/generate-bg', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ image_subject: $('image_subject').value })
+      body: JSON.stringify({ image_subject: $('image_subject').value, size: currentSize })
     });
     const data = await res.json();
     if(!res.ok) throw new Error(data.error || 'generation failed');
@@ -148,6 +183,7 @@ $('btnRender').addEventListener('click', async () => {
   try{
     const d = collect();
     d.bg_image = bgImage;
+    d.size = currentSize;
     const res = await fetch('/api/render', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify(d)
@@ -155,7 +191,8 @@ $('btnRender').addEventListener('click', async () => {
     const data = await res.json();
     if(!res.ok) throw new Error(data.error || 'export failed');
     const a = document.createElement('a');
-    a.href = data.image; a.download = data.file || 'offer.png'; a.click();
+    a.href = data.url; a.download = data.file || 'offer.png';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
     setStatus('Exported: ' + data.file, 'ok');
   }catch(e){
     setStatus('Error: ' + e.message, 'err');

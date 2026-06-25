@@ -7,7 +7,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const TEMPLATE_PATH = path.join(__dirname, '..', 'templates', 'offer-slide.html');
+const config = require('../config');
+const TEMPLATES_DIR = path.join(__dirname, '..', 'templates');
 const LOGO_PATH = path.join(__dirname, '..', 'templates', 'logo.png');
 const FONTS_DIR = path.join(__dirname, '..', 'fonts');
 
@@ -43,7 +44,10 @@ function escapeHtml(str) {
  * @returns {string} final HTML ready for export
  */
 function fillTemplate(data) {
-  let html = fs.readFileSync(TEMPLATE_PATH, 'utf8');
+  const size = data.size && config.SIZES[data.size] ? data.size : config.DEFAULT_SIZE;
+  const templateFile = config.SIZES[size].template;
+  const templatePath = path.join(TEMPLATES_DIR, templateFile);
+  let html = fs.readFileSync(templatePath, 'utf8');
 
   // bg_image is a data-URI (not user text) -> not escaped
   const replacements = {

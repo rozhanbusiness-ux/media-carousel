@@ -34,13 +34,14 @@ async function getBrowser() {
  * @param {string} html - full HTML content
  * @returns {Promise<Buffer>}
  */
-async function renderToPng(html) {
+async function renderToPng(html, size) {
+  const dims = (size && config.SIZES && config.SIZES[size]) ? config.SIZES[size] : config.CANVAS;
   const browser = await getBrowser();
   const page = await browser.newPage();
   try {
     await page.setViewport({
-      width: config.CANVAS.width,
-      height: config.CANVAS.height,
+      width: dims.width,
+      height: dims.height,
       deviceScaleFactor: 1,
     });
     // inject <base> so relative assets (fonts/logo) resolve if not embedded
@@ -54,7 +55,7 @@ async function renderToPng(html) {
     await new Promise((r) => setTimeout(r, 300));
     const buf = await page.screenshot({
       type: 'png',
-      clip: { x: 0, y: 0, width: config.CANVAS.width, height: config.CANVAS.height },
+      clip: { x: 0, y: 0, width: dims.width, height: dims.height },
     });
     return buf;
   } finally {

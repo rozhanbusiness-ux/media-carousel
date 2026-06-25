@@ -6,7 +6,7 @@
 const config = require('../config');
 
 // Build the image prompt with fixed brand rules
-function buildImagePrompt(subject) {
+function buildImagePrompt(subject, orientationText) {
   return [
     `Professional high-quality travel photograph of ${subject}.`,
     // rule: sky <= 10% at the very top, rest is city/landmarks
@@ -19,7 +19,7 @@ function buildImagePrompt(subject) {
     // high realism + high contrast
     'Ultra realistic, true-to-life colors, very high contrast, sharp details, high resolution,',
     'vibrant and rich tones, bright clear daylight, aerial or elevated view.',
-    'Vertical 9:16 portrait orientation. No text, no logos, no watermarks, no people in foreground.',
+    orientationText + ' No text, no logos, no watermarks, no people in foreground.',
   ].join(' ');
 }
 
@@ -28,12 +28,17 @@ function buildImagePrompt(subject) {
  * @param {string} subject - destination description
  * @returns {Promise<string>} data:image/png;base64,...
  */
-async function generateBackground(subject) {
+async function generateBackground(subject, size) {
   if (!config.GEMINI_API_KEY) {
     throw new Error('GEMINI_API_KEY is not set. Put it in your .env file.');
   }
 
-  const prompt = buildImagePrompt(subject);
+  const isSquare = size === 'square';
+  const aspectRatio = isSquare ? '1:1' : '9:16';
+  const orientationText = isSquare
+    ? 'Square 1:1 composition.'
+    : 'Vertical 9:16 portrait orientation.';
+  const prompt = buildImagePrompt(subject, orientationText);
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${config.GEMINI_IMAGE_MODEL}:generateContent`;
 
   const res = await fetch(url, {
@@ -44,6 +49,13 @@ async function generateBackground(subject) {
     },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: {
+        responseModalities: ['Image'],
+        imageConfig: {
+          imageSize: config.GEMINI_IMAGE_SIZE || '2K',
+          aspectRatio: aspectRatio,
+        },
+      },
     }),
   });
 
