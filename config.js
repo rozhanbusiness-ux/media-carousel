@@ -18,6 +18,7 @@ module.exports = {
   SIZES: {
     story:  { width: 1080, height: 1920, template: 'offer-slide.html' },
     square: { width: 1080, height: 1080, template: 'offer-slide-square.html' },
+    portrait: { width: 1080, height: 1350, template: 'offer-slide-portrait.html' },
   },
   DEFAULT_SIZE: 'story',
   // Backward-compatible default canvas (story)

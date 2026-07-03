@@ -45,43 +45,63 @@
 </head>
 <body>
   <div class="panel">
-    <h1>Offer Slide Generator</h1>
-    <div class="sub">MEDIA Travel — Story 1080x1920</div>
+    <h1>Angebots-Generator</h1>
+    <div class="sub" id="subLabel">MEDIA Travel — Story 1080x1920</div>
 
-    <div class="row">
-      <div class="field"><label>Origin city</label><input id="origin" value="STUTTGART"></div>
-      <div class="field"><label>Destination</label><input id="destination" value="Barcelona"></div>
+    <div class="field">
+      <label>Angebotstyp</label>
+      <select id="offerType" style="width:100%; padding:11px 13px; border:1.5px solid #dfe3e8; border-radius:9px; font-size:15px;"></select>
     </div>
 
-    <div class="field"><label>Price (EUR)</label><input id="price" value="139"></div>
+    <div id="offerFields">
+      <div class="row">
+        <div class="field"><label>Abflugort</label><input id="origin" value="STUTTGART"></div>
+        <div class="field"><label>Reiseziel</label><input id="destination" value="Barcelona"></div>
+      </div>
 
-    <div class="row">
-      <div class="field"><label>Departure date</label><input id="date_out" value="09.07.2026"></div>
-      <div class="field"><label>Return date</label><input id="date_return" value="15.07.2026"></div>
-    </div>
+      <div class="field"><label>Preis (EUR)</label><input id="price" value="139"></div>
 
-    <div class="row">
-      <div class="field"><label>Baggage 1</label><input id="baggage_1" value="15 KG"></div>
-      <div class="field"><label>Baggage 2</label><input id="baggage_2" value="8 KG"></div>
+      <div class="row">
+        <div class="field"><label>Hinflug</label><input id="date_out" value="09.07.2026"></div>
+        <div class="field"><label>Rückflug</label><input id="date_return" value="15.07.2026"></div>
+      </div>
+
+      <div class="row">
+        <div class="field"><label>Gepäck 1</label><input id="baggage_1" value="15 KG"></div>
+        <div class="field"><label>Gepäck 2</label><input id="baggage_2" value="8 KG"></div>
+      </div>
     </div>
 
     <div class="divider-h"></div>
 
     <div class="field">
-      <label>Background image subject (for AI)</label>
+      <label>Hintergrundbild-Motiv (für KI)</label>
       <input id="image_subject" value="Barcelona Spain city panorama Sagrada Familia">
-      <div class="hint">Describe the destination. Rule: sky &lt;= 10%, rest is city/landmarks.</div>
+      <div class="hint">Beschreiben Sie das Reiseziel. Regel: Himmel &lt;= 10%, Rest ist Stadt/Sehenswürdigkeiten.</div>
     </div>
 
     <div class="field">
-      <label>Output size</label>
-      <div style="display:flex; gap:10px;">
-        <button class="btn" id="sizeStory" style="flex:1; background:#0F2359; color:#fff;">Story 9:16</button>
-        <button class="btn" id="sizeSquare" style="flex:1; background:#e9ecef; color:#333;">Post 1:1</button>
+      <label>Ausgabegröße</label>
+      <div id="sizeChecks" style="display:flex; flex-direction:column; gap:8px;">
+        <label style="display:flex; align-items:center; gap:10px; font-size:15px; cursor:pointer;">
+          <input type="checkbox" id="chkStory" checked style="width:20px; height:20px; accent-color:#0F2359; cursor:pointer;">
+          <span style="flex:1;">Story 9:16</span>
+          <button type="button" class="btn" id="pvStory" style="width:110px; margin:0; padding:8px; font-size:13px; background:#0F2359; color:#fff;">Vorschau</button>
+        </label>
+        <label style="display:flex; align-items:center; gap:10px; font-size:15px; cursor:pointer;">
+          <input type="checkbox" id="chkSquare" style="width:20px; height:20px; accent-color:#0F2359; cursor:pointer;">
+          <span style="flex:1;">Post 1:1</span>
+          <button type="button" class="btn" id="pvSquare" style="width:110px; margin:0; padding:8px; font-size:13px; background:#e9ecef; color:#333;" disabled>Vorschau</button>
+        </label>
+        <label style="display:flex; align-items:center; gap:10px; font-size:15px; cursor:pointer;">
+          <input type="checkbox" id="chkPortrait" style="width:20px; height:20px; accent-color:#0F2359; cursor:pointer;">
+          <span style="flex:1;">Portrait 4:5</span>
+          <button type="button" class="btn" id="pvPortrait" style="width:110px; margin:0; padding:8px; font-size:13px; background:#e9ecef; color:#333;" disabled>Vorschau</button>
+        </label>
       </div>
     </div>
-    <button class="btn btn-navy" id="btnGen">Generate background image</button>
-    <button class="btn btn-gold" id="btnRender" disabled>Export final PNG</button>
+    <button class="btn btn-navy" id="btnGen">Hintergrundbild generieren</button>
+    <button class="btn btn-gold" id="btnRender" disabled>Finales PNG exportieren</button>
 
     <div class="status" id="status"></div>
   </div>
@@ -94,14 +114,45 @@
 
 <script>
 const $ = (id) => document.getElementById(id);
-const fields = ['origin','destination','price','date_out','date_return','baggage_1','baggage_2','image_subject'];
+const offerFields = ['origin','destination','price','date_out','date_return','baggage_1','baggage_2'];
 let bgImage = '';
 let bgId = '';
-let currentSize = 'story';
+let selectedSizes = ['story'];
+let currentSize = 'story'; // size currently shown in the preview
+let currentOfferType = 'flight';
+
+async function loadOfferTypes(){
+  try{
+    const res = await fetch('/api/offer-types');
+    const types = await res.json();
+    const sel = $('offerType');
+    sel.innerHTML = '';
+    types.forEach(t => {
+      const o = document.createElement('option');
+      o.value = t.id; o.textContent = t.displayName;
+      sel.appendChild(o);
+    });
+    sel.value = currentOfferType;
+    sel.addEventListener('change', () => { currentOfferType = sel.value; });
+  }catch(e){ console.error('loadOfferTypes failed:', e); }
+}
+loadOfferTypes();
+const defaultSubjects = {
+  story: 'Barcelona Spain city panorama Sagrada Familia',
+  square: 'Barcelona Spain city panorama Sagrada Familia',
+  portrait: 'Barcelona Spain city panorama Sagrada Familia',
+};
+
+function templateFor(size){
+  if (size === 'square') return 'offer-slide-square.html';
+  if (size === 'portrait') return 'offer-slide-portrait.html';
+  return 'offer-slide.html';
+}
 
 function collect(){
   const d = {};
-  fields.forEach(f => d[f] = $(f).value);
+  offerFields.forEach(f => d[f] = $(f).value);
+  d.image_subject = $('image_subject').value;
   return d;
 }
 
@@ -113,18 +164,22 @@ function setStatus(msg, type){
 
 async function updatePreview(){
   const d = collect();
-  const tpl = currentSize === 'square' ? 'offer-slide-square.html' : 'offer-slide.html';
+  const tpl = templateFor(currentSize);
   const res = await fetch('/templates/' + tpl);
   let html = await res.text();
   html = html.replace('<head>', '<head><base href="/templates/">');
-  const map = {
-    bg_image: bgImage || '/templates/test-city.png',
-    origin: d.origin.toUpperCase(),
-    destination: d.destination,
-    price: d.price.replace(/[^0-9]/g,''),
-    date_out: d.date_out, date_return: d.date_return,
-    baggage_1: d.baggage_1, baggage_2: d.baggage_2,
-  };
+
+  let map;
+  {
+    map = {
+      bg_image: bgImage || '/templates/test-city.png',
+      origin: d.origin.toUpperCase(),
+      destination: d.destination,
+      price: d.price.replace(/[^0-9]/g,''),
+      date_out: d.date_out, date_return: d.date_return,
+      baggage_1: d.baggage_1, baggage_2: d.baggage_2,
+    };
+  }
   for (const [k,v] of Object.entries(map)) html = html.replaceAll('{{'+k+'}}', v);
   $('previewFrame').srcdoc = html;
 }
@@ -136,6 +191,10 @@ function applyPreviewSize(){
     box.style.width = '480px'; box.style.height = '480px';
     frame.style.width = '1080px'; frame.style.height = '1080px';
     frame.style.transform = 'scale(0.4444)';
+  } else if(currentSize === 'portrait'){
+    box.style.width = '432px'; box.style.height = '540px';
+    frame.style.width = '1080px'; frame.style.height = '1350px';
+    frame.style.transform = 'scale(0.4)';
   } else {
     box.style.width = '360px'; box.style.height = '640px';
     frame.style.width = '1080px'; frame.style.height = '1920px';
@@ -143,19 +202,50 @@ function applyPreviewSize(){
   }
 }
 
-function selectSize(size){
+const SIZE_CTRLS = {
+  story:  { chk:'chkStory',  pv:'pvStory'  },
+  square: { chk:'chkSquare', pv:'pvSquare' },
+  portrait: { chk:'chkPortrait', pv:'pvPortrait' },
+};
+
+function syncSizeControls(){
+  selectedSizes = Object.entries(SIZE_CTRLS)
+    .filter(([size, c]) => $(c.chk).checked)
+    .map(([size]) => size);
+  for (const [size, c] of Object.entries(SIZE_CTRLS)){
+    const on = selectedSizes.includes(size);
+    const active = size === currentSize;
+    $(c.pv).disabled = !on;
+    $(c.pv).style.background = on ? (active ? '#0F2359' : '#5a6b96') : '#e9ecef';
+    $(c.pv).style.color = on ? '#fff' : '#333';
+  }
+}
+
+function showSize(size){
   currentSize = size;
-  $('sizeStory').style.background = size==='story' ? '#0F2359' : '#e9ecef';
-  $('sizeStory').style.color = size==='story' ? '#fff' : '#333';
-  $('sizeSquare').style.background = size==='square' ? '#0F2359' : '#e9ecef';
-  $('sizeSquare').style.color = size==='square' ? '#fff' : '#333';
+  $('image_subject').value = defaultSubjects[currentSize];
+  $('subLabel').textContent = 'MEDIA Travel — ' + currentSize;
+  syncSizeControls();
   applyPreviewSize();
   updatePreview();
 }
-$('sizeStory').addEventListener('click', () => selectSize('story'));
-$('sizeSquare').addEventListener('click', () => selectSize('square'));
 
-fields.forEach(f => $(f).addEventListener('input', updatePreview));
+for (const [size, c] of Object.entries(SIZE_CTRLS)){
+  $(c.chk).addEventListener('change', () => {
+    // keep at least one size selected
+    const checkedCount = Object.values(SIZE_CTRLS).filter(x => $(x.chk).checked).length;
+    if (checkedCount === 0){ $(c.chk).checked = true; return; }
+    // if the currently previewed size was unchecked, move preview to the first selected
+    syncSizeControls();
+    if (!selectedSizes.includes(currentSize)) showSize(selectedSizes[0]);
+  });
+  $(c.pv).addEventListener('click', () => showSize(size));
+}
+syncSizeControls();
+
+
+offerFields.forEach(f => $(f).addEventListener('input', updatePreview));
+$('image_subject').addEventListener('input', updatePreview);
 
 $('btnGen').addEventListener('click', async () => {
   setStatus('Generating image via Gemini...', 'load');
@@ -163,7 +253,7 @@ $('btnGen').addEventListener('click', async () => {
   try{
     const res = await fetch('/api/generate-bg', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ image_subject: $('image_subject').value, size: currentSize })
+      body: JSON.stringify({ image_subject: $('image_subject').value, size: 'story', offer_type: currentOfferType })
     });
     const data = await res.json();
     if(!res.ok) throw new Error(data.error || 'generation failed');
@@ -185,17 +275,20 @@ $('btnRender').addEventListener('click', async () => {
   try{
     const d = collect();
     d.bgId = bgId;
-    d.size = currentSize;
-    const res = await fetch('/api/render', {
+    d.sizes = selectedSizes;
+    const res = await fetch('/api/render-all', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify(d)
     });
     const data = await res.json();
     if(!res.ok) throw new Error(data.error || 'export failed');
-    const a = document.createElement('a');
-    a.href = data.url; a.download = data.file || 'offer.png';
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    setStatus('Exported: ' + data.file, 'ok');
+    for (const f of data.files){
+      const a = document.createElement('a');
+      a.href = f.url; a.download = f.file;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      await new Promise(r => setTimeout(r, 400));
+    }
+    setStatus('Exportiert: ' + data.files.length + ' Dateien', 'ok');
   }catch(e){
     setStatus('Error: ' + e.message, 'err');
   }finally{

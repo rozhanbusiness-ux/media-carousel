@@ -28,6 +28,7 @@ const FONT_ANTON = fontUri('Anton.ttf');
 const FONT_PLAYFAIR = fontUri('PlayfairDisplay-Bold.ttf');
 const FONT_MONTSERRAT = fontUri('Montserrat-Bold.ttf');
 const FONT_DMSERIF = fontUri('DMSerifDisplay-Regular.ttf');
+const FONT_GREATVIBES = fontUri('GreatVibes-Regular.ttf');
 
 // Escape user-supplied HTML-sensitive characters (basic safety)
 function escapeHtml(str) {
@@ -75,6 +76,7 @@ function fillTemplate(data) {
   if (FONT_PLAYFAIR) html = html.replace("url('../fonts/PlayfairDisplay-Bold.ttf')", `url('${FONT_PLAYFAIR}')`);
   if (FONT_MONTSERRAT) html = html.replace("url('../fonts/Montserrat-Bold.ttf')", `url('${FONT_MONTSERRAT}')`);
   if (FONT_DMSERIF) html = html.replace("url('../fonts/DMSerifDisplay-Regular.ttf')", `url('${FONT_DMSERIF}')`);
+  if (FONT_GREATVIBES) html = html.replace("url('../fonts/GreatVibes-Regular.ttf')", `url('${FONT_GREATVIBES}')`);
 
   return html;
 }
