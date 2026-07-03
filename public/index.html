@@ -53,6 +53,11 @@
       <select id="offerType" style="width:100%; padding:11px 13px; border:1.5px solid #dfe3e8; border-radius:9px; font-size:15px;"></select>
     </div>
 
+    <div class="field">
+      <label>Screenshot hochladen (automatisch ausfüllen)</label>
+      <input type="file" id="shotUpload" accept="image/*" style="width:100%; padding:8px; border:1.5px dashed #C9A227; border-radius:9px; font-size:14px; cursor:pointer;">
+    </div>
+
     <div id="offerFields">
       <div class="row">
         <div class="field"><label>Abflugort</label><input id="origin" value="STUTTGART"></div>
@@ -73,6 +78,14 @@
     </div>
 
     <div class="divider-h"></div>
+
+    <div class="field">
+      <label>Hintergrundbild zeigt</label>
+      <div style="display:flex; gap:10px;">
+        <button type="button" class="btn" id="bgCityOrigin" style="flex:1; margin:0; padding:9px; font-size:14px; background:#0F2359; color:#fff;">Abflugort</button>
+        <button type="button" class="btn" id="bgCityDest" style="flex:1; margin:0; padding:9px; font-size:14px; background:#e9ecef; color:#333;">Reiseziel</button>
+      </div>
+    </div>
 
     <div class="field">
       <label>Hintergrundbild-Motiv (für KI)</label>
@@ -246,6 +259,62 @@ syncSizeControls();
 
 offerFields.forEach(f => $(f).addEventListener('input', updatePreview));
 $('image_subject').addEventListener('input', updatePreview);
+
+let bgCityMode = 'origin'; // 'origin' | 'destination'
+
+function cityForBackground(){
+  const city = bgCityMode === 'origin' ? $('origin').value : $('destination').value;
+  return city ? (city + ' city panorama, famous landmarks, aerial view') : '';
+}
+
+function paintBgCityToggle(){
+  $('bgCityOrigin').style.background = bgCityMode==='origin' ? '#0F2359' : '#e9ecef';
+  $('bgCityOrigin').style.color = bgCityMode==='origin' ? '#fff' : '#333';
+  $('bgCityDest').style.background = bgCityMode==='destination' ? '#0F2359' : '#e9ecef';
+  $('bgCityDest').style.color = bgCityMode==='destination' ? '#fff' : '#333';
+}
+
+$('bgCityOrigin').addEventListener('click', () => {
+  bgCityMode = 'origin'; paintBgCityToggle();
+  const subj = cityForBackground(); if (subj) $('image_subject').value = subj;
+});
+$('bgCityDest').addEventListener('click', () => {
+  bgCityMode = 'destination'; paintBgCityToggle();
+  const subj = cityForBackground(); if (subj) $('image_subject').value = subj;
+});
+
+$('shotUpload').addEventListener('change', async () => {
+  const file = $('shotUpload').files[0];
+  if (!file) return;
+  setStatus('Analysiere Screenshot...', 'load');
+  try{
+    const dataUri = await new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result);
+      r.onerror = () => reject(new Error('Datei konnte nicht gelesen werden'));
+      r.readAsDataURL(file);
+    });
+    const res = await fetch('/api/extract', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ image: dataUri, offer_type: currentOfferType })
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || 'Extraktion fehlgeschlagen');
+    let filled = 0;
+    for (const [key, val] of Object.entries(data.fields)){
+      const el = document.getElementById(key);
+      if (el && val){ el.value = val; filled++; }
+    }
+    const subj = cityForBackground();
+    if (subj) $('image_subject').value = subj;
+    updatePreview();
+    setStatus('Felder ausgefüllt: ' + filled + ' — bitte prüfen und korrigieren', 'ok');
+  }catch(e){
+    setStatus('Fehler: ' + e.message, 'err');
+  }finally{
+    $('shotUpload').value = '';
+  }
+});
 
 $('btnGen').addEventListener('click', async () => {
   setStatus('Generating image via Gemini...', 'load');

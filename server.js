@@ -16,6 +16,7 @@ const { validate, normalize } = require('./src/offer-schema');
 const { listOfferTypes, getOfferType } = require('./src/offer-types');
 const { fillTemplate } = require('./src/fill-template');
 const { generateBackground } = require('./src/gemini-image');
+const { extractFromImage } = require('./src/extract-offer');
 const { renderToPng } = require('./src/render');
 
 const app = express();
@@ -53,6 +54,27 @@ app.post('/api/generate-bg', async (req, res) => {
     res.json({ image: dataUri, bgId: bgId });
   } catch (err) {
     console.error('generate-bg:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---- extract offer fields from an uploaded screenshot ----
+app.post('/api/extract', async (req, res) => {
+  try {
+    const img = (req.body.image || '').trim();
+    if (!img) return res.status(400).json({ error: 'image is required' });
+    const offerTypeId = req.body.offer_type || 'flight';
+
+    // Accept both raw base64 and full data-URIs
+    let mimeType = 'image/png';
+    let b64 = img;
+    const m = img.match(/^data:(image\/[a-zA-Z+]+);base64,(.*)$/s);
+    if (m) { mimeType = m[1]; b64 = m[2]; }
+
+    const fields = await extractFromImage(b64, mimeType, offerTypeId);
+    res.json({ fields: fields });
+  } catch (err) {
+    console.error('extract:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
