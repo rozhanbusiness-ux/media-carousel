@@ -8,3 +8,5 @@ dates-app.png
 cache/*.txt
 test-extract.png
 test-extract.js
+test-package.js
+test-package-output.png

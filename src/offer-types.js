@@ -42,6 +42,32 @@ const OFFER_TYPES = {
     },
   },
 
+  package: {
+    id: 'package',
+    displayName: 'Pauschalreise',
+    sizes: ['square', 'story', 'portrait'],
+    slides: 2, // hotel slide + details slide
+
+    buildBackgroundPrompt(subject, orientationText) {
+      // same city-panorama composition as flight offers
+      return OFFER_TYPES.flight.buildBackgroundPrompt(subject, orientationText);
+    },
+
+    fields: {
+      destination:  { label: 'Reiseziel',      type: 'text', required: true,  maxLen: 20, default: '' },
+      hotel_name:   { label: 'Hotelname',      type: 'text', required: true,  maxLen: 40, default: '' },
+      price:        { label: 'Preis',          type: 'text', required: true,  maxLen: 8,  default: '' },
+      date_from:    { label: 'Reisedatum von', type: 'text', required: true,  maxLen: 12, default: '' },
+      date_to:      { label: 'Reisedatum bis', type: 'text', required: true,  maxLen: 12, default: '' },
+      origin:       { label: 'Hinflug',        type: 'text', required: true,  maxLen: 18, default: '' },
+      board:        { label: 'Verpflegung',    type: 'text', required: false, maxLen: 20, default: '' },
+      transfer:     { label: 'Transfer',       type: 'text', required: false, maxLen: 15, default: '' },
+      stars:        { label: 'Bewertung',      type: 'text', required: false, maxLen: 1,  default: '' },
+      promo_line:   { label: 'Aktionszeile',   type: 'text', required: false, maxLen: 40, default: '', manual: true },
+      room_details: { label: 'Zimmerdetails',  type: 'text', required: false, maxLen: 60, default: '', manual: true },
+    },
+  },
+
 };
 
 function getOfferType(id) {
