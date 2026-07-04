@@ -54,26 +54,31 @@
     </div>
 
     <div class="field">
+      <label>Angebote</label>
+      <div id="offersStrip" style="display:flex; gap:8px; flex-wrap:wrap;"></div>
+    </div>
+
+    <div class="field">
       <label>Screenshot hochladen (automatisch ausfüllen)</label>
-      <input type="file" id="shotUpload" accept="image/*" style="width:100%; padding:8px; border:1.5px dashed #C9A227; border-radius:9px; font-size:14px; cursor:pointer;">
+      <input type="file" id="shotUpload" accept="image/*" multiple style="width:100%; padding:8px; border:1.5px dashed #C9A227; border-radius:9px; font-size:14px; cursor:pointer;">
     </div>
 
     <div id="offerFields">
       <div class="row">
-        <div class="field"><label>Abflugort</label><input id="origin" value="STUTTGART"></div>
-        <div class="field"><label>Reiseziel</label><input id="destination" value="Barcelona"></div>
+        <div class="field"><label>Abflugort</label><input id="origin" value=""></div>
+        <div class="field"><label>Reiseziel</label><input id="destination" value=""></div>
       </div>
 
-      <div class="field"><label>Preis (EUR)</label><input id="price" value="139"></div>
+      <div class="field"><label>Preis (EUR)</label><input id="price" value=""></div>
 
       <div class="row">
-        <div class="field"><label>Hinflug</label><input id="date_out" value="09.07.2026"></div>
-        <div class="field"><label>Rückflug</label><input id="date_return" value="15.07.2026"></div>
+        <div class="field"><label>Hinflug</label><input id="date_out" value=""></div>
+        <div class="field"><label>Rückflug</label><input id="date_return" value=""></div>
       </div>
 
       <div class="row">
-        <div class="field"><label>Gepäck 1</label><input id="baggage_1" value="15 KG"></div>
-        <div class="field"><label>Gepäck 2</label><input id="baggage_2" value="8 KG"></div>
+        <div class="field"><label>Gepäck 1</label><input id="baggage_1" value=""></div>
+        <div class="field"><label>Gepäck 2</label><input id="baggage_2" value=""></div>
       </div>
     </div>
 
@@ -89,7 +94,7 @@
 
     <div class="field">
       <label>Hintergrundbild-Motiv (für KI)</label>
-      <input id="image_subject" value="Barcelona Spain city panorama Sagrada Familia">
+      <input id="image_subject" value="">
       <div class="hint">Beschreiben Sie das Reiseziel. Regel: Himmel &lt;= 10%, Rest ist Stadt/Sehenswürdigkeiten.</div>
     </div>
 
@@ -115,6 +120,7 @@
     </div>
     <button class="btn btn-navy" id="btnGen">Hintergrundbild generieren</button>
     <button class="btn btn-gold" id="btnRender" disabled>Finales PNG exportieren</button>
+    <button class="btn btn-gold" id="btnRenderAll" style="background:#8a6d1f;">Alle Angebote exportieren</button>
 
     <div class="status" id="status"></div>
   </div>
@@ -133,6 +139,86 @@ let bgId = '';
 let selectedSizes = ['story'];
 let currentSize = 'story'; // size currently shown in the preview
 let currentOfferType = 'flight';
+let bgCityMode = 'origin'; // 'origin' | 'destination'
+const generatingOffers = new Set(); // indexes currently generating
+
+// ---- multi-offer state ----
+let offers = [];           // [{fields:{...}, bgImage:'', bgId:'', bgCityMode:'origin'}]
+let currentOfferIndex = 0;
+
+function emptyOffer(){
+  const f = {};
+  offerFields.forEach(k => f[k] = '');
+  return { fields: f, bgImage: '', bgId: '', bgCityMode: 'origin' };
+}
+
+function saveCurrentOffer(){
+  if (!offers[currentOfferIndex]) return;
+  const o = offers[currentOfferIndex];
+  offerFields.forEach(k => o.fields[k] = $(k).value);
+  o.bgImage = bgImage; o.bgId = bgId; o.bgCityMode = bgCityMode;
+  o.imageSubject = $('image_subject').value;
+}
+
+function loadOffer(i){
+  const o = offers[i];
+  currentOfferIndex = i;
+  offerFields.forEach(k => $(k).value = o.fields[k] || '');
+  bgImage = o.bgImage || ''; bgId = o.bgId || ''; bgCityMode = o.bgCityMode || 'origin';
+  paintBgCityToggle();
+  if (o.imageSubject){
+    $('image_subject').value = o.imageSubject;
+  } else {
+    const subj = cityForBackground();
+    $('image_subject').value = subj || '';
+    o.imageSubject = $('image_subject').value;
+  }
+  renderOffersStrip();
+  updatePreview();
+}
+
+function renderOffersStrip(){
+  const strip = $('offersStrip');
+  strip.innerHTML = '';
+  offers.forEach((o, i) => {
+    const card = document.createElement('div');
+    const active = i === currentOfferIndex;
+    card.style.cssText = 'padding:8px 12px; border-radius:9px; cursor:pointer; font-size:13px; display:flex; align-items:center; gap:8px;'
+      + (active ? 'background:#0F2359; color:#fff;' : 'background:#e9ecef; color:#333;');
+    const label = (o.fields.origin || '?') + ' → ' + (o.fields.destination || '?')
+      + (o.fields.price ? ' | ' + o.fields.price + ' €' : '');
+    const txt = document.createElement('span');
+    txt.textContent = (i+1) + '. ' + label;
+    card.appendChild(txt);
+    if (offers.length > 1){
+      const del = document.createElement('span');
+      del.textContent = '✕';
+      del.style.cssText = 'font-weight:bold; opacity:0.7;';
+      del.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        offers.splice(i, 1);
+        if (currentOfferIndex >= offers.length) currentOfferIndex = offers.length - 1;
+        loadOffer(currentOfferIndex);
+      });
+      card.appendChild(del);
+    }
+    card.addEventListener('click', () => {
+      if (i === currentOfferIndex) return;
+      saveCurrentOffer();
+      loadOffer(i);
+    });
+    strip.appendChild(card);
+  });
+  const add = document.createElement('div');
+  add.textContent = '+ Neu';
+  add.style.cssText = 'padding:8px 12px; border-radius:9px; cursor:pointer; font-size:13px; background:#C9A227; color:#fff; font-weight:bold;';
+  add.addEventListener('click', () => {
+    saveCurrentOffer();
+    offers.push(emptyOffer());
+    loadOffer(offers.length - 1);
+  });
+  strip.appendChild(add);
+}
 
 async function loadOfferTypes(){
   try{
@@ -150,11 +236,9 @@ async function loadOfferTypes(){
   }catch(e){ console.error('loadOfferTypes failed:', e); }
 }
 loadOfferTypes();
-const defaultSubjects = {
-  story: 'Barcelona Spain city panorama Sagrada Familia',
-  square: 'Barcelona Spain city panorama Sagrada Familia',
-  portrait: 'Barcelona Spain city panorama Sagrada Familia',
-};
+offers.push(emptyOffer());
+saveCurrentOffer();
+renderOffersStrip();
 
 function templateFor(size){
   if (size === 'square') return 'offer-slide-square.html';
@@ -236,7 +320,6 @@ function syncSizeControls(){
 
 function showSize(size){
   currentSize = size;
-  $('image_subject').value = defaultSubjects[currentSize];
   $('subLabel').textContent = 'MEDIA Travel — ' + currentSize;
   syncSizeControls();
   applyPreviewSize();
@@ -257,10 +340,17 @@ for (const [size, c] of Object.entries(SIZE_CTRLS)){
 syncSizeControls();
 
 
-offerFields.forEach(f => $(f).addEventListener('input', updatePreview));
+offerFields.forEach(f => $(f).addEventListener('input', () => {
+  if (f === 'origin' || f === 'destination'){
+    const relevant = (bgCityMode === 'origin' && f === 'origin') || (bgCityMode === 'destination' && f === 'destination');
+    if (relevant){
+      const subj = cityForBackground();
+      $('image_subject').value = subj || '';
+    }
+  }
+  updatePreview(); saveCurrentOffer(); renderOffersStrip();
+}));
 $('image_subject').addEventListener('input', updatePreview);
-
-let bgCityMode = 'origin'; // 'origin' | 'destination'
 
 function cityForBackground(){
   const city = bgCityMode === 'origin' ? $('origin').value : $('destination').value;
@@ -284,31 +374,60 @@ $('bgCityDest').addEventListener('click', () => {
 });
 
 $('shotUpload').addEventListener('change', async () => {
-  const file = $('shotUpload').files[0];
-  if (!file) return;
-  setStatus('Analysiere Screenshot...', 'load');
-  try{
-    const dataUri = await new Promise((resolve, reject) => {
-      const r = new FileReader();
-      r.onload = () => resolve(r.result);
-      r.onerror = () => reject(new Error('Datei konnte nicht gelesen werden'));
-      r.readAsDataURL(file);
-    });
+  const files = Array.from($('shotUpload').files);
+  if (!files.length) return;
+
+  const readFile = (file) => new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = () => reject(new Error('Datei konnte nicht gelesen werden'));
+    r.readAsDataURL(file);
+  });
+
+  const extractOne = async (dataUri) => {
     const res = await fetch('/api/extract', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ image: dataUri, offer_type: currentOfferType })
     });
     const data = await res.json();
     if(!res.ok) throw new Error(data.error || 'Extraktion fehlgeschlagen');
-    let filled = 0;
-    for (const [key, val] of Object.entries(data.fields)){
-      const el = document.getElementById(key);
-      if (el && val){ el.value = val; filled++; }
+    return data.fields;
+  };
+
+  try{
+    if (files.length === 1){
+      // single file: fill the currently open offer (existing behavior)
+      setStatus('Analysiere Screenshot...', 'load');
+      const fields = await extractOne(await readFile(files[0]));
+      let filled = 0;
+      for (const [key, val] of Object.entries(fields)){
+        const el = document.getElementById(key);
+        if (el && val){ el.value = val; filled++; }
+      }
+      const subj = cityForBackground();
+      if (subj) $('image_subject').value = subj;
+      saveCurrentOffer();
+      renderOffersStrip();
+      updatePreview();
+      setStatus('Felder ausgefüllt: ' + filled + ' — bitte prüfen und korrigieren', 'ok');
+    } else {
+      // multiple files: each becomes a new offer card
+      saveCurrentOffer();
+      let done = 0;
+      for (const file of files){
+        setStatus('Analysiere Screenshot ' + (done+1) + ' von ' + files.length + '...', 'load');
+        const fields = await extractOne(await readFile(file));
+        const o = emptyOffer();
+        for (const [key, val] of Object.entries(fields)){
+          if (key in o.fields) o.fields[key] = val;
+        }
+        offers.push(o);
+        done++;
+        renderOffersStrip();
+      }
+      loadOffer(offers.length - 1);
+      setStatus(done + ' Angebote hinzugefügt — bitte prüfen und korrigieren', 'ok');
     }
-    const subj = cityForBackground();
-    if (subj) $('image_subject').value = subj;
-    updatePreview();
-    setStatus('Felder ausgefüllt: ' + filled + ' — bitte prüfen und korrigieren', 'ok');
   }catch(e){
     setStatus('Fehler: ' + e.message, 'err');
   }finally{
@@ -317,8 +436,14 @@ $('shotUpload').addEventListener('change', async () => {
 });
 
 $('btnGen').addEventListener('click', async () => {
-  setStatus('Generating image via Gemini...', 'load');
-  $('btnGen').disabled = true;
+  const targetIndex = currentOfferIndex; // remember which offer requested this
+  saveCurrentOffer();
+  setStatus('Generiere Hintergrundbild...', 'load');
+  if (generatingOffers.has(targetIndex)){
+    setStatus('Dieses Angebot wird bereits generiert...', 'load');
+    return;
+  }
+  generatingOffers.add(targetIndex);
   try{
     const res = await fetch('/api/generate-bg', {
       method:'POST', headers:{'Content-Type':'application/json'},
@@ -326,15 +451,19 @@ $('btnGen').addEventListener('click', async () => {
     });
     const data = await res.json();
     if(!res.ok) throw new Error(data.error || 'generation failed');
-    bgImage = data.image;
-    bgId = data.bgId || '';
-    await updatePreview();
-    setStatus('Image generated. You can export now.', 'ok');
+    // write result into the offer that requested it, not into whatever is open now
+    offers[targetIndex].bgImage = data.image;
+    offers[targetIndex].bgId = data.bgId || '';
+    if (targetIndex === currentOfferIndex){
+      bgImage = data.image; bgId = data.bgId || '';
+      await updatePreview();
+    }
+    setStatus('Hintergrundbild für Angebot ' + (targetIndex+1) + ' generiert', 'ok');
     $('btnRender').disabled = false;
   }catch(e){
-    setStatus('Error: ' + e.message, 'err');
+    setStatus('Fehler: ' + e.message, 'err');
   }finally{
-    $('btnGen').disabled = false;
+    generatingOffers.delete(targetIndex);
   }
 });
 
@@ -362,6 +491,48 @@ $('btnRender').addEventListener('click', async () => {
     setStatus('Error: ' + e.message, 'err');
   }finally{
     $('btnRender').disabled = false;
+  }
+});
+
+$('btnRenderAll').addEventListener('click', async () => {
+  saveCurrentOffer();
+  const ready = offers.filter(o => o.bgId);
+  const skipped = offers.length - ready.length;
+  if (!ready.length){
+    setStatus('Kein Angebot hat ein generiertes Hintergrundbild', 'err');
+    return;
+  }
+  $('btnRenderAll').disabled = true;
+  let files = 0;
+  try{
+    for (let i = 0; i < ready.length; i++){
+      setStatus('Exportiere Angebot ' + (i+1) + ' von ' + ready.length + '...', 'load');
+      const o = ready[i];
+      const d = {};
+      offerFields.forEach(k => d[k] = o.fields[k]);
+      d.bgId = o.bgId;
+      d.sizes = selectedSizes;
+      const res = await fetch('/api/render-all', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(d)
+      });
+      const data = await res.json();
+      if(!res.ok) throw new Error(data.error || 'Export fehlgeschlagen');
+      for (const f of data.files){
+        const a = document.createElement('a');
+        a.href = f.url; a.download = f.file;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        files++;
+        await new Promise(r => setTimeout(r, 400));
+      }
+    }
+    let msg = 'Exportiert: ' + files + ' Dateien (' + ready.length + ' Angebote)';
+    if (skipped > 0) msg += ' — ' + skipped + ' ohne Hintergrund übersprungen';
+    setStatus(msg, 'ok');
+  }catch(e){
+    setStatus('Fehler: ' + e.message, 'err');
+  }finally{
+    $('btnRenderAll').disabled = false;
   }
 });
 

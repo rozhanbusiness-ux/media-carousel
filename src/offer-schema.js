@@ -10,8 +10,8 @@ const FIELDS = {
   price:         { label: 'Price (digits)',  type: 'text', required: true, maxLen: 6  },
   date_out:      { label: 'Departure date',  type: 'text', required: true, maxLen: 12 },
   date_return:   { label: 'Return date',     type: 'text', required: true, maxLen: 12 },
-  baggage_1:     { label: 'Baggage 1',       type: 'text', required: true, maxLen: 8  },
-  baggage_2:     { label: 'Baggage 2',       type: 'text', required: true, maxLen: 8  },
+  baggage_1:     { label: 'Baggage 1',       type: 'text', required: false, maxLen: 8  },
+  baggage_2:     { label: 'Baggage 2',       type: 'text', required: false, maxLen: 8  },
   image_subject: { label: 'Image subject',   type: 'text', required: true, maxLen: 60 },
 };
 

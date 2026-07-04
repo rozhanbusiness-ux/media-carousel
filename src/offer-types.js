@@ -22,8 +22,10 @@ const OFFER_TYPES = {
         'daytime, clear blue sky only — absolutely no sunset, no orange, no golden sky at the top.',
         'Ultra realistic, true-to-life colors, very high contrast, sharp details, high resolution,',
         'vibrant and rich tones, bright clear daylight, aerial or elevated view.',
-        'IMPORTANT: keep all key landmarks and visual interest in the vertical CENTER of the frame,',
-        'because the image will also be cropped to square and 4:5 formats from the middle.',
+        'CRITICAL COMPOSITION RULE: place the city skyline and all key landmarks in the UPPER-MIDDLE band',
+        'of the frame, roughly between 15 and 60 percent of the image height from the top.',
+        'The bottom 40 percent may contain water, streets or foreground that can be safely cropped away,',
+        'because the image will be cropped to square and 4:5 formats keeping the upper part.',
         orientationText + ' No text, no logos, no watermarks, no people in foreground.',
       ].join(' ');
     },
