@@ -10,3 +10,5 @@ test-extract.png
 test-extract.js
 test-package.js
 test-package-output.png
+test-package-details.js
+test-package-details-output.png
