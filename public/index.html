@@ -565,6 +565,7 @@ $('btnRender').addEventListener('click', async () => {
     const d = collect();
     d.bgId = bgId;
     d.sizes = selectedSizes;
+    d.offer_type = currentOfferType;
     const res = await fetch('/api/render-all', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify(d)
@@ -603,6 +604,7 @@ $('btnRenderAll').addEventListener('click', async () => {
       offerFields.forEach(k => d[k] = o.fields[k]);
       d.bgId = o.bgId;
       d.sizes = selectedSizes;
+      d.offer_type = currentOfferType;
       const res = await fetch('/api/render-all', {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify(d)
