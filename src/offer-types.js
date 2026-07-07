@@ -11,6 +11,12 @@ const OFFER_TYPES = {
     id: 'flight',
     displayName: 'Flug',                 // German UI name
     sizes: ['square', 'story', 'portrait'],  // available sizes for this type
+    // templates per size: array = slides rendered per offer (flight = 1 slide)
+    templates: {
+      story:    ['offer-slide.html'],
+      square:   ['offer-slide-square.html'],
+      portrait: ['offer-slide-portrait.html'],
+    },
 
     // Background prompt builder (subject = user's image description)
     buildBackgroundPrompt(subject, orientationText) {
@@ -45,8 +51,11 @@ const OFFER_TYPES = {
   package: {
     id: 'package',
     displayName: 'Pauschalreise',
-    sizes: ['square', 'story', 'portrait'],
-    slides: 2, // hotel slide + details slide
+    sizes: ['story'], // square/portrait templates not built yet
+    // templates per size: package renders a PAIR per offer (hotel + details)
+    templates: {
+      story: ['package-hotel.html', 'package-details.html'],
+    },
 
     buildBackgroundPrompt(subject, orientationText) {
       // same city-panorama composition as flight offers
@@ -57,10 +66,10 @@ const OFFER_TYPES = {
       destination:  { label: 'Reiseziel',      type: 'text', required: true,  maxLen: 20, default: '' },
       hotel_name:   { label: 'Hotelname',      type: 'text', required: true,  maxLen: 40, default: '' },
       price:        { label: 'Preis',          type: 'text', required: true,  maxLen: 8,  default: '' },
-      date_from:    { label: 'Reisedatum von', type: 'text', required: true,  maxLen: 12, default: '' },
-      date_to:      { label: 'Reisedatum bis', type: 'text', required: true,  maxLen: 12, default: '' },
+      date_from:    { label: 'Reisedatum von', type: 'date', required: true,  maxLen: 12, default: '' },
+      date_to:      { label: 'Reisedatum bis', type: 'date', required: true,  maxLen: 12, default: '' },
       origin:       { label: 'Hinflug',        type: 'text', required: true,  maxLen: 18, default: '' },
-      board:        { label: 'Verpflegung',    type: 'text', required: false, maxLen: 20, default: '' },
+      board:        { label: 'Verpflegung',    type: 'select', required: false, maxLen: 20, default: '', options: ['nur Übernachtung', 'Frühstück', 'Halb Pension', 'Full Pension', 'All Inklusive', 'All Inklusive +'] },
       transfer:     { label: 'Transfer',       type: 'text', required: false, maxLen: 15, default: '' },
       stars:        { label: 'Bewertung',      type: 'text', required: false, maxLen: 1,  default: '' },
       promo_line:   { label: 'Aktionszeile',   type: 'text', required: false, maxLen: 40, default: '', manual: true },

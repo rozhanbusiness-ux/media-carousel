@@ -47,6 +47,7 @@
   <div class="panel">
     <h1>Angebots-Generator</h1>
     <div class="sub" id="subLabel">MEDIA Travel — Story 1080x1920</div>
+    <button type="button" class="btn" id="btnSlideToggle" style="display:none; width:auto; padding:8px 18px; font-size:13px; background:#e9ecef; color:#333; margin-bottom:12px;">Folie: 1/2</button>
 
     <div class="field">
       <label>Angebotstyp</label>
@@ -63,24 +64,7 @@
       <input type="file" id="shotUpload" accept="image/*" multiple style="width:100%; padding:8px; border:1.5px dashed #C9A227; border-radius:9px; font-size:14px; cursor:pointer;">
     </div>
 
-    <div id="offerFields">
-      <div class="row">
-        <div class="field"><label>Abflugort</label><input id="origin" value=""></div>
-        <div class="field"><label>Reiseziel</label><input id="destination" value=""></div>
-      </div>
-
-      <div class="field"><label>Preis (EUR)</label><input id="price" value=""></div>
-
-      <div class="row">
-        <div class="field"><label>Hinflug</label><input id="date_out" value=""></div>
-        <div class="field"><label>Rückflug</label><input id="date_return" value=""></div>
-      </div>
-
-      <div class="row">
-        <div class="field"><label>Gepäck 1</label><input id="baggage_1" value=""></div>
-        <div class="field"><label>Gepäck 2</label><input id="baggage_2" value=""></div>
-      </div>
-    </div>
+    <div id="offerFields"></div>
 
     <div class="divider-h"></div>
 
@@ -133,11 +117,49 @@
 
 <script>
 const $ = (id) => document.getElementById(id);
-const offerFields = ['origin','destination','price','date_out','date_return','baggage_1','baggage_2'];
+let offerFields = []; // rebuilt from the selected offer type's registry
+let currentTypeDef = null;
+
+function buildFieldsUI(typeDef){
+  currentTypeDef = typeDef;
+  offerFields = Object.keys(typeDef.fields);
+  const box = $('offerFields');
+  box.innerHTML = '';
+  for (const [key, f] of Object.entries(typeDef.fields)){
+    const wrap = document.createElement('div');
+    wrap.className = 'field';
+    const lbl = document.createElement('label');
+    lbl.textContent = f.label + (f.manual ? ' (manuell)' : '');
+    let inp;
+    if (f.type === 'select'){
+      inp = document.createElement('select');
+      inp.style.cssText = 'width:100%; padding:11px 13px; border:1.5px solid #dfe3e8; border-radius:9px; font-size:15px;';
+      const empty = document.createElement('option');
+      empty.value = ''; empty.textContent = '—';
+      inp.appendChild(empty);
+      (f.options || []).forEach(opt => {
+        const o = document.createElement('option');
+        o.value = opt; o.textContent = opt;
+        inp.appendChild(o);
+      });
+    } else if (f.type === 'date'){
+      inp = document.createElement('input');
+      inp.type = 'date';
+      // store German format in a data attribute via change handler below
+    } else {
+      inp = document.createElement('input');
+    }
+    inp.id = key;
+    wrap.appendChild(lbl); wrap.appendChild(inp);
+    box.appendChild(wrap);
+    attachFieldListener(key);
+  }
+}
 let bgImage = '';
 let bgId = '';
 let selectedSizes = ['story'];
 let currentSize = 'story'; // size currently shown in the preview
+let currentSlideIndex = 0; // which template of the pair is previewed
 let currentOfferType = 'flight';
 let bgCityMode = 'origin'; // 'origin' | 'destination'
 const generatingOffers = new Set(); // indexes currently generating
@@ -232,8 +254,45 @@ async function loadOfferTypes(){
       sel.appendChild(o);
     });
     sel.value = currentOfferType;
-    sel.addEventListener('change', () => { currentOfferType = sel.value; });
+    await loadTypeDef(currentOfferType);
+    sel.addEventListener('change', async () => {
+      currentOfferType = sel.value;
+      await loadTypeDef(currentOfferType);
+      // force a size the new type actually supports
+      const avail = currentTypeDef.sizes || ['story'];
+      selectedSizes = selectedSizes.filter(x => avail.includes(x));
+      if (!selectedSizes.length) selectedSizes = [avail[0]];
+      for (const [size, c] of Object.entries(SIZE_CTRLS)){
+        $(c.chk).checked = selectedSizes.includes(size);
+        $(c.chk).disabled = !avail.includes(size);
+      }
+      // offers of different types never mix in one carousel
+      offers = [emptyOffer()];
+      currentOfferIndex = 0;
+      showSize(selectedSizes[0]);
+      loadOffer(0);
+    });
   }catch(e){ console.error('loadOfferTypes failed:', e); }
+}
+
+async function loadTypeDef(id){
+  const res = await fetch('/api/offer-types/' + id);
+  const def = await res.json();
+  buildFieldsUI(def);
+  currentSlideIndex = 0;
+  refreshSlideToggle();
+}
+
+function refreshSlideToggle(){
+  const n = slideCount(currentSize);
+  const btn = $('btnSlideToggle');
+  if (n > 1){
+    btn.style.display = 'inline-block';
+    btn.textContent = 'Folie: ' + (currentSlideIndex + 1) + '/' + n;
+  } else {
+    btn.style.display = 'none';
+    currentSlideIndex = 0;
+  }
 }
 loadOfferTypes();
 offers.push(emptyOffer());
@@ -241,14 +300,30 @@ saveCurrentOffer();
 renderOffersStrip();
 
 function templateFor(size){
+  if (currentTypeDef && currentTypeDef.templates && currentTypeDef.templates[size]){
+    const list = currentTypeDef.templates[size];
+    return list[Math.min(currentSlideIndex, list.length - 1)];
+  }
   if (size === 'square') return 'offer-slide-square.html';
   if (size === 'portrait') return 'offer-slide-portrait.html';
   return 'offer-slide.html';
 }
 
+function slideCount(size){
+  if (currentTypeDef && currentTypeDef.templates && currentTypeDef.templates[size]){
+    return currentTypeDef.templates[size].length;
+  }
+  return 1;
+}
+
+function toGermanDate(v){
+  const m = String(v).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? (m[3] + '.' + m[2] + '.' + m[1]) : v;
+}
+
 function collect(){
   const d = {};
-  offerFields.forEach(f => d[f] = $(f).value);
+  offerFields.forEach(f => d[f] = toGermanDate($(f).value));
   d.image_subject = $('image_subject').value;
   return d;
 }
@@ -268,14 +343,19 @@ async function updatePreview(){
 
   let map;
   {
-    map = {
-      bg_image: bgImage || '/templates/test-city.png',
-      origin: d.origin.toUpperCase(),
-      destination: d.destination,
-      price: d.price.replace(/[^0-9]/g,''),
-      date_out: d.date_out, date_return: d.date_return,
-      baggage_1: d.baggage_1, baggage_2: d.baggage_2,
-    };
+    map = { bg_image: bgImage || '/templates/test-city.png' };
+    for (const key of offerFields){
+      let v = d[key] || '';
+      if (key === 'origin' && currentOfferType === 'flight') v = v.toUpperCase();
+      if (key === 'price') v = v.replace(/[^0-9.,]/g,'');
+      map[key] = v;
+    }
+    // derived: stars number -> gold star SVGs
+    if ('stars' in map){
+      const n = Math.max(0, Math.min(5, parseInt(map.stars, 10) || 0));
+      const one = '<svg viewBox="0 0 60 60" width="52" height="52"><path d="M30 4 l7.6 16.2 17.4 2.1 -12.9 12.1 3.4 17.2 -15.5-8.7 -15.5 8.7 3.4-17.2 -12.9-12.1 17.4-2.1 Z" fill="#E6C25A"/></svg>';
+      map.stars_svg = one.repeat(n);
+    }
   }
   for (const [k,v] of Object.entries(map)) html = html.replaceAll('{{'+k+'}}', v);
   $('previewFrame').srcdoc = html;
@@ -318,8 +398,17 @@ function syncSizeControls(){
   }
 }
 
+$('btnSlideToggle').addEventListener('click', () => {
+  const n = slideCount(currentSize);
+  currentSlideIndex = (currentSlideIndex + 1) % n;
+  refreshSlideToggle();
+  updatePreview();
+});
+
 function showSize(size){
   currentSize = size;
+  currentSlideIndex = 0;
+  refreshSlideToggle();
   $('subLabel').textContent = 'MEDIA Travel — ' + currentSize;
   syncSizeControls();
   applyPreviewSize();
@@ -340,16 +429,18 @@ for (const [size, c] of Object.entries(SIZE_CTRLS)){
 syncSizeControls();
 
 
-offerFields.forEach(f => $(f).addEventListener('input', () => {
-  if (f === 'origin' || f === 'destination'){
-    const relevant = (bgCityMode === 'origin' && f === 'origin') || (bgCityMode === 'destination' && f === 'destination');
-    if (relevant){
-      const subj = cityForBackground();
-      $('image_subject').value = subj || '';
+function attachFieldListener(f){
+  $(f).addEventListener('input', () => {
+    if (f === 'origin' || f === 'destination'){
+      const relevant = (bgCityMode === 'origin' && f === 'origin') || (bgCityMode === 'destination' && f === 'destination');
+      if (relevant){
+        const subj = cityForBackground();
+        $('image_subject').value = subj || '';
+      }
     }
-  }
-  updatePreview(); saveCurrentOffer(); renderOffersStrip();
-}));
+    updatePreview(); saveCurrentOffer(); renderOffersStrip();
+  });
+}
 $('image_subject').addEventListener('input', updatePreview);
 
 function cityForBackground(){

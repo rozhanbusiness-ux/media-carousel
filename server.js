@@ -14,7 +14,7 @@ const fs = require('fs');
 const config = require('./config');
 const { validate, normalize } = require('./src/offer-schema');
 const { listOfferTypes, getOfferType } = require('./src/offer-types');
-const { fillTemplate } = require('./src/fill-template');
+const { fillTemplate, fillTemplateFile } = require('./src/fill-template');
 const { generateBackground } = require('./src/gemini-image');
 const { extractFromImage } = require('./src/extract-offer');
 const { renderToPng } = require('./src/render');
@@ -35,7 +35,7 @@ app.get('/api/offer-types', (req, res) => {
 app.get('/api/offer-types/:id', (req, res) => {
   const t = getOfferType(req.params.id);
   if (!t) return res.status(404).json({ error: 'unknown offer type' });
-  res.json({ id: t.id, displayName: t.displayName, sizes: t.sizes, fields: t.fields });
+  res.json({ id: t.id, displayName: t.displayName, sizes: t.sizes, fields: t.fields, templates: t.templates });
 });
 
 // ---- generate background image via Gemini ----
@@ -100,14 +100,21 @@ app.post('/api/render-all', async (req, res) => {
 
     const stamp = Date.now();
     const files = [];
+    const offerTypeId = req.body.offer_type || 'flight';
+    const typeDef = getOfferType(offerTypeId);
     for (const size of sizes) {
       if (!config.SIZES[size]) continue;
-      data.size = size;
-      const html = fillTemplate(data);
-      const png = await renderToPng(html, size);
-      const fname = `offer_${stamp}_${size}.png`;
-      fs.writeFileSync(path.join(__dirname, 'output', fname), png);
-      files.push({ size: size, url: '/output/' + fname, file: fname });
+      const templates = (typeDef && typeDef.templates && typeDef.templates[size])
+        ? typeDef.templates[size]
+        : [config.SIZES[size].template];
+      for (let ti = 0; ti < templates.length; ti++) {
+        const html = fillTemplateFile(templates[ti], data, offerTypeId);
+        const png = await renderToPng(html, size);
+        const suffix = templates.length > 1 ? '_' + (ti + 1) : '';
+        const fname = `offer_${stamp}_${size}${suffix}.png`;
+        fs.writeFileSync(path.join(__dirname, 'output', fname), png);
+        files.push({ size: size, url: '/output/' + fname, file: fname });
+      }
     }
     if (!files.length) return res.status(400).json({ error: 'no valid sizes' });
     res.json({ files: files });
