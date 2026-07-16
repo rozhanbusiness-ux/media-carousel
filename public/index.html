@@ -61,7 +61,7 @@
 
     <div class="field">
       <label>Screenshot hochladen (automatisch ausfüllen)</label>
-      <input type="file" id="shotUpload" accept="image/*" multiple style="width:100%; padding:8px; border:1.5px dashed #C9A227; border-radius:9px; font-size:14px; cursor:pointer;">
+      <input type="file" id="shotUpload" accept="image/*,application/pdf" multiple style="width:100%; padding:8px; border:1.5px dashed #C9A227; border-radius:9px; font-size:14px; cursor:pointer;">
     </div>
 
     <div id="offerFields"></div>
@@ -485,8 +485,35 @@ $('shotUpload').addEventListener('change', async () => {
     return data.fields;
   };
 
+  const extractPdfOffers = async (dataUri) => {
+    const res = await fetch('/api/extract-pdf', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ pdf: dataUri, offer_type: currentOfferType })
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || 'PDF-Extraktion fehlgeschlagen');
+    return data.offers;
+  };
+  const pdfFile = files.find(f => f.type === 'application/pdf');
   try{
-    if (files.length === 1){
+    if (pdfFile){
+      setStatus('Analysiere PDF-Dokument...', 'load');
+      saveCurrentOffer();
+      const dataUri = await readFile(pdfFile);
+      const extractedOffers = await extractPdfOffers(dataUri);
+      let added = 0;
+      for (const fields of extractedOffers){
+        const o = emptyOffer();
+        for (const [key, val] of Object.entries(fields)){
+          if (key in o.fields) o.fields[key] = val;
+        }
+        offers.push(o);
+        added++;
+      }
+      renderOffersStrip();
+      loadOffer(offers.length - 1);
+      setStatus(added + ' Angebote aus PDF hinzugefügt — bitte prüfen und korrigieren', 'ok');
+    } else if (files.length === 1){
       // single file: fill the currently open offer (existing behavior)
       setStatus('Analysiere Screenshot...', 'load');
       const fields = await extractOne(await readFile(files[0]));

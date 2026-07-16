@@ -16,7 +16,7 @@ const { validate, normalize } = require('./src/offer-schema');
 const { listOfferTypes, getOfferType } = require('./src/offer-types');
 const { fillTemplate, fillTemplateFile } = require('./src/fill-template');
 const { generateBackground } = require('./src/gemini-image');
-const { extractFromImage } = require('./src/extract-offer');
+const { extractFromImage, extractFromPdf } = require('./src/extract-offer');
 const { renderToPng } = require('./src/render');
 
 const app = express();
@@ -75,6 +75,25 @@ app.post('/api/extract', async (req, res) => {
     res.json({ fields: fields });
   } catch (err) {
     console.error('extract:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---- extract MULTIPLE offers from an uploaded PDF ----
+app.post('/api/extract-pdf', async (req, res) => {
+  try {
+    const pdf = (req.body.pdf || '').trim();
+    if (!pdf) return res.status(400).json({ error: 'pdf is required' });
+    const offerTypeId = req.body.offer_type || 'package';
+
+    let b64 = pdf;
+    const m = pdf.match(/^data:application\/pdf;base64,(.*)$/s);
+    if (m) b64 = m[1];
+
+    const offersList = await extractFromPdf(b64, offerTypeId);
+    res.json({ offers: offersList });
+  } catch (err) {
+    console.error('extract-pdf:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
