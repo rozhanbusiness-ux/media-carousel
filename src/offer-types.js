@@ -71,7 +71,7 @@ const OFFER_TYPES = {
       date_to:      { label: 'Reisedatum bis', type: 'date', required: true,  maxLen: 12, default: '' },
       origin:       { label: 'Hinflug',        type: 'text', required: true,  maxLen: 18, default: '' },
       board:        { label: 'Verpflegung',    type: 'select', required: false, maxLen: 20, default: '', options: ['nur Übernachtung', 'Frühstück', 'Halb Pension', 'Full Pension', 'All Inklusive', 'All Inklusive +'] },
-      transfer:     { label: 'Transfer',       type: 'text', required: false, maxLen: 15, default: '' },
+      transfer:     { label: 'Transfer',       type: 'select', required: false, maxLen: 15, default: '', options: ['Inklusive', 'Nicht inklusive'] },
       stars:        { label: 'Bewertung',      type: 'text', required: false, maxLen: 1,  default: '' },
       promo_line:   { label: 'Aktionszeile',   type: 'text', required: false, maxLen: 40, default: '', manual: true },
       room_details: { label: 'Zimmerdetails',  type: 'text', required: false, maxLen: 60, default: '', manual: true },
