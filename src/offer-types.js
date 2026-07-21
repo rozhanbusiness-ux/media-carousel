@@ -51,11 +51,12 @@ const OFFER_TYPES = {
   package: {
     id: 'package',
     displayName: 'Pauschalreise',
-    sizes: ['story', 'portrait'], // square template not built yet
+    sizes: ['story', 'portrait', 'square'],
     // templates per size: package renders a PAIR per offer (hotel + details)
     templates: {
       story: ['package-hotel.html', 'package-details.html'],
       portrait: ['package-hotel-portrait.html', 'package-details-portrait.html'],
+      square: ['package-hotel-square.html', 'package-details-square.html'],
     },
 
     buildBackgroundPrompt(subject, orientationText) {

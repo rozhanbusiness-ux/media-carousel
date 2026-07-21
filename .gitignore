@@ -18,3 +18,7 @@ test-package-hotel-portrait.js
 test-package-hotel-portrait-output.png
 test-package-details-portrait.js
 test-package-details-portrait-output.png
+test-package-details-square.js
+test-package-details-square-output.png
+test-package-hotel-square.js
+test-package-hotel-square-output.png

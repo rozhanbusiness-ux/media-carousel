@@ -8,37 +8,38 @@
 
 :root{ --navy:#0F2359; --navy-deep:#0a1838; --navy-black:#060f24; --gold:#C9A227; --gold-bright:#E6C25A; --white:#FFFFFF; }
 *{ margin:0; padding:0; box-sizing:border-box; }
-html,body{ width:1080px; height:1920px; }
-.slide{ position:relative; width:1080px; height:1920px; overflow:hidden; font-family:'Playfair Display',serif;
+html,body{ width:1080px; height:1080px; }
+.slide{ position:relative; width:1080px; height:1080px; overflow:hidden; font-family:'Playfair Display',serif;
   background:
-    radial-gradient(ellipse 900px 700px at 50% 42%, rgba(30,58,138,0.35) 0%, rgba(15,35,89,0) 60%),
+    radial-gradient(ellipse 550px 420px at 50% 36%, rgba(30,58,138,0.35) 0%, rgba(15,35,89,0) 60%),
     linear-gradient(to bottom, var(--navy-black) 0%, var(--navy-deep) 35%, var(--navy) 60%, var(--navy-deep) 100%); }
 .content{ position:absolute; inset:0; }
-.logo{ position:absolute; top:86px; left:0; width:100%; display:flex; justify-content:center; }
-.logo img{ width:359px; height:auto; }
+.logo{ position:absolute; top:48px; left:0; width:100%; display:flex; justify-content:center; }
+.logo img{ width:250px; height:auto; }
 
-.price{ position:absolute; top:390px; left:90px; display:flex; align-items:baseline; gap:22px; }
-.price .ab{ font-family:'Playfair Display',serif; font-weight:700; font-size:58px; color:var(--white); }
-.price .num{ font-family:'DM Serif Display',serif; font-weight:400; font-size:110px; color:var(--white);
+.price{ position:absolute; top:220px; left:60px; display:flex; align-items:baseline; gap:22px; }
+.price .ab{ font-family:'Playfair Display',serif; font-weight:700; font-size:34px; color:var(--white); }
+.price .num{ font-family:'DM Serif Display',serif; font-weight:400; font-size:64px; color:var(--white);
   text-shadow:0 4px 18px rgba(0,0,0,0.5); }
-.price .cur{ font-family:'Playfair Display',serif; font-weight:700; font-size:58px; color:var(--white); }
-.price-line{ position:absolute; top:540px; left:90px; width:620px; height:6px;
+.price .cur{ font-family:'Playfair Display',serif; font-weight:700; font-size:34px; color:var(--white); }
+.price-line{ position:absolute; top:300px; left:60px; width:400px; height:4px;
   background:linear-gradient(to right, var(--gold) 0%, var(--gold-bright) 45%, rgba(201,162,39,0) 100%); }
 
-.rows{ position:absolute; top:640px; left:130px; right:130px; }
-.row{ display:flex; align-items:center; gap:36px; padding:34px 0; border-bottom:1px solid rgba(201,162,39,0.18); }
+.rows{ position:absolute; top:360px; left:90px; right:90px; }
+.row{ position:relative; display:flex; align-items:center; gap:20px; padding:13px 0; }
+.row:not(:last-child)::after{ content:''; position:absolute; left:0; bottom:0; width:100%; height:1px; background:linear-gradient(to right, rgba(201,162,39,0.35), rgba(201,162,39,0)); }
 .row:last-child{ border-bottom:none; }
-.row .ic{ width:120px; height:110px; flex:none; display:flex; align-items:center; justify-content:center; }
-.row .sep{ width:3px; height:96px; flex:none; background:linear-gradient(to bottom, rgba(230,194,90,0.1), var(--gold), rgba(230,194,90,0.1)); }
+.row .ic{ width:70px; height:64px; flex:none; display:flex; align-items:center; justify-content:center; }
+.row .sep{ width:2px; height:54px; flex:none; background:linear-gradient(to bottom, rgba(230,194,90,0.1), var(--gold), rgba(230,194,90,0.1)); }
 .row .txt{ flex:1; }
-.row .lbl{ font-family:'DM Serif Display',serif; font-size:42px; color:var(--gold-bright); margin-bottom:8px; }
-.row .val{ font-family:'DM Serif Display',serif; font-weight:400; font-size:56px; color:var(--white); line-height:1.05; }
-.row .stars{ display:flex; gap:14px; margin-top:6px; }
+.row .lbl{ font-family:'DM Serif Display',serif; font-size:24px; color:var(--gold-bright); margin-bottom:4px; }
+.row .val{ font-family:'DM Serif Display',serif; font-weight:400; font-size:32px; color:var(--white); line-height:1.05; }
+.row .stars{ display:flex; gap:8px; margin-top:3px; }
 
-.footer{ position:absolute; top:1790px; left:0; width:100%; display:flex; align-items:center; justify-content:center; gap:64px; }
-.footer .cell{ display:flex; align-items:center; gap:16px; font-family:'DM Serif Display',serif; font-weight:400; font-size:32px; color:var(--white); }
-.footer .ic2{ width:52px; height:52px; flex:none; }
-.footer .ic2 svg{ width:52px; height:52px; display:block; }
+.footer{ position:absolute; top:1010px; left:0; width:100%; display:flex; align-items:center; justify-content:center; gap:44px; }
+.footer .cell{ display:flex; align-items:center; gap:10px; font-family:'DM Serif Display',serif; font-weight:400; font-size:22px; color:var(--white); }
+.footer .ic2{ width:36px; height:36px; flex:none; }
+.footer .ic2 svg{ width:36px; height:36px; display:block; }
 </style>
 </head>
 <body>

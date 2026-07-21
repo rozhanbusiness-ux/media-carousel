@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<style>
+@font-face{ font-family:'Playfair Display'; src:url('../fonts/PlayfairDisplay-Bold.ttf') format('truetype'); font-weight:400 900; }
+@font-face{ font-family:'DM Serif Display'; src:url('../fonts/DMSerifDisplay-Regular.ttf') format('truetype'); font-weight:400; }
+
+:root{ --navy:#0F2359; --navy-deep:#0a1838; --gold:#C9A227; --gold-bright:#E6C25A; --white:#FFFFFF; }
+*{ margin:0; padding:0; box-sizing:border-box; }
+html,body{ width:1080px; height:1080px; }
+.slide{ position:relative; width:1080px; height:1080px; overflow:hidden; background:var(--navy); font-family:'Playfair Display',serif; }
+.bg{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:1; image-rendering:high-quality; }
+.overlay{ position:absolute; inset:0; z-index:2;
+  background:linear-gradient(to bottom,
+    rgba(15,35,89,0) 0%, rgba(15,35,89,0) 44%,
+    rgba(15,35,89,0.30) 55%, rgba(15,35,89,0.75) 64%,
+    var(--navy) 72%, var(--navy-deep) 100%); }
+.content{ position:absolute; inset:0; z-index:3; }
+.logo{ position:absolute; top:48px; left:0; width:100%; display:flex; justify-content:center; }
+.logo img{ width:250px; height:auto; }
+
+.destination{ position:absolute; top:600px; left:0; width:100%; text-align:center;
+  font-family:'Playfair Display',serif; font-weight:800; font-size:96px; line-height:1;
+  color:var(--white); text-shadow:0 5px 24px rgba(0,0,0,0.55); }
+
+.hotel{ position:absolute; top:725px; left:0; width:100%; text-align:center;
+  font-family:'DM Serif Display',serif; font-weight:400; font-size:40px; line-height:1;
+  color:var(--gold-bright); text-shadow:0 4px 16px rgba(0,0,0,0.45); }
+
+.divider{ position:absolute; top:780px; left:8%; width:84%; display:flex; align-items:center; justify-content:center; }
+.divider .line{ flex:1; height:18px; }
+.divider .star{ width:80px; height:56px; flex:none; display:flex; align-items:center; justify-content:center; margin:0 -8px; }
+
+.promo{ position:absolute; top:850px; left:0; width:100%; text-align:center;
+  font-family:'Playfair Display',serif; font-weight:700; font-size:46px; line-height:1;
+  color:var(--white); text-shadow:0 3px 14px rgba(0,0,0,0.4); }
+
+.footer{ position:absolute; top:955px; left:0; width:100%; display:flex; align-items:center; justify-content:center; gap:48px; }
+.footer .cell{ display:flex; align-items:center; gap:12px; font-family:'DM Serif Display',serif; font-weight:400; font-size:26px; color:var(--white); }
+.footer .ic{ width:42px; height:42px; flex:none; }
+.footer .ic svg{ width:42px; height:42px; display:block; }
+</style>
+</head>
+<body>
+  <div class="slide">
+    <img class="bg" src="{{bg_image}}" alt="">
+    <div class="overlay"></div>
+    <div class="content">
+      <div class="logo"><img src="logo.png" alt="MEDIA"></div>
+
+      <div class="destination">{{destination}}</div>
+      <div class="hotel">{{hotel_name}}</div>
+
+      <div class="divider">
+        <div class="line"><svg viewBox="0 0 500 30" preserveAspectRatio="none" width="100%" height="28"><path d="M2,15 L480,9 a6,6 0 0 1 0,12 L2,15 Z" fill="#C9A227"/></svg></div>
+        <div class="star"><svg viewBox="0 0 130 90"><path d="M78 12 C80 32, 86 40, 110 43 C86 46, 80 54, 78 74 C76 54, 70 46, 46 43 C70 40, 76 32, 78 12 Z" fill="#E6C25A"/><path d="M48 54 C49 62, 52 65, 60 66 C52 67, 49 70, 48 78 C47 70, 44 67, 36 66 C44 65, 47 62, 48 54 Z" fill="#C9A227"/></svg></div>
+        <div class="line"><svg viewBox="0 0 500 30" preserveAspectRatio="none" width="100%" height="28"><path d="M498,15 L20,9 a6,6 0 0 0 0,12 L498,15 Z" fill="#C9A227"/></svg></div>
+      </div>
+
+      <div class="promo">{{promo_line}}</div>
+
+      <div class="footer">
+        <div class="cell"><span class="ic"><svg viewBox="0 0 76 76"><circle cx="38" cy="38" r="34" fill="#C9A227"/><path d="M27 24c-2 0-4 2-4 5 0 14 11 25 25 25 3 0 5-2 5-4l0-6c0-1-1-2-2-2l-7-2c-1 0-2 0-3 1l-2 2c-5-2-8-5-10-10l2-2c1-1 1-2 1-3l-2-7c0-1-1-2-2-2Z" fill="#fff"/></svg></span>+491 765 8866 999</div>
+        <div class="cell"><span class="ic"><svg viewBox="0 0 76 76"><circle cx="38" cy="38" r="34" fill="#C9A227"/><rect x="20" y="26" width="36" height="24" rx="3" fill="none" stroke="#fff" stroke-width="3"/><path d="M20 27 L38 41 L56 27" fill="none" stroke="#fff" stroke-width="3"/></svg></span>INFO@MEDIA-TRAVELS.COM</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
