@@ -103,6 +103,8 @@
       </div>
     </div>
     <button class="btn btn-navy" id="btnGen">Hintergrundbild generieren</button>
+    <button class="btn btn-navy" id="btnGenAll" style="background:#1a3a7a;">Alle generieren</button>
+    <button class="btn btn-navy" id="btnGenAllForce" style="background:#5a3a1a;">Alle neu generieren</button>
     <button class="btn btn-gold" id="btnRender" disabled>Finales PNG exportieren</button>
     <button class="btn btn-gold" id="btnRenderAll" style="background:#8a6d1f;">Alle Angebote exportieren</button>
 
@@ -553,37 +555,79 @@ $('shotUpload').addEventListener('change', async () => {
   }
 });
 
+// generate a background for one offer index; returns true on success
+async function generateOfferBackground(idx){
+  if (generatingOffers.has(idx)) return false;
+  generatingOffers.add(idx);
+  try{
+    const subject = (idx === currentOfferIndex) ? $('image_subject').value : (offers[idx].imageSubject || '');
+    const res = await fetch('/api/generate-bg', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ image_subject: subject, size: 'story', offer_type: currentOfferType })
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || 'generation failed');
+    offers[idx].bgImage = data.image;
+    offers[idx].bgId = data.bgId || '';
+    if (idx === currentOfferIndex){
+      bgImage = data.image; bgId = data.bgId || '';
+      await updatePreview();
+    }
+    return true;
+  } finally {
+    generatingOffers.delete(idx);
+  }
+}
+
 $('btnGen').addEventListener('click', async () => {
-  const targetIndex = currentOfferIndex; // remember which offer requested this
+  const targetIndex = currentOfferIndex;
   saveCurrentOffer();
-  setStatus('Generiere Hintergrundbild...', 'load');
   if (generatingOffers.has(targetIndex)){
     setStatus('Dieses Angebot wird bereits generiert...', 'load');
     return;
   }
-  generatingOffers.add(targetIndex);
+  setStatus('Generiere Hintergrundbild...', 'load');
   try{
-    const res = await fetch('/api/generate-bg', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ image_subject: $('image_subject').value, size: 'story', offer_type: currentOfferType })
-    });
-    const data = await res.json();
-    if(!res.ok) throw new Error(data.error || 'generation failed');
-    // write result into the offer that requested it, not into whatever is open now
-    offers[targetIndex].bgImage = data.image;
-    offers[targetIndex].bgId = data.bgId || '';
-    if (targetIndex === currentOfferIndex){
-      bgImage = data.image; bgId = data.bgId || '';
-      await updatePreview();
-    }
+    await generateOfferBackground(targetIndex);
     setStatus('Hintergrundbild für Angebot ' + (targetIndex+1) + ' generiert', 'ok');
     $('btnRender').disabled = false;
   }catch(e){
     setStatus('Fehler: ' + e.message, 'err');
-  }finally{
-    generatingOffers.delete(targetIndex);
   }
 });
+
+$('btnGenAll').addEventListener('click', async () => {
+  saveCurrentOffer();
+  const onlyMissing = true;
+  await runBatchGeneration(onlyMissing);
+});
+$('btnGenAllForce').addEventListener('click', async () => {
+  saveCurrentOffer();
+  await runBatchGeneration(false);
+});
+
+async function runBatchGeneration(onlyMissing){
+  const targets = offers.map((o, i) => i).filter(i => !onlyMissing || !offers[i].bgId);
+  if (!targets.length){
+    setStatus('Alle Angebote haben bereits ein Hintergrundbild', 'ok');
+    return;
+  }
+  $('btnGenAll').disabled = true; $('btnGenAllForce').disabled = true;
+  let done = 0;
+  for (const idx of targets){
+    setStatus('Generiere Hintergrundbild ' + (done+1) + ' von ' + targets.length + '...', 'load');
+    try{
+      await generateOfferBackground(idx);
+    }catch(e){
+      console.error('offer ' + idx + ' failed:', e.message);
+    }
+    done++;
+    renderOffersStrip();
+  }
+  $('btnGenAll').disabled = false; $('btnGenAllForce').disabled = false;
+  $('btnRender').disabled = false;
+  setStatus(done + ' Hintergrundbilder generiert', 'ok');
+}
 
 $('btnRender').addEventListener('click', async () => {
   setStatus('Exporting...', 'load');
