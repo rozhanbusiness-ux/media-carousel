@@ -128,15 +128,19 @@ Each offer type is ONE record in src/offer-types.js containing:
 
 ## 7. Current State (as of last update)
 
-- **Last commit:** 6dea8c5 - "Package square (1080x1080) pair added; details rows left/right margin increased across all 3 sizes; fade-line fix for row dividers"
+- **Last commit:** e78c7c0 - "Full-carousel batch background generation: two buttons (missing-only / force-all), sequential progress" - "Package square (1080x1080) pair added; details rows left/right margin increased across all 3 sizes; fade-line fix for row dividers"
 - **Repo status:** clean, fully synced with origin/main on GitHub (rozhanbusiness-ux/media-carousel)
 - **Both offer types (flight, package) are fully functional end-to-end**, with full 3-size parity (story/square/portrait), both extraction paths (screenshot + PDF), dynamic field UI, multi-offer card management, background sharing across sizes, and batch export.
 
 ---
 
-## 8. Roadmap - Not Yet Started
+## 8. Roadmap Status
 
-1. **Full-carousel batch background generation** - currently each offer card's background must be generated individually (one click per card). Next: a single button that generates backgrounds for ALL current offer cards sequentially in the background, with progress feedback, instead of manual per-card triggering.
+**COMPLETED 2026-07-19: Full-carousel batch background generation.** Two buttons added: "Alle generieren" (only generates for offer cards missing a background) and "Alle neu generieren" (force-regenerates ALL cards regardless of existing background). Both run sequentially through all offer cards with progress feedback ("Generiere Hintergrundbild N von M..."), reusing the per-offer-index busy-tracking (`generatingOffers` Set) and writing results directly into `offers[idx]` established in earlier sessions. Refactored the original single-offer generation handler into a shared `generateOfferBackground(idx)` function to avoid duplicating the fetch/error logic. Verified working end-to-end with 3 offer cards. Git commit `e78c7c0`.
+
+**This closes the entire original project roadmap** (both offer types at full 3-size parity + both extraction paths + multi-offer + batch generation). Next up per Rozhan's 2026-07-19 priority order:
+
+1. **Deploy the app to Rozhan's own server** for daily production use (see Section 9 deployment considerations) — NEXT IMMEDIATE STEP.
 2. **Additional offer types** - hotels (standalone, not part of a package), visa services, river cruises, sea cruises. Each is purely a new src/offer-types.js registry entry (fields + background prompt + templates map for the 3 sizes) plus building the actual HTML template file(s) for its slide(s). No other architectural changes are expected to be needed, per the twice-proven registry pattern.
 3. (Longer-term, from original vision) Full 10-slide carousel generation in one operation, matching the original "Carousel Constitution" structure Rozhan specified early on: hook (his own Canva asset) -> repeating hotel/details or offer pairs -> CTA (his own Canva asset). The app currently produces only the repeating data-heavy middle slides, by design.
 
