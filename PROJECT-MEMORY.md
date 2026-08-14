@@ -139,3 +139,29 @@ Each offer type is ONE record in src/offer-types.js containing:
 1. **Full-carousel batch background generation** - currently each offer card's background must be generated individually (one click per card). Next: a single button that generates backgrounds for ALL current offer cards sequentially in the background, with progress feedback, instead of manual per-card triggering.
 2. **Additional offer types** - hotels (standalone, not part of a package), visa services, river cruises, sea cruises. Each is purely a new src/offer-types.js registry entry (fields + background prompt + templates map for the 3 sizes) plus building the actual HTML template file(s) for its slide(s). No other architectural changes are expected to be needed, per the twice-proven registry pattern.
 3. (Longer-term, from original vision) Full 10-slide carousel generation in one operation, matching the original "Carousel Constitution" structure Rozhan specified early on: hook (his own Canva asset) -> repeating hotel/details or offer pairs -> CTA (his own Canva asset). The app currently produces only the repeating data-heavy middle slides, by design.
+
+---
+
+## 9. Long-Term Vision (future phases, not started, no urgency)
+
+Order of near-term work (Rozhan's explicit priority, 2026-07 planning session):
+1. Finish full-carousel batch generation (current active work)
+2. Deploy the app to Rozhan's own server for daily production use — deployment considerations noted below
+3. THEN, without rushing: additional offer types in this priority order:
+   - River cruises (Flusskreuzfahrten)
+   - Sea cruises (Seekreuzfahrten)
+   - Hotels / vacation homes (Ferienhäuser) — Rozhan is considering merging these into ONE offer type (an "accommodation type" field distinguishing hotel vs. vacation home) rather than two separate types, since their data shape is very similar. Decide this properly when we get there, not now.
+   - Visa services (Visa)
+
+### Deployment considerations (for when we deploy to Rozhan's server — not addressed yet)
+- **Secrets:** GEMINI_API_KEY currently lives in local `.env`. A real server needs a secure env var mechanism, and the app currently has NO login/auth system at all — needs consideration before public/always-on deployment.
+- **Storage:** exported PNGs currently accumulate in `output/` locally with no cleanup. A daily-use server needs either periodic cleanup or proper storage (not just an ever-growing local folder).
+- **Stability:** current server has no auto-restart-on-crash or error monitoring. Daily production use benefits from a basic process manager (e.g. pm2) or platform-level restart policy.
+
+### Big future feature ideas (Rozhan's vision, explicitly flagged as "much later, no rush")
+1. **Direct social media publishing integration** — auto-post generated carousels directly to platforms. NOTE: this requires each platform's official app registration + security review (Meta Graph API app review, etc.) — an administrative/approval process outside pure coding, not just an engineering task. Discuss in detail when we get there.
+2. **Post scheduling** — schedule carousels to publish at specific future times.
+3. **Additional regular post types** — general informational/educational content posts (not tied to travel offers), i.e. full standalone content pieces.
+4. **Reels/Shorts generation** — via integration with external video platforms (Rozhan mentioned higgsfield as an example).
+5. **Additional platforms** — e.g. LinkedIn, beyond the current Instagram/Facebook/TikTok-shared-size approach.
+6. **AI content-writing platform** — the biggest, most transformative idea: evolving the app from "data-driven image generator" into an AI tool that WRITES marketing copy/posts. This is architecturally a much bigger shift than adding an offer type (moves from templated-data-rendering into generative-content-writing) and deserves a dedicated architecture discussion whenever Rozhan wants to pursue it — not a simple registry addition like offer types are.
