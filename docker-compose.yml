@@ -5,8 +5,9 @@ services:
     restart: unless-stopped
     ports:
       - "3010:3000"
+    env_file:
+      - .env
     environment:
-      - GEMINI_API_KEY=REPLACE_ME_ON_SERVER
       - PORT=3000
     volumes:
       - ./output:/app/output
