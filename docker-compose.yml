@@ -1,0 +1,13 @@
+services:
+  media-carousel-app:
+    build: .
+    container_name: media-carousel-app
+    restart: unless-stopped
+    ports:
+      - "3010:3000"
+    environment:
+      - GEMINI_API_KEY=REPLACE_ME_ON_SERVER
+      - PORT=3000
+    volumes:
+      - ./output:/app/output
+      - ./cache:/app/cache
