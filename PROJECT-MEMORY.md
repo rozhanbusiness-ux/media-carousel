@@ -169,3 +169,27 @@ Order of near-term work (Rozhan's explicit priority, 2026-07 planning session):
 4. **Reels/Shorts generation** — via integration with external video platforms (Rozhan mentioned higgsfield as an example).
 5. **Additional platforms** — e.g. LinkedIn, beyond the current Instagram/Facebook/TikTok-shared-size approach.
 6. **AI content-writing platform** — the biggest, most transformative idea: evolving the app from "data-driven image generator" into an AI tool that WRITES marketing copy/posts. This is architecturally a much bigger shift than adding an offer type (moves from templated-data-rendering into generative-content-writing) and deserves a dedicated architecture discussion whenever Rozhan wants to pursue it — not a simple registry addition like offer types are.
+
+---
+
+## 10. Deployment — COMPLETED (2026-08-20)
+
+The app is fully deployed and live in production at https://carousel.media-travels.com
+
+### Live setup
+- Server: Hetzner VPS, IP 167.233.144.112, Ubuntu 24.04. App lives at /opt/media-carousel
+- Container: Docker Compose, service media-carousel-app, host port 3010 to container 3000, restart unless-stopped, secrets via env_file .env (never committed). Volumes: ./output and ./cache
+- DNS: A record carousel.media-travels.com to 167.233.144.112 (managed at Hostinger, TTL 14400)
+- Nginx: host-level reverse-proxy vhost at /etc/nginx/sites-available/carousel (symlinked into sites-enabled), proxying to 127.0.0.1:3010. Same pattern as existing offers/n8n vhosts
+- SSL: Let's Encrypt via Certbot (--nginx), auto-renewing. HTTP to HTTPS redirect by Certbot. Cert expires 2026-11-18
+- Auth: HTTP Basic Auth protects the whole site (app has no login of its own). Credentials file /etc/nginx/.htpasswd-carousel. Username MediaTravel (password known to Rozhan only; set via htpasswd, never stored in chat or repo). To add/change a user: htpasswd /etc/nginx/.htpasswd-carousel USERNAME then systemctl reload nginx
+
+### Redeploy procedure (after any future code change)
+Reload SSH key in a fresh Codespace, then git pull + rebuild on the server:
+  mkdir -p ~/.ssh && echo the HETZNER_SSH_KEY secret into ~/.ssh/hetzner_key && chmod 600 it
+  ssh -i ~/.ssh/hetzner_key root@167.233.144.112 then: cd /opt/media-carousel && git pull && docker compose up -d --build
+
+### Notes / still open (minor, non-blocking)
+- Kernel upgrade pending on the server (noticed 2026-08-20) — a reboot is advisable at a convenient time; it briefly stops all host services. Not urgent
+- output/ PNG cleanup and a crash-restart/monitoring solution (pm2 or a compose healthcheck) remain nice-to-haves, not yet done
+- Optional: add .devcontainer/setup-ssh.sh to auto-load the SSH key after each Codespace rebuild (currently manual)
