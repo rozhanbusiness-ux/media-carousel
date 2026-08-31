@@ -43,11 +43,11 @@ function validate(data) {
   return errors;
 }
 
-// Clean + normalize -> origin always uppercase, price digits only
+// Clean + normalize -> origin always uppercase, price keeps digits + . and ,
 function normalize(data) {
   const out = { ...DEFAULTS, ...data };
   out.origin = (out.origin || '').toUpperCase();
-  out.price = (out.price || '').toString().replace(/[^0-9]/g, '');
+  out.price = (out.price || '').toString().replace(/[^0-9.,]/g, '');
   return out;
 }
 
