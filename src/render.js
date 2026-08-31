@@ -50,7 +50,7 @@ async function renderToPng(html, size) {
     if (!/<base /i.test(finalHtml)) {
       finalHtml = finalHtml.replace(/<head>/i, `<head><base href="${templatesDir}">`);
     }
-    await page.setContent(finalHtml, { waitUntil: 'networkidle0' });
+    await page.setContent(finalHtml, { waitUntil: 'load', timeout: 60000 });
     await page.evaluateHandle('document.fonts.ready');
     await new Promise((r) => setTimeout(r, 300));
     const buf = await page.screenshot({
