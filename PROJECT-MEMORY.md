@@ -193,3 +193,36 @@ Reload SSH key in a fresh Codespace, then git pull + rebuild on the server:
 - Kernel upgrade pending on the server (noticed 2026-08-20) — a reboot is advisable at a convenient time; it briefly stops all host services. Not urgent
 - output/ PNG cleanup and a crash-restart/monitoring solution (pm2 or a compose healthcheck) remain nice-to-haves, not yet done
 - Optional: add .devcontainer/setup-ssh.sh to auto-load the SSH key after each Codespace rebuild (currently manual)
+
+---
+
+## 11. Known Bugs To Fix (reported 2026-08-20, NOT yet fixed)
+
+Diagnose each properly first (grep/cat the real current code before touching anything), small verified steps.
+
+1. PRICE DECIMAL SEPARATOR LOST ON EXPORT (high priority). In the app UI the price shows correctly e.g. 399.99, but in the exported image it renders as 39999 — the decimal separator is stripped somewhere in the render/export path (likely fill-template or the Puppeteer render step), not in the input. A wrong price on a marketing image is a real problem. Note: German price format normally uses a comma (399,99). Clarify desired final display format when fixing.
+2. BATCH DOWNLOAD (export all at once) fails most of the time. This is the batch EXPORT, not the batch background generation (which works).
+3. SOME individual images are not downloadable at all. May share the same root cause as bug 2 (export pipeline).
+
+## 12. Planned Work — Priority Order (agreed 2026-08-20)
+
+Phase 1 — Fix the bugs above (highest priority, start here). Bug 1 (price) first.
+
+Phase 2 — Mobile-responsive UI (priority RAISED at Rozhan's request). The UI (public/index.html) was built and tested on desktop only. It IS reachable on phones (web app at the live domain) but is not phone-optimized. Rozhan frequently receives supplier offers while mobile and wants to build carousels from his phone. Needs a responsive redesign: usable fields, buttons, screenshot/PDF upload, and preview on small screens.
+
+Phase 3 — Quick wins:
+- Additional offer types via the proven registry pattern, in Rozhan's order: river cruises, sea cruises, hotels/vacation-homes (maybe merged into one type with an accommodation-type field — decide then), visa. Each = one registry entry (fields + background prompt + templates map for 3 sizes) + building the HTML templates. No other architecture change needed.
+- Drag-and-drop slide reordering.
+- Full-carousel sequential download (all slides numbered in correct order in one click). This is useful on its own and does NOT depend on the share button.
+
+Phase 4 — Sharing (needs a feasibility test before committing):
+- "Share full carousel" button using the phone native share sheet (same mechanism Canva uses — achievable to the same degree, not Canva-exclusive). Works well for WhatsApp and single-image stories.
+- Manual first + last slide upload: two slots to upload Rozhan's own Canva Hook (first) and CTA (last) slides, combined with the generated offer slides into the complete ordered carousel. Rozhan considers this CONDITIONAL on direct multi-image share working.
+- Hard part: sharing multiple ordered images at once as a single carousel POST is restricted by the platforms (esp. Instagram). A multi-image ordered post cannot be pushed pre-arranged from an external website; real direct auto-post needs official platform app registration + review (admin process, not just code). Plan: build a SMALL share-button test first and test it live on Rozhan's phone across WhatsApp/Instagram/TikTok to see what actually happens per platform, before designing. Guaranteed-value fallback: numbered ordered download + native share sheet.
+
+## 13. Bigger Future Ideas (not started, need dedicated discussion when pursued)
+
+- User-controllable styling/themes: control colors, fonts, sizes, switch templates on demand. TENSION with the fixed brand identity — decide first between full free control vs. a small set of pre-approved on-brand presets. A design discussion, not just code.
+- Reusable generated-image library/archive. Currently Gemini backgrounds are cached in /cache (short bgId, for export speed) and exported PNGs pile up in /output with no reuse/archival — tied to the open output-cleanup item.
+- Video generation via Veo integration — short videos and UGC-style videos for TikTok/Instagram. Biggest idea yet: turns the app into a multimedia content platform. Needs a dedicated architecture discussion (related to the earlier Reels/Shorts + social auto-publishing long-term items).
+- Also still noted from earlier: full 10-slide carousel generation in one operation; social auto-publishing; post scheduling; AI content-writing platform.
