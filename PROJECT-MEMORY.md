@@ -196,21 +196,23 @@ Reload SSH key in a fresh Codespace, then git pull + rebuild on the server:
 
 ---
 
-## 11. Known Bugs To Fix (reported 2026-08-20, NOT yet fixed)
+## 11. Known Bugs — ALL CLOSED (2026-09-04)
 
-Diagnose each properly first (grep/cat the real current code before touching anything), small verified steps.
+1. PRICE DECIMAL SEPARATOR LOST ON EXPORT — FIXED 2026-08-31. Root cause: src/offer-schema.js normalize() regex was stripping the decimal point/comma. Fixed to keep digits, dot, and comma as typed (no forced German-comma conversion). Confirmed live on production.
+2. BATCH DOWNLOAD (export all at once) — FIXED 2026-08-31, STRESS-TESTED 2026-09-04. Root cause: src/render.js used waitUntil:'networkidle0', which large embedded Gemini background images could prevent from completing within the 30s timeout. Fixed to {waitUntil:'load', timeout:60000}. Verified live with a 3-4 offer batch export — all files downloaded with zero errors.
+3. SOME INDIVIDUAL IMAGES NOT DOWNLOADABLE — same root cause as bug 2, same fix, verified live with a single-offer export — zero errors.
 
-1. PRICE DECIMAL SEPARATOR LOST ON EXPORT (high priority). In the app UI the price shows correctly e.g. 399.99, but in the exported image it renders as 39999 — the decimal separator is stripped somewhere in the render/export path (likely fill-template or the Puppeteer render step), not in the input. A wrong price on a marketing image is a real problem. Note: German price format normally uses a comma (399,99). Clarify desired final display format when fixing.
-2. BATCH DOWNLOAD (export all at once) fails most of the time. This is the batch EXPORT, not the batch background generation (which works).
-3. SOME individual images are not downloadable at all. May share the same root cause as bug 2 (export pipeline).
+If export issues recur in the future, check `docker compose logs` on the server first.
 
 ## 12. Planned Work — Priority Order (agreed 2026-08-20)
 
-Phase 1 — Fix the bugs above (highest priority, start here). Bug 1 (price) first.
+Phase 1 — Fix the bugs above. DONE 2026-08-31, stress-tested and confirmed closed 2026-09-04 (see Section 11).
 
-Phase 2 — Mobile-responsive UI (priority RAISED at Rozhan's request). The UI (public/index.html) was built and tested on desktop only. It IS reachable on phones (web app at the live domain) but is not phone-optimized. Rozhan frequently receives supplier offers while mobile and wants to build carousels from his phone. Needs a responsive redesign: usable fields, buttons, screenshot/PDF upload, and preview on small screens.
+Phase 2 — Mobile-responsive UI. FIRST PASS DONE 2026-09-04: added a @media (max-width:768px) block to public/index.html — panel and preview now stack vertically on phones instead of squeezing side-by-side. Confirmed live on Rozhan's actual phone: fields, buttons, upload, offer-card strip, and preview all comfortable, no notes. The preview box itself is still a fixed 360px width (not yet fully fluid/vw-based) — candidate for later polish on narrower phones, not urgent since it already fits real devices fine.
 
-Phase 3 — Quick wins:
+Phase 2b — Small quality-of-life fix, DONE 2026-09-04: flight date fields (Hinflug/Rückflug) switched from free-text to the native calendar-picker (type:'date', same system package dates already used) — no more manual date typing. Also removed old hardcoded default date values (03.07.2026 / 18.07.2026) that violated the no-default-values rule.
+
+Phase 3 — Quick wins (current priority, not yet started):
 - Additional offer types via the proven registry pattern, in Rozhan's order: river cruises, sea cruises, hotels/vacation-homes (maybe merged into one type with an accommodation-type field — decide then), visa. Each = one registry entry (fields + background prompt + templates map for 3 sizes) + building the HTML templates. No other architecture change needed.
 - Drag-and-drop slide reordering.
 - Full-carousel sequential download (all slides numbered in correct order in one click). This is useful on its own and does NOT depend on the share button.
