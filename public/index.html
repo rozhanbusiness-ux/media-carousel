@@ -41,6 +41,12 @@
   .preview iframe{ width:1080px; height:1920px; border:0; transform:scale(0.3333);
                    transform-origin:top left; position:absolute; top:0; left:0; }
   .divider-h{ height:1px; background:#eee; margin:20px 0; }
+
+  @media (max-width: 768px) {
+    body{ flex-direction:column; min-height:auto; }
+    .panel{ width:100%; height:auto; box-shadow:0 2px 10px rgba(0,0,0,.06); }
+    .preview-wrap{ padding:20px; }
+  }
 </style>
 </head>
 <body>
