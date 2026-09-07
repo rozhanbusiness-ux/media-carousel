@@ -678,7 +678,7 @@ $('btnRenderAll').addEventListener('click', async () => {
       setStatus('Exportiere Angebot ' + (i+1) + ' von ' + ready.length + '...', 'load');
       const o = ready[i];
       const d = {};
-      offerFields.forEach(k => d[k] = o.fields[k]);
+      offerFields.forEach(k => d[k] = toGermanDate(o.fields[k]));
       d.bgId = o.bgId;
       d.sizes = selectedSizes;
       d.offer_type = currentOfferType;
