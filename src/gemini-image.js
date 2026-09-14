@@ -25,10 +25,18 @@ function buildCityPrompt(subject, orientationText) {
  * Build the final prompt.
  * Priority: offer-type prompt builder > city fallback.
  */
-function buildImagePrompt(subject, orientationText, size, offerTypeId) {
+function buildImagePrompt(subject, orientationText, size, offerTypeId, purpose) {
   const offerType = offerTypeId ? getOfferType(offerTypeId) : null;
-  if (offerType && typeof offerType.buildBackgroundPrompt === 'function') {
-    return offerType.buildBackgroundPrompt(subject, orientationText);
+  if (offerType) {
+    if (purpose === 'hero' && typeof offerType.buildHeroBackgroundPrompt === 'function') {
+      return offerType.buildHeroBackgroundPrompt(subject, orientationText);
+    }
+    if (purpose === 'itinerary' && typeof offerType.buildItineraryBackgroundPrompt === 'function') {
+      return offerType.buildItineraryBackgroundPrompt(subject, orientationText);
+    }
+    if (typeof offerType.buildBackgroundPrompt === 'function') {
+      return offerType.buildBackgroundPrompt(subject, orientationText);
+    }
   }
   return buildCityPrompt(subject, orientationText);
 }
@@ -40,7 +48,7 @@ function buildImagePrompt(subject, orientationText, size, offerTypeId) {
  * @param {string} [offerTypeId] - offer type id (e.g. 'flight')
  * @returns {Promise<string>} data:image/png;base64,...
  */
-async function generateBackground(subject, size, offerTypeId) {
+async function generateBackground(subject, size, offerTypeId, purpose) {
   if (!config.GEMINI_API_KEY) {
     throw new Error('GEMINI_API_KEY is not set. Put it in your .env file.');
   }
@@ -53,7 +61,7 @@ async function generateBackground(subject, size, offerTypeId) {
   const r = RATIOS[size] || RATIOS.story;
   const aspectRatio = r.ratio;
   const orientationText = r.text;
-  const prompt = buildImagePrompt(subject, orientationText, size, offerTypeId);
+  const prompt = buildImagePrompt(subject, orientationText, size, offerTypeId, purpose);
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${config.GEMINI_IMAGE_MODEL}:generateContent`;
 
   const res = await fetch(url, {

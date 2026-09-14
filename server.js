@@ -45,7 +45,8 @@ app.post('/api/generate-bg', async (req, res) => {
     if (!subject) return res.status(400).json({ error: 'image_subject is required' });
     const size = req.body.size || 'story';
     const offerTypeId = req.body.offer_type || '';
-    const dataUri = await generateBackground(subject, size, offerTypeId);
+    const purpose = req.body.purpose || '';
+    const dataUri = await generateBackground(subject, size, offerTypeId, purpose);
     // Save the generated background on the server itself, return only a small id
     // so the heavy image never needs to travel back and forth over the network.
     const bgId = 'bg_' + Date.now();
