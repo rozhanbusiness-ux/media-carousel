@@ -138,6 +138,12 @@ function buildFieldsUI(typeDef){
     wrap.className = 'field';
     const lbl = document.createElement('label');
     lbl.textContent = f.label + (f.manual ? ' (manuell)' : '');
+    wrap.appendChild(lbl);
+    if (f.type === 'list'){
+      buildListFieldUI(key, f, wrap);
+      box.appendChild(wrap);
+      continue;
+    }
     let inp;
     if (f.type === 'select'){
       inp = document.createElement('select');
@@ -158,9 +164,74 @@ function buildFieldsUI(typeDef){
       inp = document.createElement('input');
     }
     inp.id = key;
-    wrap.appendChild(lbl); wrap.appendChild(inp);
+    wrap.appendChild(inp);
     box.appendChild(wrap);
     attachFieldListener(key);
+  }
+}
+
+// ---- list-type field support (e.g. cruise 'stops') — global scope ----
+let listFieldsData = {};
+
+function buildListFieldUI(key, f, wrap){
+  listFieldsData[key] = listFieldsData[key] || [];
+  const container = document.createElement('div');
+  container.id = 'list_' + key;
+  wrap.appendChild(container);
+  const addBtn = document.createElement('button');
+  addBtn.type = 'button';
+  addBtn.textContent = '+ Station hinzufügen';
+  addBtn.style.cssText = 'margin-top:6px; padding:8px 12px; border-radius:9px; border:1.5px solid #dfe3e8; background:#fff; cursor:pointer; font-size:13px;';
+  addBtn.addEventListener('click', () => {
+    const item = {};
+    Object.keys(f.itemFields).forEach(ik => item[ik] = '');
+    listFieldsData[key].push(item);
+    renderListField(key, f, container);
+    updatePreview(); saveCurrentOffer(); renderOffersStrip();
+  });
+  wrap.appendChild(addBtn);
+  renderListField(key, f, container);
+}
+
+function renderListField(key, f, container){
+  container.innerHTML = '';
+  listFieldsData[key].forEach((item, idx) => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex; gap:6px; align-items:center; margin-bottom:6px; padding:8px; background:#f7f8f9; border-radius:8px;';
+    Object.entries(f.itemFields).forEach(([ik, idef]) => {
+      const inp = document.createElement('input');
+      inp.placeholder = idef.label;
+      inp.value = item[ik] || '';
+      inp.style.cssText = 'flex:1; padding:8px 10px; border:1.5px solid #dfe3e8; border-radius:7px; font-size:13px;';
+      inp.addEventListener('input', () => {
+        item[ik] = inp.value;
+        updatePreview(); saveCurrentOffer(); renderOffersStrip();
+      });
+      row.appendChild(inp);
+    });
+    const rmBtn = document.createElement('button');
+    rmBtn.type = 'button';
+    rmBtn.textContent = '✕';
+    rmBtn.style.cssText = 'padding:6px 10px; border-radius:7px; border:1.5px solid #dfe3e8; background:#fff; cursor:pointer;';
+    rmBtn.addEventListener('click', () => {
+      listFieldsData[key].splice(idx, 1);
+      renderListField(key, f, container);
+      updatePreview(); saveCurrentOffer(); renderOffersStrip();
+    });
+    row.appendChild(rmBtn);
+    container.appendChild(row);
+  });
+}
+
+function getListFieldValue(key){
+  return listFieldsData[key] || [];
+}
+
+function setListFieldValue(key, items){
+  listFieldsData[key] = Array.isArray(items) ? items.map(i => Object.assign({}, i)) : [];
+  const container = $('list_' + key);
+  if (container && currentTypeDef && currentTypeDef.fields[key]){
+    renderListField(key, currentTypeDef.fields[key], container);
   }
 }
 let bgImage = '';
@@ -178,14 +249,20 @@ let currentOfferIndex = 0;
 
 function emptyOffer(){
   const f = {};
-  offerFields.forEach(k => f[k] = '');
+  offerFields.forEach(k => {
+    const def = currentTypeDef && currentTypeDef.fields[k];
+    f[k] = (def && def.type === 'list') ? [] : '';
+  });
   return { fields: f, bgImage: '', bgId: '', bgCityMode: 'origin' };
 }
 
 function saveCurrentOffer(){
   if (!offers[currentOfferIndex]) return;
   const o = offers[currentOfferIndex];
-  offerFields.forEach(k => o.fields[k] = $(k).value);
+  offerFields.forEach(k => {
+    const def = currentTypeDef && currentTypeDef.fields[k];
+    o.fields[k] = (def && def.type === 'list') ? getListFieldValue(k) : $(k).value;
+  });
   o.bgImage = bgImage; o.bgId = bgId; o.bgCityMode = bgCityMode;
   o.imageSubject = $('image_subject').value;
 }
@@ -193,7 +270,11 @@ function saveCurrentOffer(){
 function loadOffer(i){
   const o = offers[i];
   currentOfferIndex = i;
-  offerFields.forEach(k => $(k).value = o.fields[k] || '');
+  offerFields.forEach(k => {
+    const def = currentTypeDef && currentTypeDef.fields[k];
+    if (def && def.type === 'list'){ setListFieldValue(k, o.fields[k] || []); }
+    else { $(k).value = o.fields[k] || ''; }
+  });
   bgImage = o.bgImage || ''; bgId = o.bgId || ''; bgCityMode = o.bgCityMode || 'origin';
   paintBgCityToggle();
   if (o.imageSubject){
@@ -331,7 +412,16 @@ function toGermanDate(v){
 
 function collect(){
   const d = {};
-  offerFields.forEach(f => d[f] = toGermanDate($(f).value));
+  offerFields.forEach(f => {
+    const def = currentTypeDef && currentTypeDef.fields[f];
+    if (def && def.type === 'list'){
+      d[f] = getListFieldValue(f);
+    } else if (def && def.type === 'date'){
+      d[f] = toGermanDate($(f).value);
+    } else {
+      d[f] = $(f).value;
+    }
+  });
   d.image_subject = $('image_subject').value;
   return d;
 }
@@ -452,7 +542,9 @@ function attachFieldListener(f){
 $('image_subject').addEventListener('input', updatePreview);
 
 function cityForBackground(){
-  const city = bgCityMode === 'origin' ? $('origin').value : $('destination').value;
+  const originEl = $('origin');
+  const destEl = $('destination');
+  const city = (bgCityMode === 'origin' && originEl) ? originEl.value : (destEl ? destEl.value : '');
   return city ? (city + ' city panorama, famous landmarks, aerial view') : '';
 }
 
