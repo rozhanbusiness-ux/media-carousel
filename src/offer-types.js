@@ -79,6 +79,58 @@ const OFFER_TYPES = {
     },
   },
 
+  cruise: {
+    id: 'cruise',
+    displayName: 'Kreuzfahrt',
+    sizes: ['story', 'portrait', 'square'],
+    templates: {
+      story:    ['cruise-hero.html', 'cruise-itinerary.html', 'cruise-details.html'],
+      portrait: ['cruise-hero-portrait.html', 'cruise-itinerary-portrait.html', 'cruise-details-portrait.html'],
+      square:   ['cruise-hero-square.html', 'cruise-itinerary-square.html', 'cruise-details-square.html'],
+    },
+
+    buildHeroBackgroundPrompt(subject, orientationText) {
+      return OFFER_TYPES.flight.buildBackgroundPrompt(subject, orientationText);
+    },
+
+    buildItineraryBackgroundPrompt(subject, orientationText) {
+      return [
+        `Professional high-quality travel photograph related to ${subject}, river or sea cruise scenery.`,
+        'Wide atmospheric shot suitable for a dark navy overlay to be placed on top.',
+        'Ultra realistic, true-to-life colors, high resolution, daytime, clear conditions.',
+        'CRITICAL COMPOSITION RULE: keep the main visual interest in the UPPER-MIDDLE band,',
+        'roughly between 15 and 60 percent of the image height, so the image survives cropping.',
+        orientationText + ' No text, no logos, no watermarks, no people in foreground.',
+      ].join(' ');
+    },
+
+    fields: {
+      destination:     { label: 'Reiseziel',      type: 'text',   required: true,  maxLen: 20, default: '' },
+      ship_name:       { label: 'Schiffsname',     type: 'text',   required: true,  maxLen: 30, default: '' },
+      promo_line:      { label: 'Aktionszeile',    type: 'text',   required: false, maxLen: 40, default: '', manual: true },
+      stars:           { label: 'Bewertung',       type: 'text',   required: false, maxLen: 1,  default: '' },
+
+      stops: {
+        label: 'Reiseverlauf',
+        type: 'list',
+        required: true,
+        itemFields: {
+          city:        { label: 'Stadt',        type: 'text', required: true,  maxLen: 20 },
+          day_label:   { label: 'Tag',          type: 'text', required: true,  maxLen: 10 },
+          description: { label: 'Beschreibung', type: 'text', required: false, maxLen: 60 },
+        },
+      },
+
+      price:            { label: 'Preis',            type: 'text',   required: true,  maxLen: 8,  default: '' },
+      date_from:        { label: 'Reisedatum von',   type: 'date',   required: true,  maxLen: 12, default: '' },
+      date_to:          { label: 'Reisedatum bis',   type: 'date',   required: true,  maxLen: 12, default: '' },
+      departure_port:   { label: 'Abfahrtshafen',    type: 'text',   required: true,  maxLen: 20, default: '' },
+      cabin_type:       { label: 'Kabinentyp',       type: 'select', required: false, maxLen: 15, default: '', options: ['Innenkabine', 'Meerblick', 'Balkon', 'Suite'] },
+      board:            { label: 'Verpflegung',      type: 'select', required: false, maxLen: 20, default: '', options: ['nur Übernachtung', 'Frühstück', 'Halb Pension', 'Full Pension', 'All Inklusive', 'All Inklusive +'] },
+      transfer:         { label: 'Transfer',         type: 'select', required: false, maxLen: 15, default: '', options: ['Inklusive', 'Nicht inklusive'] },
+    },
+  },
+
 };
 
 function getOfferType(id) {
