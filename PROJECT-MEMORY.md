@@ -228,3 +228,24 @@ Phase 4 — Sharing (needs a feasibility test before committing):
 - Reusable generated-image library/archive. Currently Gemini backgrounds are cached in /cache (short bgId, for export speed) and exported PNGs pile up in /output with no reuse/archival — tied to the open output-cleanup item.
 - Video generation via Veo integration — short videos and UGC-style videos for TikTok/Instagram. Biggest idea yet: turns the app into a multimedia content platform. Needs a dedicated architecture discussion (related to the earlier Reels/Shorts + social auto-publishing long-term items).
 - Also still noted from earlier: full 10-slide carousel generation in one operation; social auto-publishing; post scheduling; AI content-writing platform.
+
+---
+
+## 14. Session Log — 14.09.2026 — Cruise Offer Type (in progress)
+
+**Design agreed (3 slides per offer):**
+- Hero: destination, ship_name, promo_line (manual), stars — AI city-panorama background
+- Itinerary: stops repeatable list field (city, day_label, description) — independent AI background with navy overlay; dynamic sizing, default 6 stops shown but no hard cap
+- Details: same pattern as package (price, date_from, date_to, departure_port, cabin_type select, board select, transfer select) — coded navy background
+
+**Implemented and pushed:**
+- cruise registry entry in src/offer-types.js (commit d13d6be) — fields, templates map, dual background prompt builders
+- Dual-background support in src/gemini-image.js + server.js via optional purpose param, backward-compatible (commit 4fa7d2a)
+- list field type support in public/index.html: dynamic add/edit/remove UI for stops, plus fixes to emptyOffer, saveCurrentOffer, loadOffer, collect() (commit 53fd817)
+- Two pre-existing frontend bugs discovered and fixed: collect() was calling toGermanDate() on all fields regardless of type; cityForBackground() assumed an origin field always exists (cruise has none)
+
+**NOT done yet — no visual template exists:**
+- The 9 HTML templates (hero/itinerary/details x story/portrait/square) are not built. Previewing a cruise offer currently 404s on /templates/cruise-hero.html etc. - expected, not a bug.
+- List-field extraction (Gemini reading stops from a screenshot/PDF) not yet implemented in src/extract-offer.js.
+
+**Next session:** build the 9 cruise HTML templates first, then tackle list extraction.
