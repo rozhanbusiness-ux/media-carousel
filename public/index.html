@@ -200,7 +200,11 @@ function renderListField(key, f, container){
     row.style.cssText = 'display:flex; gap:6px; align-items:center; margin-bottom:6px; padding:8px; background:#f7f8f9; border-radius:8px;';
     Object.entries(f.itemFields).forEach(([ik, idef]) => {
       const inp = document.createElement('input');
-      inp.placeholder = idef.label;
+      if (idef.type === 'date'){
+        inp.type = 'date';
+      } else {
+        inp.placeholder = idef.label;
+      }
       inp.value = item[ik] || '';
       inp.style.cssText = 'flex:1; padding:8px 10px; border:1.5px solid #dfe3e8; border-radius:7px; font-size:13px;';
       inp.addEventListener('input', () => {

@@ -108,7 +108,7 @@ const OFFER_TYPES = {
       destination:     { label: 'Reiseziel',      type: 'text',   required: true,  maxLen: 20, default: '' },
       ship_name:       { label: 'Schiffsname',     type: 'text',   required: true,  maxLen: 30, default: '' },
       promo_line:      { label: 'Aktionszeile',    type: 'text',   required: false, maxLen: 40, default: '', manual: true },
-      stars:           { label: 'Bewertung',       type: 'text',   required: false, maxLen: 1,  default: '' },
+      stars:           { label: 'Bewertung',       type: 'select', required: false, maxLen: 1,  default: '', options: ['1', '2', '3', '4', '5'] },
 
       stops: {
         label: 'Reiseverlauf',
@@ -116,7 +116,7 @@ const OFFER_TYPES = {
         required: true,
         itemFields: {
           city:        { label: 'Stadt',        type: 'text', required: true,  maxLen: 20 },
-          day_label:   { label: 'Tag',          type: 'text', required: true,  maxLen: 10 },
+          day_label:   { label: 'Datum',        type: 'date', required: true,  maxLen: 12 },
           description: { label: 'Beschreibung', type: 'text', required: false, maxLen: 60 },
         },
       },
@@ -127,7 +127,6 @@ const OFFER_TYPES = {
       departure_port:   { label: 'Abfahrtshafen',    type: 'text',   required: true,  maxLen: 20, default: '' },
       cabin_type:       { label: 'Kabinentyp',       type: 'select', required: false, maxLen: 15, default: '', options: ['Innenkabine', 'Meerblick', 'Balkon', 'Suite'] },
       board:            { label: 'Verpflegung',      type: 'select', required: false, maxLen: 20, default: '', options: ['nur Übernachtung', 'Frühstück', 'Halb Pension', 'Full Pension', 'All Inklusive', 'All Inklusive +'] },
-      transfer:         { label: 'Transfer',         type: 'select', required: false, maxLen: 15, default: '', options: ['Inklusive', 'Nicht inklusive'] },
     },
   },
 

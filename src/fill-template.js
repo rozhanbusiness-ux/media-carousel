@@ -47,6 +47,47 @@ function starsSvg(n) {
   return one.repeat(count);
 }
 
+// Build the itinerary timeline HTML for the cruise 'stops' list field.
+// Dynamically sizes spacing, dot radius, and font sizes based on how many
+// stops there are, so any number of stops fits the fixed slide height.
+// Currently tuned for the STORY size (1080x1920) only.
+function buildStopsHtml(stops, size) {
+  const list = Array.isArray(stops) ? stops.filter(s => s && (s.city || s.day_label || s.description)) : [];
+  const n = list.length;
+  if (n === 0) return '';
+
+  // Story-size layout constants (usable vertical band for the timeline)
+  const AREA_TOP = 340;
+  const AREA_BOTTOM = 1780;
+  const areaHeight = AREA_BOTTOM - AREA_TOP;
+  const slotHeight = areaHeight / n;
+
+  // Dynamic sizing: shrink as stop count grows, clamped to sane bounds
+  const dotRadius = Math.max(16, Math.min(28, slotHeight * 0.16));
+  const cityFontSize = Math.max(28, Math.min(48, slotHeight * 0.26));
+  const dayFontSize = Math.max(18, Math.min(30, slotHeight * 0.17));
+  const descFontSize = Math.max(16, Math.min(24, slotHeight * 0.13));
+
+  const rows = list.map((stop, i) => {
+    const cy = AREA_TOP + slotHeight * (i + 0.5);
+    const city = escapeHtml(stop.city || '');
+    const dayLabel = escapeHtml(stop.day_label || '');
+    const description = escapeHtml(stop.description || '');
+    const descRow = description
+      ? `<div class="stop-desc" style="font-size:${descFontSize}px;">${description}</div>`
+      : '';
+    return `
+      <div class="stop-dot" style="top:${cy - dotRadius}px; width:${dotRadius * 2}px; height:${dotRadius * 2}px; font-size:${dotRadius}px;">${i + 1}</div>
+      <div class="stop-text" style="top:${cy - dotRadius}px;">
+        <div class="stop-city" style="font-size:${cityFontSize}px;">${city}</div>
+        <div class="stop-day" style="font-size:${dayFontSize}px;">${dayLabel}</div>
+        ${descRow}
+      </div>`;
+  }).join('\n');
+
+  return `<div class="stop-line" style="top:${AREA_TOP}px; height:${areaHeight}px;"></div>` + rows;
+}
+
 function embedAssets(html) {
   html = html.replace('src="logo.png"', `src="${LOGO_DATA_URI}"`);
   for (const [rel, uri] of FONTS) {
@@ -69,11 +110,13 @@ function fillTemplateFile(templateFile, data, offerTypeId) {
   // bg_image is a data-URI (not user text) -> not escaped
   html = html.replaceAll('{{bg_image}}', data.bg_image || '');
 
-  for (const key of Object.keys(offerType.fields)) {
+  for (const [key, fieldDef] of Object.entries(offerType.fields)) {
+    if (fieldDef.type === 'list') continue; // handled separately below
     html = html.replaceAll('{{' + key + '}}', escapeHtml(data[key] || ''));
   }
   // derived placeholders
   html = html.replaceAll('{{stars_svg}}', starsSvg(data.stars));
+  html = html.replaceAll('{{stops_html}}', buildStopsHtml(data.stops, data.size));
 
   return embedAssets(html);
 }
@@ -92,4 +135,4 @@ function fillTemplate(data) {
   return fillTemplateFile(templates[0], data, offerTypeId);
 }
 
-module.exports = { fillTemplate, fillTemplateFile, starsSvg };
+module.exports = { fillTemplate, fillTemplateFile, starsSvg, buildStopsHtml };
