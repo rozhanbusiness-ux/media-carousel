@@ -249,3 +249,25 @@ Phase 4 — Sharing (needs a feasibility test before committing):
 - List-field extraction (Gemini reading stops from a screenshot/PDF) not yet implemented in src/extract-offer.js.
 
 **Next session:** build the 9 cruise HTML templates first, then tackle list extraction.
+
+---
+
+## 15. Session Log — 14.09.2026 (continued) — Cruise Offer Type: all 3 Story-size slides complete
+
+**Bugs fixed this session:**
+- Removed unused `description` field from `stops.itemFields` (registry, server-side `buildStopsHtml`, browser-side `buildStopsHtmlPreview`) - Rozhan decided it added no value
+- Increased itinerary timeline font/dot sizes significantly (dotRadius 26-40px, cityFontSize 44-72px, dayFontSize 28-42px) - previous values were far too small regardless of stop count
+- `stars` field changed from free text to a select dropdown (1-5); `day_label` in stops changed from text to a native date picker; `transfer` field removed entirely from cruise (not needed)
+- Added a second background-generation flow for the itinerary slide: new `btnGenItinerary` button (visible only for cruise), subject auto-derived from `destination` (no manual input), sends `purpose:'itinerary'` to `/api/generate-bg`, stored separately as `itineraryBgImage`/`itineraryBgId` per offer
+- Fixed `updatePreview()` to pick the correct background (`bgImage` vs `itineraryBgImage`) depending on which slide is currently shown
+- Fixed a deeper bug affecting any future offer type without an `origin` field: the origin/destination background-subject toggle is now hidden when the type has no `origin` field, and `emptyOffer()` now derives its default `bgCityMode` from the current type instead of hardcoding `'origin'` (previously the offer-reset sequence on type change silently overwrote the correct mode)
+
+**Templates completed (Story size only):**
+- `cruise-hero.html`, `cruise-itinerary.html`, `cruise-details.html` - all three built, tested, and confirmed working end-to-end in the browser (offer type selection, field entry, both background generations, all 3 slides previewing correctly)
+
+**NOT done yet:**
+- Portrait and Square variants of all 3 slides (currently 404 if those sizes are selected)
+- List-field extraction in `src/extract-offer.js` (Gemini reading `stops` from a screenshot/PDF)
+- AI-generated station descriptions - dropped for now since the `description` field itself was removed; revisit only if Rozhan raises it again
+
+**Next session:** build Portrait and Square template variants for all 3 cruise slides, then tackle list extraction.
