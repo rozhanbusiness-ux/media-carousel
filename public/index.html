@@ -74,7 +74,7 @@
 
     <div class="divider-h"></div>
 
-    <div class="field">
+    <div class="field" id="bgCityToggleWrap">
       <label>Hintergrundbild zeigt</label>
       <div style="display:flex; gap:10px;">
         <button type="button" class="btn" id="bgCityOrigin" style="flex:1; margin:0; padding:9px; font-size:14px; background:#0F2359; color:#fff;">Abflugort</button>
@@ -260,7 +260,8 @@ function emptyOffer(){
     const def = currentTypeDef && currentTypeDef.fields[k];
     f[k] = (def && def.type === 'list') ? [] : '';
   });
-  return { fields: f, bgImage: '', bgId: '', bgCityMode: 'origin', itineraryBgImage: '', itineraryBgId: '' };
+  const defaultBgCityMode = (currentTypeDef && currentTypeDef.fields.origin) ? 'origin' : 'destination';
+  return { fields: f, bgImage: '', bgId: '', bgCityMode: defaultBgCityMode, itineraryBgImage: '', itineraryBgId: '' };
 }
 
 function saveCurrentOffer(){
@@ -380,6 +381,11 @@ async function loadTypeDef(id){
   currentSlideIndex = 0;
   refreshSlideToggle();
   $('btnGenItinerary').style.display = (id === 'cruise') ? 'inline-block' : 'none';
+  const hasOrigin = !!def.fields.origin;
+  $('bgCityToggleWrap').style.display = hasOrigin ? 'block' : 'none';
+  if (!hasOrigin){
+    bgCityMode = 'destination';
+  }
 }
 
 function refreshSlideToggle(){
@@ -481,7 +487,9 @@ async function updatePreview(){
 
   let map;
   {
-    map = { bg_image: bgImage || '/templates/test-city.png' };
+    const isItinerarySlide = (currentOfferType === 'cruise' && currentSlideIndex === 1);
+    const activeBg = isItinerarySlide ? itineraryBgImage : bgImage;
+    map = { bg_image: activeBg || '/templates/test-city.png' };
     for (const key of offerFields){
       const def = currentTypeDef && currentTypeDef.fields[key];
       if (def && def.type === 'list') continue; // handled separately below
