@@ -109,6 +109,7 @@
       </div>
     </div>
     <button class="btn btn-navy" id="btnGen">Hintergrundbild generieren</button>
+    <button class="btn btn-navy" id="btnGenItinerary" style="background:#2a4a8a; display:none;">Hintergrundbild fuer Reiseverlauf generieren</button>
     <button class="btn btn-navy" id="btnGenAll" style="background:#1a3a7a;">Alle generieren</button>
     <button class="btn btn-navy" id="btnGenAllForce" style="background:#5a3a1a;">Alle neu generieren</button>
     <button class="btn btn-gold" id="btnRender" disabled>Finales PNG exportieren</button>
@@ -240,6 +241,8 @@ function setListFieldValue(key, items){
 }
 let bgImage = '';
 let bgId = '';
+let itineraryBgImage = '';
+let itineraryBgId = '';
 let selectedSizes = ['story'];
 let currentSize = 'story'; // size currently shown in the preview
 let currentSlideIndex = 0; // which template of the pair is previewed
@@ -257,7 +260,7 @@ function emptyOffer(){
     const def = currentTypeDef && currentTypeDef.fields[k];
     f[k] = (def && def.type === 'list') ? [] : '';
   });
-  return { fields: f, bgImage: '', bgId: '', bgCityMode: 'origin' };
+  return { fields: f, bgImage: '', bgId: '', bgCityMode: 'origin', itineraryBgImage: '', itineraryBgId: '' };
 }
 
 function saveCurrentOffer(){
@@ -268,6 +271,7 @@ function saveCurrentOffer(){
     o.fields[k] = (def && def.type === 'list') ? getListFieldValue(k) : $(k).value;
   });
   o.bgImage = bgImage; o.bgId = bgId; o.bgCityMode = bgCityMode;
+  o.itineraryBgImage = itineraryBgImage; o.itineraryBgId = itineraryBgId;
   o.imageSubject = $('image_subject').value;
 }
 
@@ -280,6 +284,7 @@ function loadOffer(i){
     else { $(k).value = o.fields[k] || ''; }
   });
   bgImage = o.bgImage || ''; bgId = o.bgId || ''; bgCityMode = o.bgCityMode || 'origin';
+  itineraryBgImage = o.itineraryBgImage || ''; itineraryBgId = o.itineraryBgId || '';
   paintBgCityToggle();
   if (o.imageSubject){
     $('image_subject').value = o.imageSubject;
@@ -374,6 +379,7 @@ async function loadTypeDef(id){
   buildFieldsUI(def);
   currentSlideIndex = 0;
   refreshSlideToggle();
+  $('btnGenItinerary').style.display = (id === 'cruise') ? 'inline-block' : 'none';
 }
 
 function refreshSlideToggle(){
@@ -717,6 +723,42 @@ async function generateOfferBackground(idx){
     generatingOffers.delete(idx);
   }
 }
+
+async function generateItineraryBackground(idx){
+  if (generatingOffers.has('itin_' + idx)) return false;
+  generatingOffers.add('itin_' + idx);
+  try{
+    const dest = (offers[idx].fields && offers[idx].fields.destination) || '';
+    const subject = dest ? (dest + ' river cruise scenery') : '';
+    const res = await fetch('/api/generate-bg', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ image_subject: subject, size: 'story', offer_type: currentOfferType, purpose: 'itinerary' })
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || 'generation failed');
+    offers[idx].itineraryBgImage = data.image;
+    offers[idx].itineraryBgId = data.bgId || '';
+    if (idx === currentOfferIndex){
+      itineraryBgImage = data.image; itineraryBgId = data.bgId || '';
+      await updatePreview();
+    }
+    return true;
+  } finally {
+    generatingOffers.delete('itin_' + idx);
+  }
+}
+
+$('btnGenItinerary').addEventListener('click', async () => {
+  const targetIndex = currentOfferIndex;
+  saveCurrentOffer();
+  setStatus('Generiere Hintergrundbild fuer Reiseverlauf...', 'load');
+  try{
+    await generateItineraryBackground(targetIndex);
+    setStatus('Reiseverlauf-Hintergrundbild erstellt.', 'ok');
+  } catch(e){
+    setStatus('Fehler: ' + e.message, 'err');
+  }
+});
 
 $('btnGen').addEventListener('click', async () => {
   const targetIndex = currentOfferIndex;
