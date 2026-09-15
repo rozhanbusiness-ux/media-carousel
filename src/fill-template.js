@@ -66,22 +66,15 @@ function buildStopsHtml(stops, size) {
   const dotRadius = Math.max(16, Math.min(28, slotHeight * 0.16));
   const cityFontSize = Math.max(28, Math.min(48, slotHeight * 0.26));
   const dayFontSize = Math.max(18, Math.min(30, slotHeight * 0.17));
-  const descFontSize = Math.max(16, Math.min(24, slotHeight * 0.13));
-
   const rows = list.map((stop, i) => {
     const cy = AREA_TOP + slotHeight * (i + 0.5);
     const city = escapeHtml(stop.city || '');
     const dayLabel = escapeHtml(stop.day_label || '');
-    const description = escapeHtml(stop.description || '');
-    const descRow = description
-      ? `<div class="stop-desc" style="font-size:${descFontSize}px;">${description}</div>`
-      : '';
     return `
       <div class="stop-dot" style="top:${cy - dotRadius}px; width:${dotRadius * 2}px; height:${dotRadius * 2}px; font-size:${dotRadius}px;">${i + 1}</div>
       <div class="stop-text" style="top:${cy - dotRadius}px;">
         <div class="stop-city" style="font-size:${cityFontSize}px;">${city}</div>
         <div class="stop-day" style="font-size:${dayFontSize}px;">${dayLabel}</div>
-        ${descRow}
       </div>`;
   }).join('\n');
 

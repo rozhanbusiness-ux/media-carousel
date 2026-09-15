@@ -115,9 +115,8 @@ const OFFER_TYPES = {
         type: 'list',
         required: true,
         itemFields: {
-          city:        { label: 'Stadt',        type: 'text', required: true,  maxLen: 20 },
-          day_label:   { label: 'Datum',        type: 'date', required: true,  maxLen: 12 },
-          description: { label: 'Beschreibung', type: 'text', required: false, maxLen: 60 },
+          city:        { label: 'Stadt', type: 'text', required: true, maxLen: 20 },
+          day_label:   { label: 'Datum', type: 'date', required: true, maxLen: 12 },
         },
       },
 
