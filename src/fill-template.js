@@ -63,9 +63,9 @@ function buildStopsHtml(stops, size) {
   const slotHeight = areaHeight / n;
 
   // Dynamic sizing: shrink as stop count grows, clamped to sane bounds
-  const dotRadius = Math.max(16, Math.min(28, slotHeight * 0.16));
-  const cityFontSize = Math.max(28, Math.min(48, slotHeight * 0.26));
-  const dayFontSize = Math.max(18, Math.min(30, slotHeight * 0.17));
+  const dotRadius = Math.max(26, Math.min(40, slotHeight * 0.24));
+  const cityFontSize = Math.max(44, Math.min(72, slotHeight * 0.40));
+  const dayFontSize = Math.max(28, Math.min(42, slotHeight * 0.24));
   const rows = list.map((stop, i) => {
     const cy = AREA_TOP + slotHeight * (i + 0.5);
     const city = escapeHtml(stop.city || '');
