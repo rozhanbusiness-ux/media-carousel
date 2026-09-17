@@ -11,15 +11,26 @@ const { getOfferType } = require('./offer-types');
 const EXTRACT_MODEL = 'gemini-2.5-flash';
 
 function buildExtractionPrompt(offerType, todayIso) {
-  const fieldLines = Object.entries(offerType.fields)
+  const normalFields = Object.entries(offerType.fields).filter(([, f]) => f.type !== 'list');
+  const listFields = Object.entries(offerType.fields).filter(([, f]) => f.type === 'list');
+
+  const fieldLines = normalFields
     .map(([key, f]) => `- "${key}": ${f.label} (example: ${f.default})`)
     .join('\n');
+
+  const listFieldLines = listFields.map(([key, f]) => {
+    const itemKeys = Object.entries(f.itemFields || {})
+      .map(([ik, itemF]) => `"${ik}" (${itemF.label})`)
+      .join(', ');
+    return `- "${key}": ${f.label} — a LIST. Find EVERY item in the image. Each item is an object with keys: ${itemKeys}. Output an ARRAY of such objects, in the order they appear. If none are found, output an empty array [].`;
+  }).join('\n');
 
   return [
     'You are a precise data extraction engine for a travel agency.',
     'Look at the attached screenshot of a travel offer and extract the value of each field below.',
     'Fields to find:',
     fieldLines,
+    listFieldLines ? '\nList fields to find:\n' + listFieldLines : '',
     '',
     'Rules:',
     `- Today is ${todayIso}. Travel dates are ALWAYS in the future.`,
@@ -30,7 +41,11 @@ function buildExtractionPrompt(offerType, todayIso) {
     '- City fields: output the city NAME in GERMAN (e.g. "DUS" means Düsseldorf, "EBL" means Erbil, "CGN" means Köln — NEVER "Cologne"). Always use the German city name, never the English name.',
     '- If a field cannot be found in the image, output an empty string "" for it. NEVER guess.',
     '- Answer with ONLY a raw JSON object, no markdown, no explanations.',
-    'Example answer format: {"origin":"Düsseldorf","destination":"Erbil","price":"694.11","date_out":"09.07.2026","date_return":"30.07.2026","baggage_1":"","baggage_2":""}',
+    'Example answer format (use the EXACT field keys listed above for THIS offer type): {' +
+      normalFields.map(([key]) => `"${key}":"..."`).join(',') +
+      (listFields.length ? ',' + listFields.map(([key]) => `"${key}":[{...}]`).join(',') : '') +
+      '}',
+    listFieldLines ? 'For list fields, example: "stops":[{"city":"Palma de Mallorca","day_label":"12.07.2026"},{"city":"Barcelona","day_label":"13.07.2026"}]' : '',
   ].join('\n');
 }
 
@@ -87,16 +102,37 @@ async function extractFromImage(imageBase64, mimeType, offerTypeId) {
 
   // keep only known fields; unknown keys are dropped
   const out = {};
-  for (const key of Object.keys(offerType.fields)) {
+  for (const [key, fieldDef] of Object.entries(offerType.fields)) {
+    if (fieldDef.type === 'list') {
+      const rawList = Array.isArray(extracted[key]) ? extracted[key] : [];
+      out[key] = rawList.map(item => {
+        const cleanItem = {};
+        for (const ik of Object.keys(fieldDef.itemFields || {})) {
+          cleanItem[ik] = typeof item[ik] === 'string' ? item[ik].trim() : '';
+        }
+        return cleanItem;
+      }).filter(item => Object.values(item).some(v => v));
+      continue;
+    }
     out[key] = typeof extracted[key] === 'string' ? extracted[key].trim() : '';
   }
   return out;
 }
 
 function buildMultiExtractionPrompt(offerType, todayIso) {
-  const fieldLines = Object.entries(offerType.fields)
+  const normalFields = Object.entries(offerType.fields).filter(([, f]) => f.type !== 'list');
+  const listFields = Object.entries(offerType.fields).filter(([, f]) => f.type === 'list');
+
+  const fieldLines = normalFields
     .map(([key, f]) => `- "${key}": ${f.label} (example: ${f.default})`)
     .join('\n');
+
+  const listFieldLines = listFields.map(([key, f]) => {
+    const itemKeys = Object.entries(f.itemFields || {})
+      .map(([ik, itemF]) => `"${ik}" (${itemF.label})`)
+      .join(', ');
+    return `- "${key}": ${f.label} — a LIST. Find EVERY item for that offer. Each item is an object with keys: ${itemKeys}. Output an ARRAY of such objects, in order. If none found, output an empty array [].`;
+  }).join('\n');
 
   return [
     'You are a precise data extraction engine for a travel agency.',
@@ -104,6 +140,7 @@ function buildMultiExtractionPrompt(offerType, todayIso) {
     'Find EVERY offer in the document and extract the value of each field below FOR EACH offer.',
     'Fields to find (per offer):',
     fieldLines,
+    listFieldLines ? '\nList fields to find (per offer):\n' + listFieldLines : '',
     '',
     'Rules:',
     `- Today is ${todayIso}. Travel dates are ALWAYS in the future.`,
@@ -114,7 +151,10 @@ function buildMultiExtractionPrompt(offerType, todayIso) {
     '- If a field cannot be found for a given offer, output an empty string "" for it. NEVER guess.',
     '- Extract ALL offers found in the document, however many there are.',
     '- Answer with ONLY a raw JSON ARRAY of objects, no markdown, no explanations.',
-    'Example answer format: [{"destination":"Antalya","hotel_name":"Campus Hill Hotel","price":"457",...}, {...}, ...]',
+    'Example answer format (one object per offer, use the EXACT field keys listed above for THIS offer type): [{' +
+      normalFields.map(([key]) => `"${key}":"..."`).join(',') +
+      (listFields.length ? ',' + listFields.map(([key]) => `"${key}":[{...}]`).join(',') : '') +
+      '}, {...}, ...]',
   ].join('\n');
 }
 
@@ -171,7 +211,18 @@ async function extractFromPdf(pdfBase64, offerTypeId) {
 
   return extractedList.map(extracted => {
     const out = {};
-    for (const key of Object.keys(offerType.fields)) {
+    for (const [key, fieldDef] of Object.entries(offerType.fields)) {
+      if (fieldDef.type === 'list') {
+        const rawList = Array.isArray(extracted[key]) ? extracted[key] : [];
+        out[key] = rawList.map(item => {
+          const cleanItem = {};
+          for (const ik of Object.keys(fieldDef.itemFields || {})) {
+            cleanItem[ik] = typeof item[ik] === 'string' ? item[ik].trim() : '';
+          }
+          return cleanItem;
+        }).filter(item => Object.values(item).some(v => v));
+        continue;
+      }
       out[key] = typeof extracted[key] === 'string' ? extracted[key].trim() : '';
     }
     return out;

@@ -56,16 +56,26 @@ function buildStopsHtml(stops, size) {
   const n = list.length;
   if (n === 0) return '';
 
-  // Story-size layout constants (usable vertical band for the timeline)
-  const AREA_TOP = 340;
-  const AREA_BOTTOM = 1780;
+  // Per-size layout constants (usable vertical band for the timeline)
+  const AREA_BOUNDS = {
+    story:    { top: 340, bottom: 1780 },
+    portrait: { top: 270, bottom: 1258 },
+    square:   { top: 210, bottom: 998 },
+  };
+  const bounds = AREA_BOUNDS[size] || AREA_BOUNDS.story;
+  const AREA_TOP = bounds.top;
+  const AREA_BOTTOM = bounds.bottom;
   const areaHeight = AREA_BOTTOM - AREA_TOP;
   const slotHeight = areaHeight / n;
 
+  // Smaller canvases need proportionally smaller text/dots, not just a smaller area
+  const SIZE_SCALE = { story: 1, portrait: 0.73, square: 0.58 };
+  const scale = SIZE_SCALE[size] || 1;
+
   // Dynamic sizing: shrink as stop count grows, clamped to sane bounds
-  const dotRadius = Math.max(26, Math.min(40, slotHeight * 0.24));
-  const cityFontSize = Math.max(44, Math.min(72, slotHeight * 0.40));
-  const dayFontSize = Math.max(28, Math.min(42, slotHeight * 0.24));
+  const dotRadius = Math.max(26 * scale, Math.min(40 * scale, slotHeight * 0.24));
+  const cityFontSize = Math.max(44 * scale, Math.min(72 * scale, slotHeight * 0.40));
+  const dayFontSize = Math.max(28 * scale, Math.min(42 * scale, slotHeight * 0.24));
   const rows = list.map((stop, i) => {
     const cy = AREA_TOP + slotHeight * (i + 0.5);
     const city = escapeHtml(stop.city || '');

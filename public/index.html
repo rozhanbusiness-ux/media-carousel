@@ -448,19 +448,28 @@ function setStatus(msg, type){
   s.className = 'status show ' + type;
 }
 
-function buildStopsHtmlPreview(stops){
+function buildStopsHtmlPreview(stops, size){
   const list = Array.isArray(stops) ? stops.filter(s => s && (s.city || s.day_label || s.description)) : [];
   const n = list.length;
   if (n === 0) return '';
 
-  const AREA_TOP = 340;
-  const AREA_BOTTOM = 1780;
+  const AREA_BOUNDS = {
+    story:    { top: 340, bottom: 1780 },
+    portrait: { top: 270, bottom: 1258 },
+    square:   { top: 210, bottom: 998 },
+  };
+  const bounds = AREA_BOUNDS[size] || AREA_BOUNDS.story;
+  const AREA_TOP = bounds.top;
+  const AREA_BOTTOM = bounds.bottom;
   const areaHeight = AREA_BOTTOM - AREA_TOP;
   const slotHeight = areaHeight / n;
 
-  const dotRadius = Math.max(26, Math.min(40, slotHeight * 0.24));
-  const cityFontSize = Math.max(44, Math.min(72, slotHeight * 0.40));
-  const dayFontSize = Math.max(28, Math.min(42, slotHeight * 0.24));
+  const SIZE_SCALE = { story: 1, portrait: 0.73, square: 0.58 };
+  const scale = SIZE_SCALE[size] || 1;
+
+  const dotRadius = Math.max(26 * scale, Math.min(40 * scale, slotHeight * 0.24));
+  const cityFontSize = Math.max(44 * scale, Math.min(72 * scale, slotHeight * 0.40));
+  const dayFontSize = Math.max(28 * scale, Math.min(42 * scale, slotHeight * 0.24));
   const esc = (s) => String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
   const rows = list.map((stop, i) => {
@@ -504,9 +513,9 @@ async function updatePreview(){
       const one = '<svg viewBox="0 0 60 60" width="52" height="52"><path d="M30 4 l7.6 16.2 17.4 2.1 -12.9 12.1 3.4 17.2 -15.5-8.7 -15.5 8.7 3.4-17.2 -12.9-12.1 17.4-2.1 Z" fill="#E6C25A"/></svg>';
       map.stars_svg = one.repeat(n);
     }
-    // derived: cruise itinerary timeline (mirrors buildStopsHtml in src/fill-template.js, story size only)
+    // derived: cruise itinerary timeline (mirrors buildStopsHtml in src/fill-template.js, all 3 sizes)
     if ('stops' in d){
-      map.stops_html = buildStopsHtmlPreview(d.stops);
+      map.stops_html = buildStopsHtmlPreview(d.stops, currentSize);
     }
   }
   for (const [k,v] of Object.entries(map)) html = html.replaceAll('{{'+k+'}}', v);
@@ -674,6 +683,11 @@ $('shotUpload').addEventListener('change', async () => {
       const fields = await extractOne(await readFile(files[0]));
       let filled = 0;
       for (const [key, val] of Object.entries(fields)){
+        const def = currentTypeDef && currentTypeDef.fields[key];
+        if (def && def.type === 'list'){
+          if (Array.isArray(val) && val.length){ setListFieldValue(key, val); filled++; }
+          continue;
+        }
         const el = document.getElementById(key);
         if (el && val){ el.value = val; filled++; }
       }
