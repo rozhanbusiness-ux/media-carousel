@@ -28,6 +28,7 @@ module.exports = function mountStudio(app) {
 
   // Create today's (or a given day's) draft. One generation at a time.
   router.post('/drafts', async (req, res) => {
+    if (what === 'photo-pick' && !(Number.isInteger(value) && value > 0)) return res.status(400).json({ error: 'bad photo' });
     if (generating) return res.status(429).json({ error: 'already generating' });
     const day = typeof req.body.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(req.body.date) ? new Date(req.body.date + 'T12:00:00') : new Date();
     generating = true;
@@ -78,7 +79,7 @@ module.exports = function mountStudio(app) {
     const draft = store.getDraft(req.params.id);
     if (!draft) return res.status(404).json({ error: 'not found' });
     const { what, value } = req.body || {};
-    if (!['photo', 'photo-ai', 'text', 'all', 'style', 'langs', 'photo-upload'].includes(what)) return res.status(400).json({ error: 'bad request' });
+    if (!['photo', 'photo-pick', 'photo-auto', 'photo-ai', 'text', 'all', 'style', 'langs', 'photo-upload'].includes(what)) return res.status(400).json({ error: 'bad request' });
     if (what === 'photo-upload' && !(typeof value === 'string' && value.length < 12000000 && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(value))) {
       return res.status(400).json({ error: 'bad image' });
     }

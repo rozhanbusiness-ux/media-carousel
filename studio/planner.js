@@ -12,7 +12,8 @@ const { getFlightOffers } = require('./offers');
 const { buildCaption, formatDate, cityName, LANGS } = require('./captions');
 const { renderSlide, STYLE_BY_WEEKDAY, STYLES } = require('./render');
 const { generatePhoto } = require('./image');
-const { findPhoto } = require('./pexels');
+const { candidates: pexelsCandidates, download: pexelsDownload } = require('./pexels');
+const { rankPhotos } = require('./photo-rank');
 const store = require('./store');
 
 const ROOT = path.join(__dirname, '..');
@@ -41,25 +42,47 @@ function libraryPhoto(code, used) {
   return { file, pexelsId: null, dataUri: `data:image/${ext};base64,` + fs.readFileSync(path.join(dir, file)).toString('base64') };
 }
 
-/**
- * Photo order (client decision): 1) our library, 2) real photo from Pexels.
- * AI photos are never chosen automatically (only via the explicit 'photo-ai' action).
- * Returns null when nothing suitable exists; the draft then asks for an own photo.
- */
-async function choosePhoto(offer) {
+// Better search words for frequent destinations (bright, iconic, non-religious views).
+const QUERIES = {
+  IST: ['Istanbul Bosphorus sunny', 'Galata tower daytime', 'Istanbul waterfront'],
+  AYT: ['Antalya beach', 'Antalya coast turquoise', 'Kaleici harbour'],
+  PMI: ['Mallorca bay turquoise', 'Palma de Mallorca harbour', 'Mallorca beach'],
+  BCN: ['Barcelona beach sunny', 'Barcelona city view', 'Barcelona street'],
+  DXB: ['Dubai skyline day', 'Dubai marina', 'Dubai beach'],
+  EBL: ['Erbil citadel', 'Erbil city', 'Kurdistan mountains'],
+  BGW: ['Baghdad Tigris', 'Baghdad city'],
+  HRG: ['Hurghada beach', 'Red Sea beach Egypt'],
+  LIS: ['Lisbon tram sunny', 'Lisbon viewpoint', 'Lisbon city'],
+  FCO: ['Rome Colosseum sunny', 'Rome street', 'Rome city view'],
+};
+const queriesFor = (offer) => QUERIES[offer.to.code] || [`${offer.to.name} city sunny`, `${offer.to.name} travel`, offer.to.name];
+
+/** Library photo (client decision: our library comes first), or null. */
+function choosePhoto(offer) {
   const drafts = store.listDrafts();
-  const lib = libraryPhoto(offer.to.code, new Set(drafts.map((d) => d.photoFile).filter(Boolean)));
-  if (lib) return lib;
-  const usedIds = new Set(drafts.map((d) => d.pexelsId).filter(Boolean));
-  const name = offer.to.name;
-  try {
-    const p = await findPhoto([`${name} city`, name, `${name} travel`], usedIds);
-    if (p) return { file: null, pexelsId: p.id, dataUri: p.dataUri };
-  } catch (err) { console.error('studio pexels:', err.message); }
-  return null;
+  return libraryPhoto(offer.to.code, new Set(drafts.map((d) => d.photoFile).filter(Boolean)));
+}
+
+/** Real photo candidates for a draft, ranked best first by Gemini (score 0-10). */
+async function findCandidates(draft) {
+  const used = new Set(store.listDrafts().map((d) => d.pexelsId).filter(Boolean));
+  for (const c of draft.photoCandidates || []) used.add(c.id); // "more photos" shows new ones
+  let list = [];
+  try { list = await pexelsCandidates(queriesFor(draft.offer), used, 15); } catch (err) { console.error('studio pexels:', err.message); }
+  const ranked = await rankPhotos(list, draft.offer.to.name);
+  draft.photoCandidates = ranked.map((c) => ({ id: c.id, url: c.url, thumb: c.thumb, score: c.score }));
+}
+
+/** Use one candidate (by Pexels id) as the draft photo. */
+async function useCandidate(draft, id) {
+  const c = (draft.photoCandidates || []).find((x) => x.id === id);
+  if (!c) throw new Error('unknown photo');
+  setPhoto(draft, { file: null, pexelsId: c.id, dataUri: await pexelsDownload(c.url) });
+  draft.photoCandidates = [];
 }
 
 function setPhoto(draft, p) {
+  if (p) draft.photoCandidates = [];
   fs.writeFileSync(photoPath(draft.id), p ? p.dataUri : '');
   draft.photoFile = p ? p.file : null;
   draft.pexelsId = p ? p.pexelsId : null;
@@ -134,13 +157,17 @@ async function writeTexts(draft, langs = draft.langs) {
 
 async function buildDraft({ offer, style, date, source, photo = null, langs = null }) {
   const id = crypto.randomBytes(6).toString('hex');
-  const picture = photo ? { file: null, pexelsId: null, dataUri: photo } : await choosePhoto(offer);
+  const picture = photo ? { file: null, pexelsId: null, dataUri: photo } : choosePhoto(offer);
   const draft = {
     id, createdAt: new Date().toISOString(), forDate: date.toISOString().slice(0, 10),
     status: 'pending', style, source, offer, langs: langs || defaultLangs(date), versions: [],
   };
   setPhoto(draft, picture);
   await writeTexts(draft);
+  if (!picture) { // no library photo: show ranked real photos; the client picks one (or "auto")
+    await findCandidates(draft);
+    return store.upsertDraft(draft);
+  }
   return renderDraft(draft);
 }
 
@@ -157,14 +184,21 @@ async function createManualDraft({ offer, style, photo = null, date = new Date()
 
 /** Re-generate one part of an existing draft: 'photo' | 'text' | 'all' | {style} | {langs}. */
 async function regenerate(draft, what, value) {
-  if (what === 'photo' || what === 'all') {
-    const p = await choosePhoto(draft.offer);
-    if (!p) throw new Error('Kein weiteres echtes Foto gefunden – bitte eigenes Foto hochladen oder KI-Foto (Notfall) nutzen.');
-    setPhoto(draft, p);
+  if (what === 'photo') { // show (new) ranked candidates; current photo stays until one is picked
+    await findCandidates(draft);
+    if (!draft.photoCandidates.length) throw new Error('Kein weiteres echtes Foto gefunden – bitte eigenes Foto hochladen oder KI-Foto (Notfall) nutzen.');
+    return store.upsertDraft(draft);
+  }
+  if (what === 'photo-pick') await useCandidate(draft, value);
+  if (what === 'photo-auto') {
+    if (!(draft.photoCandidates || []).length) await findCandidates(draft);
+    if (!draft.photoCandidates.length) throw new Error('Kein echtes Foto gefunden – bitte eigenes Foto hochladen.');
+    await useCandidate(draft, draft.photoCandidates[0].id);
   }
   if (what === 'photo-ai') setPhoto(draft, { file: null, pexelsId: null, dataUri: await generatePhoto(draft.offer.to.name) });
   if (what === 'photo-upload') setPhoto(draft, { file: null, pexelsId: null, dataUri: value });
   if (what === 'text' || what === 'all') await writeTexts(draft);
+  if (what === 'all') await findCandidates(draft); // new ranked photos to choose from
   if (what === 'style') {
     if (!STYLES.includes(value)) throw new Error('unknown style');
     draft.style = value;
@@ -175,6 +209,7 @@ async function regenerate(draft, what, value) {
     await writeTexts(draft, draft.langs.filter((l) => !(draft.texts || {})[l]));
   }
   draft.status = 'pending';
+  if (draft.needsPhoto) return store.upsertDraft(draft); // nothing to render until a photo is chosen
   return renderDraft(draft);
 }
 

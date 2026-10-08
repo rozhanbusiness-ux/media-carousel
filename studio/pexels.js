@@ -29,7 +29,7 @@ async function search(query, fetchImpl = fetch) {
     .filter((p) => Number.isInteger(p.id) && typeof p.src?.original === 'string' && p.height > p.width && p.height >= 2000)
     .filter((p) => !RELIGIOUS.test(`${p.alt || ''} ${p.url || ''}`))
     .filter((p) => brightness(p.avg_color) >= MIN_BRIGHTNESS) // the template adds a dark filter, so start bright
-    .map((p) => ({ id: p.id, url: p.src.original }));
+    .map((p) => ({ id: p.id, url: p.src.original, thumb: p.src.medium || p.src.small || '' }));
 }
 
 /** Download one photo (Pexels CDN only), resized by the CDN to ~2200 px wide. Returns a data URI. */
@@ -62,4 +62,17 @@ async function findPhoto(queries, used, fetchImpl = fetch) {
   return null;
 }
 
-module.exports = { findPhoto, search, download, brightness, RELIGIOUS };
+/** Up to `max` unused candidates over all queries (deduplicated), in search order. */
+async function candidates(queries, used, max = 15, fetchImpl = fetch) {
+  if (!key()) return [];
+  const out = new Map();
+  for (const q of queries.filter(Boolean)) {
+    for (const p of await search(q, fetchImpl)) {
+      if (!used.has(p.id) && !out.has(p.id) && /^https:\/\/images\.pexels\.com\//.test(p.thumb)) out.set(p.id, p);
+      if (out.size >= max) return [...out.values()];
+    }
+  }
+  return [...out.values()];
+}
+
+module.exports = { candidates, findPhoto, search, download, brightness, RELIGIOUS };
