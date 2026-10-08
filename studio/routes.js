@@ -8,7 +8,7 @@
 const path = require('path');
 const express = require('express');
 const store = require('./store');
-const { deleteDraft, createDailyDraft, createManualDraft, regenerate } = require('./planner');
+const { saveToLibrary, deleteDraft, createDailyDraft, createManualDraft, regenerate } = require('./planner');
 const { STYLES } = require('./render');
 const { getFlightOffers } = require('./offers');
 
@@ -78,7 +78,7 @@ module.exports = function mountStudio(app) {
     const draft = store.getDraft(req.params.id);
     if (!draft) return res.status(404).json({ error: 'not found' });
     const { what, value } = req.body || {};
-    if (!['photo', 'text', 'all', 'style', 'langs', 'photo-upload'].includes(what)) return res.status(400).json({ error: 'bad request' });
+    if (!['photo', 'photo-ai', 'text', 'all', 'style', 'langs', 'photo-upload'].includes(what)) return res.status(400).json({ error: 'bad request' });
     if (what === 'photo-upload' && !(typeof value === 'string' && value.length < 12000000 && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(value))) {
       return res.status(400).json({ error: 'bad image' });
     }
@@ -99,6 +99,9 @@ module.exports = function mountStudio(app) {
       if (!['pending', 'approved', 'rejected'].includes(status)) return res.status(400).json({ error: 'bad status' });
       draft.status = status;
       draft.decidedAt = new Date().toISOString();
+      if (status === 'approved') {
+        try { saveToLibrary(draft); } catch (err) { console.error('studio library:', err.message); }
+      }
     }
     if (caption !== undefined) {
       const v = draft.versions.find((x) => x.lang === lang);

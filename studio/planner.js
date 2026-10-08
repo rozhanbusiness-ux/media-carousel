@@ -12,12 +12,14 @@ const { getFlightOffers } = require('./offers');
 const { buildCaption, formatDate, cityName, LANGS } = require('./captions');
 const { renderSlide, STYLE_BY_WEEKDAY, STYLES } = require('./render');
 const { generatePhoto } = require('./image');
+const { findPhoto } = require('./pexels');
 const store = require('./store');
 
 const ROOT = path.join(__dirname, '..');
 const OUTPUT = path.join(ROOT, 'output');
 const CACHE = path.join(ROOT, 'cache');
 const PHOTOS = path.join(__dirname, 'photos');
+const LIBRARY = path.join(CACHE, 'studio-library'); // approved photos, kept across deploys (cache volume)
 const REPEAT_DAYS = 3;
 const KURDISH_DAYS = new Set([1, 3, 5]);
 
@@ -26,22 +28,56 @@ const photoPath = (id) => path.join(CACHE, `studio-photo-${id}.txt`);
 
 /** A library photo for the destination (studio/photos/<IATA>-n.jpg), least recently used first. */
 function libraryPhoto(code, used) {
-  let files = [];
-  try { files = fs.readdirSync(PHOTOS).filter((f) => code && f.startsWith(code + '-') && /\.(jpe?g|png|webp)$/i.test(f)); } catch { /* none */ }
-  const fresh = files.filter((f) => !used.has(f));
+  const files = [];
+  for (const dir of [PHOTOS, LIBRARY]) {
+    try {
+      for (const f of fs.readdirSync(dir)) if (code && f.startsWith(code + '-') && /\.(jpe?g|png|webp)$/i.test(f)) files.push([dir, f]);
+    } catch { /* none */ }
+  }
+  const fresh = files.filter(([, f]) => !used.has(f));
   if (!fresh.length) return null;
-  const file = fresh[0];
+  const [dir, file] = fresh[0];
   const ext = file.split('.').pop().toLowerCase().replace('jpg', 'jpeg');
-  return { file, dataUri: `data:image/${ext};base64,` + fs.readFileSync(path.join(PHOTOS, file)).toString('base64') };
+  return { file, pexelsId: null, dataUri: `data:image/${ext};base64,` + fs.readFileSync(path.join(dir, file)).toString('base64') };
 }
 
-async function choosePhoto(offer, { forceNew = false } = {}) {
-  if (!forceNew) {
-    const used = new Set(store.listDrafts().map((d) => d.photoFile).filter(Boolean));
-    const lib = libraryPhoto(offer.to.code, used);
-    if (lib) return lib;
-  }
-  return { file: null, dataUri: await generatePhoto(offer.to.name) };
+/**
+ * Photo order (client decision): 1) our library, 2) real photo from Pexels.
+ * AI photos are never chosen automatically (only via the explicit 'photo-ai' action).
+ * Returns null when nothing suitable exists; the draft then asks for an own photo.
+ */
+async function choosePhoto(offer) {
+  const drafts = store.listDrafts();
+  const lib = libraryPhoto(offer.to.code, new Set(drafts.map((d) => d.photoFile).filter(Boolean)));
+  if (lib) return lib;
+  const usedIds = new Set(drafts.map((d) => d.pexelsId).filter(Boolean));
+  const name = offer.to.name;
+  try {
+    const p = await findPhoto([`${name} city`, name, `${name} travel`], usedIds);
+    if (p) return { file: null, pexelsId: p.id, dataUri: p.dataUri };
+  } catch (err) { console.error('studio pexels:', err.message); }
+  return null;
+}
+
+function setPhoto(draft, p) {
+  fs.writeFileSync(photoPath(draft.id), p ? p.dataUri : '');
+  draft.photoFile = p ? p.file : null;
+  draft.pexelsId = p ? p.pexelsId : null;
+  draft.needsPhoto = !p;
+}
+
+/** Keep the photo of an approved draft in the library (once per draft). */
+function saveToLibrary(draft) {
+  if (draft.photoFile || draft.libraryFile) return;
+  let data = '';
+  try { data = fs.readFileSync(photoPath(draft.id), 'utf8'); } catch { return; }
+  const m = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/=]+)$/.exec(data);
+  if (!m || !/^[A-Z]{3}$/.test(draft.offer.to.code || '')) return;
+  fs.mkdirSync(LIBRARY, { recursive: true });
+  const file = `${draft.offer.to.code}-${draft.id}.${m[1] === 'jpeg' ? 'jpg' : m[1]}`;
+  fs.writeFileSync(path.join(LIBRARY, file), Buffer.from(m[2], 'base64'));
+  draft.libraryFile = file;
+  draft.photoFile = file; // counts as used by this draft
 }
 
 const pickOffer = (offers, recent) => offers.find((o) => !recent.has(o.to.code)) || null;
@@ -98,12 +134,12 @@ async function writeTexts(draft, langs = draft.langs) {
 
 async function buildDraft({ offer, style, date, source, photo = null, langs = null }) {
   const id = crypto.randomBytes(6).toString('hex');
-  const picture = photo ? { file: null, dataUri: photo } : await choosePhoto(offer);
-  fs.writeFileSync(photoPath(id), picture.dataUri);
+  const picture = photo ? { file: null, pexelsId: null, dataUri: photo } : await choosePhoto(offer);
   const draft = {
     id, createdAt: new Date().toISOString(), forDate: date.toISOString().slice(0, 10),
-    status: 'pending', style, source, offer, photoFile: picture.file, langs: langs || defaultLangs(date), versions: [],
+    status: 'pending', style, source, offer, langs: langs || defaultLangs(date), versions: [],
   };
+  setPhoto(draft, picture);
   await writeTexts(draft);
   return renderDraft(draft);
 }
@@ -122,14 +158,12 @@ async function createManualDraft({ offer, style, photo = null, date = new Date()
 /** Re-generate one part of an existing draft: 'photo' | 'text' | 'all' | {style} | {langs}. */
 async function regenerate(draft, what, value) {
   if (what === 'photo' || what === 'all') {
-    const p = await choosePhoto(draft.offer, { forceNew: true });
-    fs.writeFileSync(photoPath(draft.id), p.dataUri);
-    draft.photoFile = p.file;
+    const p = await choosePhoto(draft.offer);
+    if (!p) throw new Error('Kein weiteres echtes Foto gefunden – bitte eigenes Foto hochladen oder KI-Foto (Notfall) nutzen.');
+    setPhoto(draft, p);
   }
-  if (what === 'photo-upload') {
-    fs.writeFileSync(photoPath(draft.id), value);
-    draft.photoFile = null;
-  }
+  if (what === 'photo-ai') setPhoto(draft, { file: null, pexelsId: null, dataUri: await generatePhoto(draft.offer.to.name) });
+  if (what === 'photo-upload') setPhoto(draft, { file: null, pexelsId: null, dataUri: value });
   if (what === 'text' || what === 'all') await writeTexts(draft);
   if (what === 'style') {
     if (!STYLES.includes(value)) throw new Error('unknown style');
@@ -153,4 +187,4 @@ function deleteDraft(draft) {
   store.removeDraft(draft.id);
 }
 
-module.exports = { deleteDraft, createDailyDraft, createManualDraft, regenerate, pickOffer };
+module.exports = { saveToLibrary, deleteDraft, createDailyDraft, createManualDraft, regenerate, pickOffer };
