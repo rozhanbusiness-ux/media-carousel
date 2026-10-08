@@ -17,6 +17,13 @@ const SIZES = ['story', 'portrait', 'square'];
 // Client decision: the full-photo glass template is the default every day; others stay selectable per draft.
 const STYLE_BY_WEEKDAY = { 1: 'flight', 2: 'flight', 3: 'flight', 4: 'flight', 5: 'flight', 6: 'flight', 0: 'flight' };
 
+// Package posts (hotel + flight) override a few labels.
+const PACKAGE_LABELS = {
+  de: { kicker: 'Pauschalreise', detailsTitle: 'Dein Urlaub' },
+  ar: { kicker: 'باقة سياحية', detailsTitle: 'عطلتك' },
+  ckb: { kicker: 'پاکێجا گەشتێ', detailsTitle: 'بێهنڤەدانا تە' },
+};
+
 const LABELS = {
   de: { kicker: 'Flugangebot', swipe: 'Wischen für Details →', detailsTitle: 'Dein Flug', priceLabel: 'ab', perPerson: 'pro Person',
     fromLabel: 'Ab', toLabel: 'Nach', datesLabel: 'Reisedatum', airlineLabel: 'Airline',
@@ -74,7 +81,10 @@ async function renderSlide(post, size, slide) {
     destination: post.destination, hook: post.hook,
     fromCity: post.from.city, fromCode: post.from.code, toCity: post.to.city, toCode: post.to.code,
     dates: '\u2066' + post.dates + '\u2069', price: '%%PRICE%%',
+    kind: post.kind === 'package' ? 'package' : 'flight',
+    hotel: post.hotel || '', stars: post.stars || '', pkgLine: post.pkgLine || '', place: post.place || '',
   };
+  if (post.kind === 'package') Object.assign(values, PACKAGE_LABELS[post.lang] || PACKAGE_LABELS.de);
   const priceHtml = buildPriceHtml(post.price);
   const tpl = fs.readFileSync(path.join(DIR, 'templates', post.style + '.html'), 'utf8');
   let html = tpl.replace(/\{\{(\w+)\}\}/g, (_, k) => (k === 'fontCss' || k === 'photo' ? `{{${k}}}` : esc(values[k])));

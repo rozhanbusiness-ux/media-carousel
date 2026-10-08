@@ -33,7 +33,7 @@
   .dots i.on { background: var(--gold); width: 30px; border-radius: 6px; }
 
   /* Slide 1: hook */
-  .s1 .shade { background: linear-gradient(180deg, rgba(4,10,28,.55) 0%, rgba(4,10,28,0) 24%, rgba(4,10,28,0) 46%, rgba(4,10,28,.85) 80%, rgba(4,10,28,.95) 100%); }
+  .s1 .shade { background: linear-gradient(180deg, rgba(4,10,28,.35) 0%, rgba(4,10,28,0) 22%, rgba(4,10,28,0) 52%, rgba(4,10,28,.55) 80%, rgba(4,10,28,.72) 100%); }
   .s1 .block { position: absolute; left: 70px; right: 70px; bottom: calc(130 * var(--u)); text-align: center; }
   .s1 .kicker { font-size: calc(22 * var(--u)); margin-bottom: calc(14 * var(--u)); }
   .s1 .title { font-size: calc(230 * var(--u)); line-height: .95; margin: 0 0 calc(34 * var(--u));
@@ -44,8 +44,8 @@
   .story .s1 .block { bottom: 300px; }
 
   /* Slide 2: details */
-  .s2 .bg { filter: blur(6px) brightness(.55); transform: scale(1.08); }
-  .s2 .shade { background: radial-gradient(120% 80% at 50% 30%, rgba(10,24,56,.25), rgba(4,10,28,.9)); }
+  .s2 .bg { filter: blur(6px) brightness(.78); transform: scale(1.08); }
+  .s2 .shade { background: radial-gradient(120% 80% at 50% 30%, rgba(10,24,56,.12), rgba(4,10,28,.6)); }
   .s2 .card { position: absolute; left: 80px; right: 80px; top: 50%; transform: translateY(-46%);
     padding: calc(56 * var(--u)) calc(56 * var(--u)); text-align: center; }
   .s2 .kicker { font-size: calc(20 * var(--u)); }
@@ -66,8 +66,12 @@
   .s2 .price em { display: inline-block; margin-top: calc(10 * var(--u)); padding: 6px 18px; border: 1px solid rgba(230,194,90,.45); border-radius: 999px; letter-spacing: .08em; }
   .s2 .price em { font-style: normal; font-size: calc(22 * var(--u)); color: rgba(255,255,255,.75); }
 
+  .s2 .hotel { font-size: calc(52 * var(--u)); font-weight: 800; line-height: 1.15; margin-top: calc(22 * var(--u)); text-wrap: balance; }
+  .s2 .stars { font-size: calc(34 * var(--u)); letter-spacing: .25em; margin: calc(12 * var(--u)) 0 calc(14 * var(--u)); }
+  .s2 .place { color: rgba(255,255,255,.75); font-size: calc(24 * var(--u)) !important; letter-spacing: .04em; }
+
   /* Slide 3: call to action */
-  .s3 .shade { background: linear-gradient(180deg, rgba(4,10,28,.35), rgba(4,10,28,.88)); }
+  .s3 .shade { background: radial-gradient(60% 22% at 50% 52%, rgba(4,10,28,.45), rgba(4,10,28,0)), linear-gradient(180deg, rgba(4,10,28,.35) 0%, rgba(4,10,28,0) 22%, rgba(4,10,28,0) 52%, rgba(4,10,28,.55) 80%, rgba(4,10,28,.72) 100%); } /* slide 1 tone + soft glow behind the text */
   .s3 .block { position: absolute; left: 80px; right: 80px; top: 50%; transform: translateY(-40%); text-align: center; }
   .s3 .big { font-size: calc(150 * var(--u)); line-height: 1; }
   .rtl .s3 .big { font-weight: 700; font-size: calc(96 * var(--u)); line-height: 1.2; }
@@ -83,7 +87,7 @@
 .pl { transform: rotate(90deg); } .rtl .pl { transform: rotate(-90deg); }
 </style>
 </head>
-<body class="{{size}} {{dir}}">
+<body class="{{size}} {{dir}} k-{{kind}}">
   <div class="post s{{slide}}">
     <img class="bg" src="{{photo}}" style="object-position: {{photoPosition}}" alt="" />
     <div class="shade"></div>
@@ -99,7 +103,16 @@
     </div>
 
     <!-- slide 2 -->
-    <div class="card glass" data-only="2">
+    <div class="card glass pkg" data-only="2">
+      <div class="kicker tracking gold">{{detailsTitle}}</div>
+      <div class="hotel">{{hotel}}</div>
+      <div class="stars gold">{{stars}}</div>
+      <div class="row place">{{place}}</div>
+      <div class="row">{{pkgLine}}</div>
+      <div class="line"></div>
+      <div class="price"><small>{{priceLabel}}</small><span class="serif gold">{{price}}</span><br /><em>{{perPerson}}</em></div>
+    </div>
+    <div class="card glass flt" data-only="2">
       <div class="kicker tracking gold">{{detailsTitle}}</div>
       <div class="route">
         <div class="city"><b>{{fromCity}}</b><span>{{fromCode}}</span></div>
@@ -125,6 +138,7 @@
   <style>
     [data-only] { display: none; }
     .s1 [data-only="1"], .s2 [data-only="2"], .s3 [data-only="3"] { display: block; }
+    .k-flight .pkg, .k-package .flt { display: none !important; }
     .s1 .d1, .s2 .d2, .s3 .d3 { background: var(--gold); width: 30px; border-radius: 6px; }
   </style>
 </body>

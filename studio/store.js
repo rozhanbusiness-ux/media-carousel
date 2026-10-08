@@ -36,7 +36,7 @@ function upsertDraft(draft) {
 /** Destination codes used by drafts created in the last `days` days (not rejected). */
 function recentDestinations(days) {
   const since = Date.now() - days * 86400000;
-  return new Set(load().drafts.filter((d) => d.status !== 'rejected' && Date.parse(d.createdAt) >= since).map((d) => d.offer.to.code));
+  return new Set(load().drafts.filter((d) => d.status !== 'rejected' && Date.parse(d.createdAt) >= since).map((d) => d.offer.to.code || d.offer.to.name));
 }
 
 function removeDraft(id) {

@@ -51,6 +51,7 @@
 <main>
   <div class="row" style="align-items:center">
     <button class="primary" id="gen">Heutigen Entwurf erstellen</button>
+    <button class="primary" id="genPkg">Paket-Entwurf erstellen</button>
     <span style="font-size:14px;color:#cfd6e6">Sprachen:</span>
     <label class="chk"><input type="checkbox" name="deflang" value="de"> Deutsch</label>
     <label class="chk"><input type="checkbox" name="deflang" value="ar"> العربية</label>
@@ -104,7 +105,7 @@ function render(drafts) {
   $('#list').innerHTML = drafts.map((d) => `
     <div class="draft" data-id="${esc(d.id)}">
       <div class="meta"><span class="badge ${esc(d.status)}">${esc(d.status)}</span>
-        <span>${esc(d.forDate)}</span><span>${esc(d.offer.from.name)} → ${esc(d.offer.to.name)}</span>
+        <span>${esc(d.forDate)}</span><span>${d.offer.kind === 'package' ? '🏨 ' + esc(d.offer.to.name) + ' – ' + esc(d.offer.hotel) : esc(d.offer.from.name) + ' → ' + esc(d.offer.to.name)}</span>
         <span>${esc(d.offer.price)} €</span></div>
       ${(d.photoCandidates || []).length ? `
         <div class="photo-pick"><h3>Foto wählen <small>(beste zuerst, Bewertung durch KI)</small></h3>
@@ -117,6 +118,9 @@ function render(drafts) {
         <button class="ghost" data-act="langs">Sprachen übernehmen</button>
       </div>
       <div class="row">
+        <button class="ghost" data-act="offer-next">🔀 Andere Destination</button>
+        <button class="ghost" data-act="offer-list">📋 Angebot wählen</button>
+        <select data-act="offer-pick" hidden></select>
         <button class="ghost" data-act="photo">🖼 Fotos zeigen</button>
         <label class="ghost" style="padding:10px 18px;border-radius:999px;cursor:pointer;font-weight:700">⬆ Eigenes Foto<input type="file" accept="image/jpeg,image/png,image/webp" data-act="upload" hidden></label>
         <button class="ghost" data-act="text">✍ Neuer Text</button>
@@ -133,7 +137,15 @@ function render(drafts) {
     </div>`).join('') || '<p>Noch keine Entwürfe.</p>';
 }
 
-async function load() { render(await api('/api/studio/drafts')); }
+let drafts = [];
+async function load() { drafts = await api('/api/studio/drafts'); render(drafts); }
+
+$('#genPkg').onclick = async () => {
+  $('#genPkg').disabled = true; $('#msg').textContent = 'Erstelle Paket-Entwurf … (ca. 1 Minute)';
+  try { await api('/api/studio/drafts/package', { method: 'POST', body: JSON.stringify(defLangs().length ? { langs: defLangs() } : {}) }); $('#msg').textContent = 'Fertig.'; await load(); }
+  catch (e) { $('#msg').textContent = 'Fehler: ' + e.message; }
+  $('#genPkg').disabled = false;
+};
 
 $('#gen').onclick = async () => {
   $('#gen').disabled = true; $('#msg').textContent = 'Erstelle Entwurf … (ca. 1 Minute)';
@@ -150,6 +162,7 @@ async function regen(box, what, value) {
 $('#list').onchange = async (e) => {
   const box = e.target.closest('.draft'); if (!box) return;
   if (e.target.dataset.act === 'style') return regen(box, 'style', e.target.value);
+  if (e.target.dataset.act === 'offer-pick' && e.target.value) return regen(box, 'offer-pick', e.target.value);
   if (e.target.dataset.act === 'upload' && e.target.files[0]) return regen(box, 'photo-upload', await readFile(e.target.files[0]));
 };
 $('#list').onclick = async (e) => {
@@ -159,6 +172,18 @@ $('#list').onclick = async (e) => {
   if (act === 'photo-pick') return regen(box, 'photo-pick', Number(b.dataset.pid));
   if (['photo', 'photo-auto', 'photo-ai', 'text', 'all'].includes(act)) return regen(box, act);
   if (act === 'langs') return regen(box, 'langs', [...box.querySelectorAll('[data-lang-box]:checked')].map((i) => i.value));
+  if (act === 'offer-next') return regen(box, 'offer-next');
+  if (act === 'offer-list') {
+    const sel = box.querySelector('select[data-act="offer-pick"]');
+    $('#msg').textContent = 'Lade Angebote …';
+    try {
+      const kind = drafts.find((x) => x.id === id)?.offer.kind === 'package' ? 'package' : 'flight';
+      const list = await api('/api/studio/offer-choices?kind=' + kind);
+      sel.innerHTML = '<option value="">– Angebot wählen –</option>' + list.map((o) => `<option value="${esc(o.key)}">${esc(o.label)} · ${esc(o.price)} €</option>`).join('');
+      sel.hidden = false; $('#msg').textContent = list.length + ' Angebote.';
+    } catch (err) { $('#msg').textContent = 'Fehler: ' + err.message; }
+    return;
+  }
   if (act === 'delete') {
     if (!confirm('Diesen abgelehnten Entwurf endgültig löschen?')) return;
     try { await api('/api/studio/drafts/' + id, { method: 'DELETE' }); $('#msg').textContent = 'Gelöscht.'; await load(); }

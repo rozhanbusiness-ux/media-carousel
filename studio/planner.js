@@ -8,7 +8,8 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const { getFlightOffers } = require('./offers');
+const { getFlightOffers, getPackageOffers } = require('./offers');
+const { toDraftOffer, factLine, starText, offerKey } = require('./packages');
 const { buildCaption, formatDate, cityName, LANGS } = require('./captions');
 const { renderSlide, STYLE_BY_WEEKDAY, STYLES } = require('./render');
 const { generatePhoto } = require('./image');
@@ -55,7 +56,9 @@ const QUERIES = {
   LIS: ['Lisbon tram sunny', 'Lisbon viewpoint', 'Lisbon city'],
   FCO: ['Rome Colosseum sunny', 'Rome street', 'Rome city view'],
 };
-const queriesFor = (offer) => QUERIES[offer.to.code] || [`${offer.to.name} city sunny`, `${offer.to.name} travel`, offer.to.name];
+const queriesFor = (offer) => QUERIES[offer.to.code] || (offer.kind === 'package'
+  ? [`${offer.to.name} beach sunny`, `${offer.to.name} ${offer.region || offer.country}`.trim(), `${offer.region || offer.country} coast`.trim()]
+  : [`${offer.to.name} city sunny`, `${offer.to.name} travel`, offer.to.name]);
 
 /** Library photo (client decision: our library comes first), or null. */
 function choosePhoto(offer) {
@@ -103,9 +106,17 @@ function saveToLibrary(draft) {
   draft.photoFile = file; // counts as used by this draft
 }
 
-const pickOffer = (offers, recent) => offers.find((o) => !recent.has(o.to.code)) || null;
+const destKey = (o) => o.to.code || o.to.name;
+const pickOffer = (offers, recent, skip = new Set()) => offers.find((o) => !recent.has(destKey(o)) && !skip.has(offerKey(o))) || null;
+
+/** Live offers of one kind, in the draft offer shape. */
+async function liveOffers(kind) {
+  if (kind === 'package') return (await getPackageOffers('package')).map(toDraftOffer).filter((o) => o.to.name);
+  return getFlightOffers();
+}
 
 function datesText(offer, lang) {
+  if (offer.kind === 'package') return '';
   const out = formatDate(offer.departureDate);
   if (!offer.returnDate) return out;
   const back = formatDate(offer.returnDate);
@@ -123,10 +134,14 @@ async function renderDraft(draft) {
     const local = (p) => (lang === 'de' ? p.name : cityName(p, lang));
     const post = {
       style: draft.style, lang, photo, destination: local(draft.offer.to), hook: t.hook,
-      from: { city: local(draft.offer.from), code: draft.offer.from.code || '' },
+      from: draft.offer.from ? { city: local(draft.offer.from), code: draft.offer.from.code || '' } : { city: '', code: '' },
       to: { city: local(draft.offer.to), code: draft.offer.to.code || '' },
       dates: datesText(draft.offer, lang), airline: draft.offer.airline,
       price: draft.offer.price,
+      kind: draft.offer.kind, hotel: draft.offer.hotel, stars: starText(draft.offer.stars),
+      pkgLine: draft.offer.kind === 'package' ? factLine(draft.offer, lang) : '',
+      // Country names come in German from specials, so they are shown on German slides only.
+      place: draft.offer.kind === 'package' ? [local(draft.offer.to), lang === 'de' ? draft.offer.country : ''].filter(Boolean).join(', ') : '',
     };
     const files = [];
     for (const size of ['story', 'portrait']) { // story first: it is posted first
@@ -179,6 +194,40 @@ async function createDailyDraft({ date = new Date(), offers = null, langs = null
   return buildDraft({ offer, style: STYLE_BY_WEEKDAY[date.getDay()], date, source: 'specials', langs });
 }
 
+/** Package draft (hotel + flight) from today's specials top offers. */
+async function createPackageDraft({ date = new Date(), offers = null, langs = null } = {}) {
+  const list = offers || (await liveOffers('package'));
+  const offer = pickOffer(list, store.recentDestinations(REPEAT_DAYS));
+  if (!offer) throw new Error('no suitable package offer today');
+  return buildDraft({ offer, style: 'flight', date, source: 'specials', langs });
+}
+
+/** Replace the offer of a draft (another destination); keeps style and languages. */
+async function changeOffer(draft, key) {
+  const kind = draft.offer.kind === 'package' ? 'package' : 'flight';
+  const list = await liveOffers(kind);
+  draft.skippedOffers = [...new Set([...(draft.skippedOffers || []), offerKey(draft.offer)])].slice(-50);
+  const offer = key
+    ? list.find((o) => offerKey(o) === key)
+    : pickOffer(list, store.recentDestinations(REPEAT_DAYS), new Set(draft.skippedOffers))
+      || pickOffer(list, new Set(), new Set(draft.skippedOffers));
+  if (!offer) throw new Error(key ? 'Angebot nicht mehr verfügbar.' : 'Kein weiteres Angebot verfügbar.');
+  draft.offer = offer;
+  draft.texts = {};
+  await writeTexts(draft);
+  const lib = choosePhoto(offer);
+  setPhoto(draft, lib);
+  if (!lib) await findCandidates(draft);
+}
+
+/** Today's offers of the draft's kind, for the "choose offer" list. */
+async function offerChoices(kind) {
+  return (await liveOffers(kind === 'package' ? 'package' : 'flight')).map((o) => ({
+    key: offerKey(o), price: o.price,
+    label: o.kind === 'package' ? `${o.to.name} – ${o.hotel}` : `${o.from.name} → ${o.to.name} (${o.departureDate})`,
+  }));
+}
+
 async function createManualDraft({ offer, style, photo = null, date = new Date(), langs = null }) {
   return buildDraft({ offer, style: style || STYLE_BY_WEEKDAY[date.getDay()], date, source: 'manual', photo, langs });
 }
@@ -190,6 +239,8 @@ async function regenerate(draft, what, value) {
     if (!draft.photoCandidates.length) throw new Error('Kein weiteres echtes Foto gefunden – bitte eigenes Foto hochladen oder KI-Foto (Notfall) nutzen.');
     return store.upsertDraft(draft);
   }
+  if (what === 'offer-next') await changeOffer(draft, null);
+  if (what === 'offer-pick') await changeOffer(draft, value);
   if (what === 'photo-pick') await useCandidate(draft, value);
   if (what === 'photo-auto') {
     if (!(draft.photoCandidates || []).length) await findCandidates(draft);
@@ -202,6 +253,7 @@ async function regenerate(draft, what, value) {
   if (what === 'all') await findCandidates(draft); // new ranked photos to choose from
   if (what === 'style') {
     if (!STYLES.includes(value)) throw new Error('unknown style');
+    if (draft.offer.kind === 'package' && value !== 'flight') throw new Error('Pauschalreisen nutzen die Glas-Vorlage.');
     draft.style = value;
   }
   if (what === 'langs') {
@@ -223,4 +275,4 @@ function deleteDraft(draft) {
   store.removeDraft(draft.id);
 }
 
-module.exports = { saveToLibrary, deleteDraft, createDailyDraft, createManualDraft, regenerate, pickOffer };
+module.exports = { offerChoices, createPackageDraft, saveToLibrary, deleteDraft, createDailyDraft, createManualDraft, regenerate, pickOffer };

@@ -8,6 +8,7 @@
 // ============================================================
 
 const config = require('../config');
+const { factLine, starText } = require('./packages');
 
 const TEXT_MODEL = 'gemini-2.5-flash';
 const LANGS = ['de', 'ar', 'ckb'];
@@ -93,7 +94,8 @@ function formatDate(iso) {
 /** 184.77 -> "184,77 €" (German format, also used in ar/ckb for clarity). */
 function formatPrice(n) {
   // LRI ... PDI keeps "184,77 €" left-to-right (euro sign on the right) inside Arabic/Kurdish text.
-  return '\u2066' + n.toFixed(2).replace('.', ',').replace(/,00$/, '') + ' €\u2069';
+  const [whole, cents] = n.toFixed(2).split('.');
+  return '\u2066' + whole.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + (cents === '00' ? '' : ',' + cents) + ' €\u2069';
 }
 
 // Model output must never contain numbers, prices, links, contact data or free/discount promises.
@@ -110,7 +112,7 @@ function isSafeHashtag(t) {
 function buildPrompt(offer, lang) {
   return [
     `You write one Instagram/Facebook caption part for a travel agency (MEDIA Travel & Tourism, Germany).`,
-    `Language: ${LANG_NAME[lang]}. Destination: ${offer.toName}. Departure city: ${offer.fromName}. Product: ${offer.kind}.`,
+    `Language: ${LANG_NAME[lang]}. Destination: ${offer.toName}${offer.region ? ` (${offer.region}, ${offer.country})` : ''}. Departure: ${offer.fromName}. Product: ${offer.kind}.${offer.hotel ? ` Hotel: ${offer.hotel}.` : ''}`,
     `Brand voice: luxurious, warm, elegant and confident; never cheap, pushy or loud. Write like a high-end travel magazine.`,
     `Hook: max 55 characters, printed large on the photo. Evoke ONE concrete, sensory detail typical of ${offer.toName} (light, sea, a view, a taste, a sound, a famous place) so it could not be about any other city. Natural, native phrasing.`,
     `Avoid clichés and generic openers such as "Entdecke", "Fernweh?", "Während hier...", "Lust auf...", "اكتشف", "هل تحلم".`,
@@ -148,7 +150,11 @@ async function askModel(offer, lang, fetchImpl) {
 async function buildCaption(flight, lang, fetchImpl = fetch) {
   if (!LANGS.includes(lang)) throw new Error('unsupported language: ' + lang);
   const f = FIXED[lang];
-  const offer = {
+  const isPackage = flight.kind === 'package';
+  const offer = isPackage ? {
+    kind: 'package holiday (hotel + flight)', toName: cityName(flight.to, lang), fromName: 'Germany',
+    hotel: flight.hotel, region: flight.region, country: flight.country,
+  } : {
     kind: flight.kind || 'flight',
     fromName: cityName(flight.from, lang), toName: cityName(flight.to, lang),
     from: cityName(flight.from, lang) + (flight.from.code ? ` (${flight.from.code})` : ''), to: cityName(flight.to, lang) + (flight.to.code ? ` (${flight.to.code})` : ''),
@@ -167,11 +173,17 @@ async function buildCaption(flight, lang, fetchImpl = fetch) {
   const body = aiOk ? ai.body.trim() : f.fallbackBody;
   const hashtags = ((aiOk && Array.isArray(ai.hashtags)) ? ai.hashtags.filter(isSafeHashtag) : [])
     .concat([tagWord(offer.toName), tagWord(offer.toName + (lang === 'de' ? 'Urlaub' : '')), ...BASE_TAGS[lang], '#MediaTravel', '#MediaTravelTourism'])
+    .map((t) => (isPackage && t === '#Flugangebot' ? '#Pauschalreise' : t))
     .filter((t, i, all) => isSafeHashtag(t) && all.indexOf(t) === i)
     .slice(0, 22);
 
   // Facts are written by code only.
-  const facts = [
+  const facts = isPackage ? [
+    `🏨 ${flight.hotel} ${starText(flight.stars)}`.trim(),
+    `📍 ${[offer.toName, flight.region, flight.country].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).join(', ')}`,
+    factLine(flight, lang) ? `🌙 ${factLine(flight, lang)}` : '',
+    `💶 ${f.from} ${formatPrice(flight.price)} ${f.perPerson}`,
+  ].filter(Boolean) : [
     `✈️ ${f.route(offer)}`,
     offer.dateBack ? `📅 ${f.dates(offer)}` : `📅 ${offer.dateOut}`,
     `💶 ${f.from} ${formatPrice(flight.price)} ${f.perPerson}`,
