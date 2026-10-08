@@ -43,17 +43,17 @@ async function rankPhotos(candidates, city, fetchImpl = fetch) {
   if (!config.GEMINI_API_KEY || !list.length) return list;
   const thumbs = await Promise.all(list.map((c) => fetchThumb(c.thumb, fetchImpl)));
   const usable = list.map((c, i) => ({ c, t: thumbs[i] })).filter((x) => x.t);
-  if (!usable.length) return list;
+  if (!usable.length) { console.error('studio photo rank: no thumbnails loaded'); return list; }
   const parts = [{ text: criteria(city) }];
   usable.forEach((x, i) => parts.push({ text: `Photo ${i}:` }, { inline_data: { mime_type: x.t.mime, data: x.t.data } }));
   try {
     const res = await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': config.GEMINI_API_KEY },
-      body: JSON.stringify({ contents: [{ parts }], generationConfig: { responseMimeType: 'application/json', temperature: 0.2, maxOutputTokens: 2048 } }),
+      body: JSON.stringify({ contents: [{ parts }], generationConfig: { responseMimeType: 'application/json', temperature: 0.2, maxOutputTokens: 4096, thinkingConfig: { thinkingBudget: 0 } } }),
       signal: AbortSignal.timeout(60000),
     });
-    if (!res.ok) return list;
+    if (!res.ok) { console.error('studio photo rank: HTTP', res.status); return list; }
     const json = await res.json();
     const text = (json?.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join('');
     const scores = JSON.parse(text.replace(/```json|```/g, '').trim()).scores;

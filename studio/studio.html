@@ -106,7 +106,7 @@ function render(drafts) {
         <span>${esc(d.forDate)}</span><span>${esc(d.offer.from.name)} → ${esc(d.offer.to.name)}</span>
         <span>${esc(d.offer.price)} €</span></div>
       ${(d.photoCandidates || []).length ? `
-        <div class="pick"><h3>Foto wählen <small>(beste zuerst, Bewertung durch KI)</small></h3>
+        <div class="photo-pick"><h3>Foto wählen <small>(beste zuerst, Bewertung durch KI)</small></h3>
           <div class="row"><button class="ok" data-act="photo-auto">⚡ Automatisch: bestes Foto</button><button class="ghost" data-act="photo">Mehr Fotos</button></div>
           <div class="cands">${d.photoCandidates.map((c) => `<button class="cand" data-act="photo-pick" data-pid="${Number(c.id)}"><img src="${esc(c.thumb)}" alt="" loading="lazy" referrerpolicy="no-referrer"><span>${c.score == null ? '–' : Number(c.score) + '/10'}</span></button>`).join('')}</div>
         </div>` : (d.needsPhoto ? '<p class="warn">⚠ Kein passendes echtes Foto gefunden. Bitte eigenes Foto hochladen (⬆) oder im Notfall 🤖 KI-Foto.</p>' : '')}
