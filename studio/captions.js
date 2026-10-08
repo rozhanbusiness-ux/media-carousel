@@ -1,0 +1,149 @@
+// ============================================================
+//  studio/captions.js — social captions in de / ar / ckb
+//  Gemini writes ONLY the creative words (hook, short text,
+//  hashtags). Prices, dates, routes, the call to action and the
+//  legal notice are added by code, so the model can never invent
+//  a price or a promise. Every model answer is checked; if it fails
+//  (or no API key is set) a safe fixed caption is used instead.
+// ============================================================
+
+const config = require('../config');
+
+const TEXT_MODEL = 'gemini-2.5-flash';
+const LANGS = ['de', 'ar', 'ckb'];
+
+// City names per airport code; unknown codes keep the provider's (German) name.
+const CITY = {
+  DUS: { de: 'Düsseldorf', ar: 'دوسلدورف', ckb: 'دۆسێڵدۆرف' },
+  FRA: { de: 'Frankfurt', ar: 'فرانكفورت', ckb: 'فرانکفۆرت' },
+  MUC: { de: 'München', ar: 'ميونخ', ckb: 'میونخ' },
+  HAJ: { de: 'Hannover', ar: 'هانوفر', ckb: 'هانۆڤەر' },
+  STR: { de: 'Stuttgart', ar: 'شتوتغارت', ckb: 'شتوتگارت' },
+  IST: { de: 'Istanbul', ar: 'إسطنبول', ckb: 'ئیستانبوڵ' },
+  AYT: { de: 'Antalya', ar: 'أنطاليا', ckb: 'ئەنتاڵیا' },
+  PMI: { de: 'Mallorca', ar: 'مايوركا', ckb: 'مایۆرکا' },
+  DXB: { de: 'Dubai', ar: 'دبي', ckb: 'دوبەی' },
+  LON: { de: 'London', ar: 'لندن', ckb: 'لەندەن' },
+  EBL: { de: 'Erbil', ar: 'أربيل', ckb: 'هەولێر' },
+  ISU: { de: 'Sulaimaniyya', ar: 'السليمانية', ckb: 'سلێمانی' },
+  BGW: { de: 'Bagdad', ar: 'بغداد', ckb: 'بەغدا' },
+};
+const cityName = (place, lang) => (CITY[place.code] && CITY[place.code][lang]) || place.name;
+
+const LANG_NAME = { de: 'German', ar: 'Arabic (Modern Standard, warm tone)', ckb: 'Kurdish Badini (Behdînî, Northern Kurdish of Duhok, written in Arabic script)' };
+
+const FIXED = {
+  de: {
+    from: 'ab', perPerson: 'p. P.', route: (o) => `${o.from} → ${o.to}`,
+    dates: (o) => `${o.dateOut}–${o.dateBack}`,
+    cta: '👉 Link in der Bio – jetzt Angebot sichern.',
+    notice: 'Preise freibleibend, Verfügbarkeit vorbehalten.',
+    fallbackHook: (o) => `Während hier der Herbst beginnt: ${o.toName}.`,
+    fallbackBody: 'Ein spontaner Tapetenwechsel kostet weniger, als du denkst – aber nicht mehr lange.',
+  },
+  ar: {
+    from: 'ابتداءً من', perPerson: 'للشخص', route: (o) => `من ${o.from} إلى ${o.to}`,
+    dates: (o) => `${o.dateOut} – ${o.dateBack}`,
+    cta: '👈 الرابط في البايو – احجز الآن.',
+    notice: 'الأسعار غير ملزمة وحسب التوفر.',
+    fallbackHook: (o) => `${o.toName}… بسعر لن تصدّقه.`,
+    fallbackBody: 'المقاعد بهذا السعر محدودة، ومن يحجز أولاً يسافر أولاً.',
+  },
+  ckb: {
+    from: 'ژ', perPerson: 'بۆ هەر کەسەکی', route: (o) => `ژ ${o.from} بۆ ${o.to}`,
+    dates: (o) => `${o.dateOut} – ${o.dateBack}`,
+    cta: '👈 لینک د بایۆیێ دایە – نوکە بوک بکە.',
+    notice: 'نرخ نە جێگیرن و ل دویڤ بەردەستبوونێ نە.',
+    fallbackHook: (o) => `${o.toName}، نێزیکترە ژ ئەوا تو هزر دکەی.`,
+    fallbackBody: 'گەشتا تە یا بهێت ئێک کلیک دویرە.',
+  },
+};
+
+/** "2026-10-23" -> "23.10.2026" */
+function formatDate(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '');
+  return m ? `${m[3]}.${m[2]}.${m[1]}` : '';
+}
+
+/** 184.77 -> "184,77 €" (German format, also used in ar/ckb for clarity). */
+function formatPrice(n) {
+  return n.toFixed(2).replace('.', ',').replace(/,00$/, '') + ' €';
+}
+
+// Model output must never contain numbers, prices, links, contact data or free/discount promises.
+const FORBIDDEN = /[0-9٠-٩€$%@]|https?:|www\.|\.com|kostenlos|gratis|umsonst|rabatt|garantiert|مجان|خصم|مضمون|بەخۆڕایی|داشکاندن/i;
+
+function isSafeText(s, max) {
+  return typeof s === 'string' && s.trim().length > 0 && s.length <= max && !FORBIDDEN.test(s) && !/[<>{}]/.test(s);
+}
+
+function isSafeHashtag(t) {
+  return typeof t === 'string' && /^#[\p{L}_]{2,30}$/u.test(t);
+}
+
+function buildPrompt(offer, lang) {
+  return [
+    `You write one Instagram/Facebook caption part for a travel agency (MEDIA Travel & Tourism, Germany).`,
+    `Language: ${LANG_NAME[lang]}. Destination: ${offer.toName}. Departure city: ${offer.fromName}. Product: ${offer.kind}.`,
+    `Rules: no numbers, no prices, no dates, no links, no discounts or "free", no emojis in the hook, no religious references.`,
+    `Return ONLY JSON: {"hook": "<max 70 chars, strong emotional hook>", "body": "<max 220 chars, 1-2 sentences why this trip>", "hashtags": ["#...", 5 to 8 hashtags without numbers]}`,
+  ].join('\n');
+}
+
+async function askModel(offer, lang, fetchImpl) {
+  if (!config.GEMINI_API_KEY) return null;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${TEXT_MODEL}:generateContent`;
+  const res = await fetchImpl(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': config.GEMINI_API_KEY },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: buildPrompt(offer, lang) }] }],
+      generationConfig: { responseMimeType: 'application/json', temperature: 0.9, maxOutputTokens: 1024 },
+    }),
+    signal: AbortSignal.timeout(30000),
+  });
+  if (!res.ok) return null;
+  const json = await res.json();
+  const text = (json?.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join('');
+  try {
+    return JSON.parse(text.replace(/```json|```/g, '').trim());
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Build the caption for one flight offer (from studio/offers.js) in one language.
+ * Returns { lang, hook, body, facts, cta, notice, hashtags, text, aiWritten }.
+ */
+async function buildCaption(flight, lang, fetchImpl = fetch) {
+  if (!LANGS.includes(lang)) throw new Error('unsupported language: ' + lang);
+  const f = FIXED[lang];
+  const offer = {
+    kind: flight.kind || 'flight',
+    fromName: cityName(flight.from, lang), toName: cityName(flight.to, lang),
+    from: `${cityName(flight.from, lang)} (${flight.from.code})`, to: `${cityName(flight.to, lang)} (${flight.to.code})`,
+    dateOut: formatDate(flight.departureDate), dateBack: formatDate(flight.returnDate),
+  };
+
+  let ai = null;
+  try { ai = await askModel(offer, lang, fetchImpl); } catch { ai = null; }
+  const aiOk = ai && isSafeText(ai.hook, 70) && isSafeText(ai.body, 220);
+  const hook = aiOk ? ai.hook.trim() : f.fallbackHook(offer);
+  const body = aiOk ? ai.body.trim() : f.fallbackBody;
+  const hashtags = ((aiOk && Array.isArray(ai.hashtags)) ? ai.hashtags.filter(isSafeHashtag) : [])
+    .concat(['#MediaTravel'])
+    .filter((t, i, all) => all.indexOf(t) === i)
+    .slice(0, 9);
+
+  // Facts are written by code only.
+  const facts = [
+    `✈️ ${f.route(offer)}`,
+    offer.dateBack ? `📅 ${f.dates(offer)}` : `📅 ${offer.dateOut}`,
+    `💶 ${f.from} ${formatPrice(flight.price)} ${f.perPerson}`,
+  ];
+  const text = [hook, '', body, '', ...facts, '', f.cta, '', f.notice, '', hashtags.join(' ')].join('\n');
+  return { lang, hook, body, facts, cta: f.cta, notice: f.notice, hashtags, text, aiWritten: Boolean(aiOk) };
+}
+
+module.exports = { buildCaption, isSafeText, isSafeHashtag, formatDate, formatPrice, LANGS };
