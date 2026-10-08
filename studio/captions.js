@@ -28,7 +28,7 @@ const CITY = {
   ISU: { de: 'Sulaimaniyya', ar: 'السليمانية', ckb: 'سلێمانی' },
   BGW: { de: 'Bagdad', ar: 'بغداد', ckb: 'بەغدا' },
 };
-const cityName = (place, lang) => (CITY[place.code] && CITY[place.code][lang]) || place.name;
+const cityName = (place, lang) => (place.code && CITY[place.code] && CITY[place.code][lang]) || place.name;
 
 const LANG_NAME = { de: 'German', ar: 'Arabic (Modern Standard, warm tone)', ckb: 'Kurdish Badini (Behdînî, Northern Kurdish of Duhok, written in Arabic script)' };
 
@@ -122,7 +122,7 @@ async function buildCaption(flight, lang, fetchImpl = fetch) {
   const offer = {
     kind: flight.kind || 'flight',
     fromName: cityName(flight.from, lang), toName: cityName(flight.to, lang),
-    from: `${cityName(flight.from, lang)} (${flight.from.code})`, to: `${cityName(flight.to, lang)} (${flight.to.code})`,
+    from: cityName(flight.from, lang) + (flight.from.code ? ` (${flight.from.code})` : ''), to: cityName(flight.to, lang) + (flight.to.code ? ` (${flight.to.code})` : ''),
     dateOut: formatDate(flight.departureDate), dateBack: formatDate(flight.returnDate),
   };
 

@@ -8,7 +8,8 @@
 const path = require('path');
 const express = require('express');
 const store = require('./store');
-const { createDailyDraft } = require('./planner');
+const { createDailyDraft, createManualDraft } = require('./planner');
+const { STYLES } = require('./render');
 const { getFlightOffers } = require('./offers');
 
 const ID = /^[a-f0-9]{12}$/;
@@ -38,6 +39,37 @@ module.exports = function mountStudio(app) {
     }
   });
 
+  // Manual offer (typed in, or extracted from a screenshot/PDF in the page first).
+  router.post('/manual', async (req, res) => {
+    const b = req.body || {};
+    const name = (v) => typeof v === 'string' && v.trim().length >= 2 && v.length <= 60 && !/[<>{}]/.test(v);
+    const code = (v) => v === undefined || v === '' || /^[A-Z]{3}$/.test(v);
+    const iso = (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v));
+    const price = Number(b.price);
+    const photoOk = b.photo === undefined || b.photo === null || b.photo === ''
+      || (typeof b.photo === 'string' && b.photo.length < 12000000 && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(b.photo));
+    if (!name(b.fromName) || !name(b.toName) || !code(b.fromCode) || !code(b.toCode) || !iso(b.departureDate)
+      || !(b.returnDate === '' || iso(b.returnDate)) || !(price > 0 && price < 100000)
+      || !(b.airline === undefined || b.airline === '' || name(b.airline)) || !(b.style === undefined || b.style === '' || STYLES.includes(b.style)) || !photoOk) {
+      return res.status(400).json({ error: 'invalid offer data' });
+    }
+    if (generating) return res.status(429).json({ error: 'already generating' });
+    generating = true;
+    try {
+      const offer = {
+        kind: 'flight',
+        from: { name: b.fromName.trim(), code: b.fromCode || '' }, to: { name: b.toName.trim(), code: b.toCode || '' },
+        departureDate: b.departureDate, returnDate: b.returnDate || null, airline: b.airline || null, price,
+      };
+      res.json(await createManualDraft({ offer, style: b.style || null, photo: b.photo || null }));
+    } catch (err) {
+      console.error('studio manual:', err.message);
+      res.status(500).json({ error: err.message });
+    } finally {
+      generating = false;
+    }
+  });
+
   // Approve / reject / edit a caption.
   router.patch('/drafts/:id', (req, res) => {
     if (!ID.test(req.params.id)) return res.status(400).json({ error: 'bad id' });
@@ -57,6 +89,6 @@ module.exports = function mountStudio(app) {
     res.json(store.upsertDraft(draft));
   });
 
-  app.use('/api/studio', router);
+  app.use('/api/studio', express.json({ limit: '15mb' }), router);
   app.get('/studio', (req, res) => res.sendFile(path.join(__dirname, 'studio.html')));
 };

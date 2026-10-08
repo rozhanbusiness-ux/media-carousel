@@ -44,27 +44,37 @@ function pickOffer(offers, recent) {
 }
 
 async function createDailyDraft({ date = new Date(), offers = null } = {}) {
-  const weekday = date.getDay();
-  const style = STYLE_BY_WEEKDAY[weekday];
+  const style = STYLE_BY_WEEKDAY[date.getDay()];
   const list = offers || (await getFlightOffers());
   const offer = pickOffer(list, store.recentDestinations(REPEAT_DAYS));
   if (!offer) throw new Error('no suitable flight offer today');
+  return buildDraft({ offer, style, date, source: 'specials' });
+}
 
+/** A draft from an offer Rozhan entered by hand (or extracted from a screenshot/PDF). */
+async function createManualDraft({ offer, style, photo = null, date = new Date() }) {
+  return buildDraft({ offer, style: style || STYLE_BY_WEEKDAY[date.getDay()], date, source: 'manual', photo });
+}
+
+async function buildDraft({ offer, style, date, source, photo = null }) {
+  const weekday = date.getDay();
   const used = new Set(store.listDrafts().map((d) => d.photoFile).filter(Boolean));
-  const photo = libraryPhoto(offer.to.code, used) || (await aiPhoto(offer.to.name));
+  const picture = photo ? { file: null, dataUri: photo }
+    : (libraryPhoto(offer.to.code, used) || (await aiPhoto(offer.to.name)));
 
   const id = crypto.randomBytes(6).toString('hex');
   const langs = ['de', KURDISH_DAYS.has(weekday) ? 'ckb' : 'ar'];
   const versions = [];
   for (const lang of langs) {
     const caption = await buildCaption(offer, lang);
+    const local = (place) => (lang === 'de' ? place.name : captionCity(place, lang));
     const post = {
-      style, lang, photo: photo.dataUri,
-      destination: lang === 'de' ? offer.to.name : captionCity(offer.to, lang),
-      hook: caption.hook,
-      from: { city: lang === 'de' ? offer.from.name : captionCity(offer.from, lang), code: offer.from.code },
-      to: { city: lang === 'de' ? offer.to.name : captionCity(offer.to, lang), code: offer.to.code },
-      dates: lang === 'de' ? `${formatDate(offer.departureDate)} – ${formatDate(offer.returnDate)}`
+      style, lang, photo: picture.dataUri,
+      destination: local(offer.to), hook: caption.hook,
+      from: { city: local(offer.from), code: offer.from.code || '' },
+      to: { city: local(offer.to), code: offer.to.code || '' },
+      dates: !offer.returnDate ? formatDate(offer.departureDate)
+        : lang === 'de' ? `${formatDate(offer.departureDate)} – ${formatDate(offer.returnDate)}`
         : `${lang === 'ar' ? 'من' : 'ژ'} ${formatDate(offer.departureDate)} ${lang === 'ar' ? 'إلى' : 'بۆ'} ${formatDate(offer.returnDate)}`,
       airline: offer.airline, price: formatPrice(offer.price).replace(/,\d\d €$/, ' €'),
     };
@@ -81,7 +91,7 @@ async function createDailyDraft({ date = new Date(), offers = null } = {}) {
 
   return store.upsertDraft({
     id, createdAt: new Date().toISOString(), forDate: date.toISOString().slice(0, 10),
-    status: 'pending', style, offer, photoFile: photo.file, versions,
+    status: 'pending', style, source, offer, photoFile: picture.file, versions,
   });
 }
 
@@ -91,4 +101,4 @@ function captionCity(place, lang) {
   return cityName(place, lang);
 }
 
-module.exports = { createDailyDraft, pickOffer };
+module.exports = { createDailyDraft, createManualDraft, pickOffer };

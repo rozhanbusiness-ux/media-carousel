@@ -26,12 +26,42 @@
   .row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
   h3 { margin: 14px 0 4px; font-size: 15px; color: var(--gold); }
   #msg { margin: 10px 0; color: #f7e7a8; }
+  details.manual { background: rgba(255,255,255,.06); border: 1px solid rgba(230,194,90,.3); border-radius: 16px; padding: 14px 16px; margin: 14px 0; }
+  details.manual summary { cursor: pointer; font-weight: 700; color: var(--gold); }
+  .form { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 10px; margin-top: 12px; }
+  .form label { font-size: 13px; color: #cfd6e6; display: flex; flex-direction: column; gap: 4px; }
+  .form input, .form select { width: 100%; min-width: 0; font: inherit; padding: 9px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,.2); background: #08122b; color: #fff; }
+  .full { grid-column: 1 / -1; }
+  .pick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 </style>
 </head>
 <body>
 <header><b>MEDIA STUDIO</b><a href="/">← Carousel</a></header>
 <main>
   <button class="primary" id="gen">Heutigen Entwurf erstellen</button>
+  <details class="manual">
+    <summary>+ Eigenes Angebot (manuell, Screenshot oder PDF)</summary>
+    <div class="row">
+      <label class="ghost" style="padding:10px 16px;border-radius:999px;cursor:pointer">📷 Screenshot<input id="shot" type="file" accept="image/*" hidden></label>
+      <label class="ghost" style="padding:10px 16px;border-radius:999px;cursor:pointer">📄 PDF<input id="pdf" type="file" accept="application/pdf" hidden></label>
+    </div>
+    <div class="pick" id="pdfOffers"></div>
+    <div class="form">
+      <label>Von (Stadt)<input id="fromName" required maxlength="60"></label>
+      <label>Flughafen-Code (optional)<input id="fromCode" maxlength="3" placeholder="DUS"></label>
+      <label>Nach (Stadt)<input id="toName" required maxlength="60"></label>
+      <label>Flughafen-Code (optional)<input id="toCode" maxlength="3" placeholder="EBL"></label>
+      <label>Hinflug<input id="departureDate" type="date" required></label>
+      <label>Rückflug (optional)<input id="returnDate" type="date"></label>
+      <label>Preis ab (€)<input id="price" type="number" min="1" step="0.01" required></label>
+      <label>Airline (optional)<input id="airline" maxlength="60"></label>
+      <label>Design<select id="style"><option value="">Design des Tages</option>
+        <option value="flight">1 Glas</option><option value="flight-ticket">2 Bordkarte</option><option value="flight-split">3 Geteilt</option>
+        <option value="flight-diagonal">4 Diagonal</option><option value="flight-postcard">5 Postkarte</option><option value="flight-ribbon">6 Schleife</option><option value="flight-band">7 Goldband</option></select></label>
+      <label>Eigenes Foto (optional)<input id="photo" type="file" accept="image/jpeg,image/png,image/webp"></label>
+      <div class="full"><button class="primary" id="manualGo">Entwurf erstellen</button></div>
+    </div>
+  </details>
   <div id="msg"></div>
   <div id="list"></div>
 </main>
@@ -82,6 +112,42 @@ $('#list').onclick = async (e) => {
     else await api('/api/studio/drafts/' + id, { method: 'PATCH', body: JSON.stringify({ status: act }) });
     $('#msg').textContent = 'Gespeichert.'; await load();
   } catch (err) { $('#msg').textContent = 'Fehler: ' + err.message; }
+};
+
+// ---- manual offers ----
+const readFile = (file) => new Promise((ok, fail) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = fail; r.readAsDataURL(file); });
+const deToIso = (d) => { const m = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(d || ''); return m ? `${m[3]}-${m[2]}-${m[1]}` : ''; };
+const priceNum = (p) => { const m = /(\d{1,3}(?:\.\d{3})*|\d+)(?:,(\d{1,2}))?/.exec(String(p || '')); return m ? Number(m[1].replace(/\./g, '') + '.' + (m[2] || '0')) : ''; };
+function fillForm(f) {
+  $('#fromName').value = f.origin || ''; $('#toName').value = f.destination || '';
+  $('#departureDate').value = deToIso(f.date_out); $('#returnDate').value = deToIso(f.date_return);
+  $('#price').value = priceNum(f.price);
+}
+$('#shot').onchange = async (e) => {
+  const file = e.target.files[0]; if (!file) return;
+  $('#msg').textContent = 'Lese Screenshot …';
+  try { const { fields } = await api('/api/extract', { method: 'POST', body: JSON.stringify({ image: await readFile(file), offer_type: 'flight' }) });
+    fillForm(fields); $('#msg').textContent = 'Felder ausgefüllt – bitte prüfen.'; }
+  catch (err) { $('#msg').textContent = 'Fehler: ' + err.message; }
+};
+$('#pdf').onchange = async (e) => {
+  const file = e.target.files[0]; if (!file) return;
+  $('#msg').textContent = 'Lese PDF …';
+  try { const { offers } = await api('/api/extract-pdf', { method: 'POST', body: JSON.stringify({ pdf: await readFile(file), offer_type: 'flight' }) });
+    $('#pdfOffers').innerHTML = offers.map((o, i) => `<button class="ghost" data-i="${i}">${esc(o.origin)} → ${esc(o.destination)} · ${esc(o.price)}</button>`).join('');
+    $('#pdfOffers').onclick = (ev) => { const b = ev.target.closest('button'); if (b) fillForm(offers[b.dataset.i]); };
+    $('#msg').textContent = offers.length + ' Angebote gefunden – eines auswählen.'; }
+  catch (err) { $('#msg').textContent = 'Fehler: ' + err.message; }
+};
+$('#manualGo').onclick = async () => {
+  const v = (id) => $('#' + id).value.trim();
+  const body = { fromName: v('fromName'), fromCode: v('fromCode').toUpperCase(), toName: v('toName'), toCode: v('toCode').toUpperCase(),
+    departureDate: v('departureDate'), returnDate: v('returnDate'), price: v('price'), airline: v('airline'), style: v('style') };
+  const file = $('#photo').files[0]; if (file) body.photo = await readFile(file);
+  $('#manualGo').disabled = true; $('#msg').textContent = 'Erstelle Entwurf … (ca. 1 Minute)';
+  try { await api('/api/studio/manual', { method: 'POST', body: JSON.stringify(body) }); $('#msg').textContent = 'Fertig.'; await load(); }
+  catch (err) { $('#msg').textContent = 'Fehler: ' + err.message; }
+  $('#manualGo').disabled = false;
 };
 
 load();
