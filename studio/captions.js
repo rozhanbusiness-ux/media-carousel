@@ -115,7 +115,7 @@ function buildPrompt(offer, lang) {
     `Hook: max 55 characters, printed large on the photo. Evoke ONE concrete, sensory detail typical of ${offer.toName} (light, sea, a view, a taste, a sound, a famous place) so it could not be about any other city. Natural, native phrasing.`,
     `Avoid clichés and generic openers such as "Entdecke", "Fernweh?", "Während hier...", "Lust auf...", "اكتشف", "هل تحلم".`,
     `Rules: no numbers, no prices, no dates, no links, no discounts or "free", no emojis in the hook, no religious references or buildings.`,
-    `Return ONLY JSON: {"hook": "<the hook>", "body": "<max 220 chars, 1-2 vivid sentences why this trip is special now>", "hashtags": ["#...", 8 to 12 specific hashtags about the destination and travel, without numbers]}`,
+    `Return ONLY JSON: {"hook": "<the hook>", "body": "<max 200 characters, 1-2 vivid sentences why this trip is special now>", "hashtags": ["#...", 8 to 12 specific hashtags about the destination and travel, without numbers]}`,
   ].join('\n');
 }
 
@@ -155,9 +155,14 @@ async function buildCaption(flight, lang, fetchImpl = fetch) {
     dateOut: formatDate(flight.departureDate), dateBack: formatDate(flight.returnDate),
   };
 
+  // Up to 3 attempts: the model sometimes writes too long or uses a forbidden word.
   let ai = null;
-  try { ai = await askModel(offer, lang, fetchImpl); } catch { ai = null; }
-  const aiOk = ai && isSafeText(ai.hook, 70) && isSafeText(ai.body, 220);
+  let aiOk = false;
+  for (let attempt = 0; attempt < 3 && !aiOk; attempt++) {
+    try { ai = await askModel(offer, lang, fetchImpl); } catch { ai = null; }
+    aiOk = Boolean(ai && isSafeText(ai.hook, 70) && isSafeText(ai.body, 260));
+    if (ai && !aiOk) console.error(`studio caption (${lang}): rejected – hook ${String(ai.hook || '').length} chars, body ${String(ai.body || '').length} chars`);
+  }
   const hook = aiOk ? ai.hook.trim() : f.fallbackHook(offer);
   const body = aiOk ? ai.body.trim() : f.fallbackBody;
   const hashtags = ((aiOk && Array.isArray(ai.hashtags)) ? ai.hashtags.filter(isSafeHashtag) : [])
