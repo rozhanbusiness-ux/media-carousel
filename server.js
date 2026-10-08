@@ -179,6 +179,9 @@ app.post('/api/render', async (req, res) => {
   }
 });
 
+// Marketing studio (studio/): additive module, see studio/routes.js
+require('./studio/routes')(app);
+
 app.listen(config.PORT, () => {
   console.log(`media-carousel running on http://localhost:${config.PORT}`);
   if (!config.GEMINI_API_KEY) {
