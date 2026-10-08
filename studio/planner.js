@@ -129,9 +129,9 @@ async function renderDraft(draft) {
       price: draft.offer.price,
     };
     const files = [];
-    for (const size of ['portrait', 'story']) {
+    for (const size of ['story', 'portrait']) { // story first: it is posted first
       for (const slide of [1, 2, 3]) {
-        const name = `studio_${draft.id}_${stamp}_${lang}_${size}_${slide}.png`;
+        const name = `studio_${draft.id}_${stamp}_${lang}_${size}_${slide}.jpg`;
         fs.writeFileSync(path.join(OUTPUT, name), await renderSlide(post, size, slide));
         files.push({ size, slide, url: '/output/' + name });
       }
@@ -149,10 +149,11 @@ async function renderDraft(draft) {
 
 async function writeTexts(draft, langs = draft.langs) {
   draft.texts = draft.texts || {};
-  for (const lang of langs) {
-    const c = await buildCaption(draft.offer, lang);
+  const captions = await Promise.all(langs.map((lang) => buildCaption(draft.offer, lang))); // in parallel
+  langs.forEach((lang, i) => {
+    const c = captions[i];
     draft.texts[lang] = { hook: c.hook, caption: c.text, aiWritten: c.aiWritten };
-  }
+  });
 }
 
 async function buildDraft({ offer, style, date, source, photo = null, langs = null }) {

@@ -7,7 +7,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { renderToPng } = require('../src/render');
+const { renderToJpeg } = require('./browser');
 
 const DIR = __dirname;
 const STYLES = ['flight', 'flight-ticket', 'flight-split', 'flight-diagonal', 'flight-postcard', 'flight-ribbon', 'flight-band'];
@@ -60,7 +60,7 @@ function buildPriceHtml(price) {
 
 /**
  * Render one slide. `post` = { style, lang, destination, hook, from, to, dates, airline, price, photo (data URI) }.
- * Returns a PNG buffer.
+ * Returns a JPEG buffer.
  */
 async function renderSlide(post, size, slide) {
   if (!STYLES.includes(post.style)) throw new Error('unknown style');
@@ -85,7 +85,7 @@ async function renderSlide(post, size, slide) {
   html = html.replace('<link rel="stylesheet" href="{{fontCss}}" />', `<style>${fontCss()}${shadow}</style>`)
     .replace(/%%PRICE%%/g, priceHtml)
     .replace(/\{\{photo\}\}/g, /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(post.photo) ? post.photo : '');
-  return renderToPng(html, size);
+  return renderToJpeg(html, size);
 }
 
 module.exports = { renderSlide, buildPriceHtml, STYLES, SIZES, STYLE_BY_WEEKDAY, LABELS };
