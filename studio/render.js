@@ -20,13 +20,13 @@ const STYLE_BY_WEEKDAY = { 1: 'flight', 2: 'flight', 3: 'flight', 4: 'flight', 5
 const LABELS = {
   de: { kicker: 'Flugangebot', swipe: 'Wischen für Details →', detailsTitle: 'Dein Flug', priceLabel: 'ab', perPerson: 'pro Person',
     fromLabel: 'Ab', toLabel: 'Nach', datesLabel: 'Reisedatum', airlineLabel: 'Airline',
-    ctaTitle: 'Jetzt sichern', ctaText: 'Solange die Plätze reichen.', ctaButton: 'Link in der Bio', notice: 'Preise können sich je nach Verfügbarkeit ändern.' },
+    ctaTitle: 'Jetzt sichern', ctaText: 'Solange die Plätze reichen.', ctaButton: 'Link in der Bio', notice: 'Preise schwanken täglich – wer früh bucht, reist günstiger.' },
   ar: { kicker: 'عرض طيران', swipe: '← اسحب للتفاصيل', detailsTitle: 'رحلتك', priceLabel: 'ابتداءً من', perPerson: 'للشخص',
     fromLabel: 'من', toLabel: 'إلى', datesLabel: 'موعد السفر', airlineLabel: 'شركة الطيران',
-    ctaTitle: 'احجز الآن', ctaText: 'المقاعد محدودة بهذا السعر.', ctaButton: 'الرابط في البايو', notice: 'قد تتغير الأسعار حسب التوفر.' },
+    ctaTitle: 'احجز الآن', ctaText: 'المقاعد محدودة بهذا السعر.', ctaButton: 'الرابط في البايو', notice: 'الأسعار تتغير باستمرار، ومن يحجز أولاً يسافر بسعر أفضل.' },
   ckb: { kicker: 'پێشنیارا فرۆکێ', swipe: '← بکێشە بۆ وردەکاریان', detailsTitle: 'گەشتا تە', priceLabel: 'ژ', perPerson: 'بۆ هەر کەسەکی',
     fromLabel: 'ژ', toLabel: 'بۆ', datesLabel: 'دەمێ گەشتێ', airlineLabel: 'کۆمپانیا فرۆکێ',
-    ctaTitle: 'نوکە بوک بکە', ctaText: 'جهێن ب ڤی نرخی کێمن.', ctaButton: 'لینک د بایۆیێ دایە', notice: 'دبیت نرخ ل دویڤ بەردەستبوونێ بگوهۆڕن.' },
+    ctaTitle: 'نوکە بوک بکە', ctaText: 'جهێن ب ڤی نرخی کێمن.', ctaButton: 'لینک د بایۆیێ دایە', notice: 'نرخ بەردەوام دگوهۆڕن، ئەوێ زوی بوک بکەت ب نرخەکێ باشتر گەشتێ دکەت.' },
 };
 
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));

@@ -16,7 +16,7 @@ test('uses the model words but code-written facts', async () => {
   assert.equal(c.aiWritten, true);
   assert.match(c.text, /ab \u2066184,77 €\u2069 p\. P\./);
   assert.match(c.text, /23\.10\.2026–07\.11\.2026/);
-  assert.match(c.text, /Preise können sich/);
+  assert.match(c.text, /Preise schwanken täglich/);
   assert.ok(c.hashtags.length >= 15 && c.hashtags.includes('#Istanbul') && c.hashtags.includes('#MediaTravel'));
 });
 
@@ -33,7 +33,7 @@ test('works without an API key (safe fixed caption) in ar and ckb', async () => 
   const ar = await buildCaption(flight, 'ar');
   assert.equal(ar.aiWritten, false);
   assert.match(ar.text, /ابتداءً من \u2066184,77 €\u2069/);
-  assert.match(ar.text, /قد تتغير الأسعار/);
+  assert.match(ar.text, /الأسعار تتغير باستمرار/);
   const ckb = await buildCaption(flight, 'ckb');
   assert.match(ckb.text, /بۆ هەر کەسەکی/);
 });

@@ -48,7 +48,7 @@ const FIXED = {
     from: 'ab', perPerson: 'p. P.', route: (o) => `${o.from} → ${o.to}`,
     dates: (o) => `${o.dateOut}–${o.dateBack}`,
     cta: '👉 Link in der Bio – jetzt Angebot sichern.',
-    notice: 'Preise können sich je nach Verfügbarkeit ändern – wir beraten dich gern.',
+    notice: 'Preise schwanken täglich – wer früh bucht, reist günstiger.',
     fallbackHook: pick([
       (o) => `${o.toName} wartet schon auf dich.`,
       (o) => `Dein nächster Sonnenuntergang: ${o.toName}.`,
@@ -61,7 +61,7 @@ const FIXED = {
     from: 'ابتداءً من', perPerson: 'للشخص', route: (o) => `من ${o.from} إلى ${o.to}`,
     dates: (o) => `من ${o.dateOut} إلى ${o.dateBack}`,
     cta: '👈 الرابط في البايو – احجز الآن.',
-    notice: 'قد تتغير الأسعار حسب التوفر، ويسعدنا مساعدتك في اختيار الأنسب.',
+    notice: 'الأسعار تتغير باستمرار، ومن يحجز أولاً يسافر بسعر أفضل.',
     fallbackHook: pick([
       (o) => `${o.toName} بانتظارك…`,
       (o) => `حان وقت ${o.toName}.`,
@@ -74,7 +74,7 @@ const FIXED = {
     from: 'ژ', perPerson: 'بۆ هەر کەسەکی', route: (o) => `ژ ${o.from} بۆ ${o.to}`,
     dates: (o) => `ژ ${o.dateOut} بۆ ${o.dateBack}`,
     cta: '👈 لینک د بایۆیێ دایە – نوکە بوک بکە.',
-    notice: 'دبیت نرخ ل دویڤ بەردەستبوونێ بگوهۆڕن، ئەم ب دلخۆشی هاریکاریا تە دکەین.',
+    notice: 'نرخ بەردەوام دگوهۆڕن، ئەوێ زوی بوک بکەت ب نرخەکێ باشتر گەشتێ دکەت.',
     fallbackHook: pick([
       (o) => `${o.toName}، نێزیکترە ژ ئەوا تو هزر دکەی.`,
       (o) => `${o.toName} ل هیڤیا تە یە.`,
