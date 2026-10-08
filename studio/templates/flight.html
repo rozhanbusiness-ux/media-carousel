@@ -57,7 +57,13 @@
   .s2 .line { height: 1px; background: linear-gradient(90deg, transparent, rgba(230,194,90,.8), transparent); margin: calc(26 * var(--u)) 0; }
   .s2 .row { font-size: calc(28 * var(--u)); line-height: 1.8; color: rgba(255,255,255,.9); }
   .s2 .price small { display: block; font-size: calc(22 * var(--u)); letter-spacing: .2em; text-transform: uppercase; color: rgba(255,255,255,.75); }
-  .s2 .price span { font-size: calc(150 * var(--u)); line-height: 1; }
+  .s2 .price > span { font-size: calc(150 * var(--u)); line-height: 1; }
+  .s2 .price small { display: flex; align-items: center; justify-content: center; gap: 18px; color: var(--gold); letter-spacing: .3em; }
+  .s2 .price small::before, .s2 .price small::after { content: ""; width: 60px; height: 1px; background: linear-gradient(90deg, transparent, var(--gold)); }
+  .s2 .price small::after { transform: scaleX(-1); }
+  .s2 .price > span { font-size: calc(132 * var(--u)) !important; margin: calc(10 * var(--u)) 0 calc(4 * var(--u)); background: none !important; -webkit-text-fill-color: initial !important; }
+  .s2 .price .pr { background: linear-gradient(180deg, #fff3c8 0%, #f0d27a 40%, #c9a227 75%, #a8831a 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 6px 18px rgba(0,0,0,.35)); }
+  .s2 .price em { display: inline-block; margin-top: calc(10 * var(--u)); padding: 6px 18px; border: 1px solid rgba(230,194,90,.45); border-radius: 999px; letter-spacing: .08em; }
   .s2 .price em { font-style: normal; font-size: calc(22 * var(--u)); color: rgba(255,255,255,.75); }
 
   /* Slide 3: call to action */
@@ -100,7 +106,6 @@
         <div class="city"><b>{{toCity}}</b><span>{{toCode}}</span></div>
       </div>
       <div class="row">{{dates}}</div>
-      <div class="row">{{airline}}</div>
       <div class="line"></div>
       <div class="price"><small>{{priceLabel}}</small><span class="serif gold">{{price}}</span><br /><em>{{perPerson}}</em></div>
     </div>

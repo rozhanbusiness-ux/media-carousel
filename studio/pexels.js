@@ -7,6 +7,14 @@
 
 const API = 'https://api.pexels.com/v1/search';
 const RELIGIOUS = /mosque|minaret|church|cathedral|chapel|temple|shrine|synagogue|monastery|basilica|religio|prayer|cross\b|crucifix|crescent|islam|christian|buddh|hindu|jewish|dome|moschee|kirche|kathedrale|tempel/i;
+// Perceived brightness (0-255) of the Pexels average colour, e.g. "#A3B8CC".
+const MIN_BRIGHTNESS = 120;
+function brightness(hex) {
+  const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex || '');
+  if (!m) return 0;
+  const [r, g, b] = m.slice(1).map((h) => parseInt(h, 16));
+  return 0.299 * r + 0.587 * g + 0.114 * b;
+}
 const MAX_BYTES = 15 * 1024 * 1024;
 
 const key = () => process.env.PEXELS_API_KEY || '';
@@ -20,6 +28,7 @@ async function search(query, fetchImpl = fetch) {
   return (Array.isArray(data.photos) ? data.photos : [])
     .filter((p) => Number.isInteger(p.id) && typeof p.src?.original === 'string' && p.height > p.width && p.height >= 2000)
     .filter((p) => !RELIGIOUS.test(`${p.alt || ''} ${p.url || ''}`))
+    .filter((p) => brightness(p.avg_color) >= MIN_BRIGHTNESS) // the template adds a dark filter, so start bright
     .map((p) => ({ id: p.id, url: p.src.original }));
 }
 
@@ -53,4 +62,4 @@ async function findPhoto(queries, used, fetchImpl = fetch) {
   return null;
 }
 
-module.exports = { findPhoto, search, download, RELIGIOUS };
+module.exports = { findPhoto, search, download, brightness, RELIGIOUS };

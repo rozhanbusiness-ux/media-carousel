@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const { findPhoto, download } = require('./pexels');
 
-const photo = (id, alt, w = 3000, h = 4500) => ({ id, alt, width: w, height: h, url: `https://www.pexels.com/photo/${id}/`, src: { original: `https://images.pexels.com/photos/${id}/x.jpeg` } });
+const photo = (id, alt, w = 3000, h = 4500) => ({ id, alt, width: w, height: h, url: `https://www.pexels.com/photo/${id}/`, avg_color: '#B0C4D8', src: { original: `https://images.pexels.com/photos/${id}/x.jpeg` } });
 
 function fakeFetch(photos) {
   return async (url) => {

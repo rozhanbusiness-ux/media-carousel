@@ -44,8 +44,8 @@ const LOGO = 'data:image/png;base64,' + fs.readFileSync(path.join(DIR, '..', 'te
 
 // Price: big whole euros, small cents and euro sign top-right; long numbers shrink to stay inside badges.
 const PRICE_CSS = '.pr{font-family:"Plus Jakarta Sans",sans-serif;font-weight:800;letter-spacing:-.01em;display:inline-flex;align-items:flex-start;direction:ltr;unicode-bidi:isolate;white-space:nowrap;line-height:1}'
-  + '.pr.l4{font-size:.8em}.pr.l5{font-size:.68em}'
-  + '.pr .pt{display:flex;flex-direction:column;align-items:flex-start;font-size:.4em;line-height:1.05;margin-left:.1em;padding-top:.14em}';
+  + '.pr.l4{font-size:.8em}.pr.l5{font-size:.68em}.pr .pm{font-size:1em!important}.pr .pt span{font-size:1em!important;line-height:1.05}'
+  + '.pr .pt{font-size:.4em!important;display:flex;flex-direction:column;align-items:flex-start;font-size:.4em;line-height:1.05;margin-left:.1em;padding-top:.14em}';
 
 /** Number -> trusted HTML (digits only, never user text). Accepts 184.99 or legacy "184,99 €" strings. */
 function buildPriceHtml(price) {
@@ -73,7 +73,7 @@ async function renderSlide(post, size, slide) {
     titleClass: rtl ? '' : 'script', photoPosition: 'center', logo: LOGO,
     destination: post.destination, hook: post.hook,
     fromCity: post.from.city, fromCode: post.from.code, toCity: post.to.city, toCode: post.to.code,
-    dates: '\u2066' + post.dates + '\u2069', airline: post.airline || '', price: '%%PRICE%%',
+    dates: '\u2066' + post.dates + '\u2069', price: '%%PRICE%%',
   };
   const priceHtml = buildPriceHtml(post.price);
   const tpl = fs.readFileSync(path.join(DIR, 'templates', post.style + '.html'), 'utf8');
