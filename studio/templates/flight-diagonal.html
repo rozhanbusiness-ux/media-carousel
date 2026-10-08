@@ -18,24 +18,30 @@ html, body { width: var(--w); height: var(--h); overflow: hidden; background: va
 .story .bg { clip-path: polygon(0 0, 100% 0, 100% 62%, 0 74%); }
 .edge { position: absolute; inset: 0; background: var(--gold); clip-path: polygon(0 74%, 100% 58%, 100% 59.2%, 0 75.2%); }
 .story .edge { clip-path: polygon(0 74%, 100% 62%, 100% 63%, 0 75%); }
-.badge { position: absolute; right: 70px; top: calc(560 * var(--u)); width: calc(260 * var(--u)); height: calc(260 * var(--u)); border-radius: 50%; background: var(--navy); border: 3px solid var(--gold); display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 20px 50px rgba(0,0,0,.45); }
+.badge { position: absolute; right: 70px; top: calc(560 * var(--u)); width: calc(250 * var(--u)); height: calc(250 * var(--u)); border-radius: 50%; background: radial-gradient(circle at 30% 25%, #f6e3a0, #c9a227 60%, #94720f); display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: inset 0 0 0 calc(10 * var(--u)) rgba(255,255,255,.25), 0 20px 50px rgba(0,0,0,.4); }
 .story .badge { top: 900px; }
 .rtl .badge { right: auto; left: 70px; }
-.badge small { font-size: calc(20 * var(--u)); letter-spacing: .3em; opacity: .8; }
-.badge b { font-size: calc(58 * var(--u)); line-height: 1; }
+/* price label */ .badge small { font-size: calc(24 * var(--u)); letter-spacing: .08em; color: var(--navy); opacity: .8; }
+.badge b { font-size: calc(74 * var(--u)); line-height: 1; font-family: inherit; font-weight: 800; color: var(--navy); margin-top: calc(6 * var(--u)); }
 .low { position: absolute; left: 70px; right: 70px; bottom: calc(110 * var(--u)); }
 .title { font-size: calc(170 * var(--u)); line-height: .9; }
 .h { font-size: calc(36 * var(--u)); font-weight: 600; margin-top: 12px; opacity: .92; }
 .rows { font-size: calc(34 * var(--u)); line-height: 1.7; }
 .rows b { color: var(--gold); }
 .s1 .badge, .s2 .badge { display: flex !important; }
+
+.ic { width: 1em; height: 1em; vertical-align: -0.14em; color: var(--gold); display: inline-block; }
+.pl { transform: rotate(90deg); } .rtl .pl { transform: rotate(-90deg); }
+.s1 .low, .s3 .low { bottom: calc(90 * var(--u)); }
+.s3 .title { font-size: calc(120 * var(--u)); }
+.s1 .title { font-size: calc(140 * var(--u)); }
 </style></head>
 <body class="{{size}} {{dir}}"><div class="post s{{slide}}">
 <img class="bg" src="{{photo}}" style="object-position: {{photoPosition}}" alt="" /><div class="edge"></div>
 <img class="logo" src="{{logo}}" alt="MEDIA" />
-<div class="badge" data-only="1 2"><small>{{priceLabel}}</small><b class="serif gold">{{price}}</b></div>
+<div class="badge" data-only="1 2"><small>{{priceLabel}}</small><b>{{price}}</b></div>
 <div class="low" data-only="1"><div class="trk gold">{{kicker}}</div><div class="title {{titleClass}}">{{destination}}</div><div class="h">{{hook}}</div></div>
-<div class="low" data-only="2"><div class="trk gold" style="margin-bottom:14px">{{detailsTitle}}</div><div class="rows"><b>✈</b> {{fromCity}} – {{toCity}}<br /><b>◷</b> {{dates}}<br /><b>✦</b> {{airline}}</div></div>
+<div class="low" data-only="2"><div class="trk gold" style="margin-bottom:14px">{{detailsTitle}}</div><div class="rows"><svg class="ic pl" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg> {{fromCity}} – {{toCity}}<br /><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" d="M4 6h16v14H4zM4 10h16M8 3v4M16 3v4"/></svg> {{dates}}<br /><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.6 6.6 19.5l1.2-6L3.3 9.3l6.1-.7z"/></svg> {{airline}}</div></div>
 <div class="low" data-only="3"><div class="title {{titleClass}} gold">{{ctaTitle}}</div><div class="h" style="margin-bottom:26px">{{ctaText}}</div><span class="cta">{{ctaButton}}</span></div>
 <div class="notice" data-only="2 3">{{notice}}</div>
 </div></body></html>

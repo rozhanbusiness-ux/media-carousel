@@ -53,7 +53,7 @@
   .s2 .city b { display: block; font-size: calc(54 * var(--u)); font-weight: 800; line-height: 1.1; }
   .s2 .city span { font-size: calc(22 * var(--u)); letter-spacing: .3em; color: rgba(255,255,255,.7); }
   .s2 .plane { font-size: calc(44 * var(--u)); color: var(--gold); }
-  .rtl .s2 .plane { transform: scaleX(-1); }
+
   .s2 .line { height: 1px; background: linear-gradient(90deg, transparent, rgba(230,194,90,.8), transparent); margin: calc(26 * var(--u)) 0; }
   .s2 .row { font-size: calc(28 * var(--u)); line-height: 1.8; color: rgba(255,255,255,.9); }
   .s2 .price small { display: block; font-size: calc(22 * var(--u)); letter-spacing: .2em; text-transform: uppercase; color: rgba(255,255,255,.75); }
@@ -71,6 +71,9 @@
     background: linear-gradient(135deg, #f7e7a8, #c9a227); box-shadow: 0 14px 40px rgba(201,162,39,.4); }
   .s3 .site { margin-top: calc(30 * var(--u)); font-size: calc(24 * var(--u)); letter-spacing: .25em; color: rgba(255,255,255,.8); }
   .s3 .notice { position: absolute; bottom: calc(90 * var(--u)); width: 100%; text-align: center; font-size: calc(17 * var(--u)); color: rgba(255,255,255,.65); }
+
+.ic { width: 1em; height: 1em; vertical-align: -0.14em; color: var(--gold); display: inline-block; }
+.pl { transform: rotate(90deg); } .rtl .pl { transform: rotate(-90deg); }
 </style>
 </head>
 <body class="{{size}} {{dir}}">
@@ -93,7 +96,7 @@
       <div class="kicker tracking gold">{{detailsTitle}}</div>
       <div class="route">
         <div class="city"><b>{{fromCity}}</b><span>{{fromCode}}</span></div>
-        <div class="plane">✈</div>
+        <div class="plane"><svg class="ic pl" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg></div>
         <div class="city"><b>{{toCity}}</b><span>{{toCode}}</span></div>
       </div>
       <div class="row">{{dates}}</div>

@@ -28,6 +28,14 @@ const CITY = {
   ISU: { de: 'Sulaimaniyya', ar: 'السليمانية', ckb: 'سلێمانی' },
   BGW: { de: 'Bagdad', ar: 'بغداد', ckb: 'بەغدا' },
 };
+// Fixed hashtags per language (always added); the destination adds its own.
+const BASE_TAGS = {
+  de: ['#Reisen', '#Urlaub', '#Flugangebot', '#Reiseangebote', '#Reisebüro', '#Fernweh', '#Reiselust', '#UrlaubBuchen', '#Herbsturlaub', '#Halle', '#Düsseldorf'],
+  ar: ['#سفر', '#سياحة', '#عروض_سفر', '#طيران', '#حجز_طيران', '#عطلة', '#سفر_من_المانيا', '#المانيا', '#رحلات', '#عروض_طيران'],
+  ckb: ['#گەشت', '#گەشتیاری', '#فرۆکە', '#پێشنیار', '#کوردستان', '#ئەڵمانیا', '#بەهدینان', '#دهۆک', '#گەشتکرن', '#هەولێر'],
+};
+const tagWord = (s) => '#' + String(s).replace(/[^\p{L}]/gu, '');
+
 const cityName = (place, lang) => (place.code && CITY[place.code] && CITY[place.code][lang]) || place.name;
 
 const LANG_NAME = { de: 'German', ar: 'Arabic (Modern Standard, warm tone)', ckb: 'Kurdish Badini (Behdînî, Northern Kurdish of Duhok, written in Arabic script)' };
@@ -37,7 +45,7 @@ const FIXED = {
     from: 'ab', perPerson: 'p. P.', route: (o) => `${o.from} → ${o.to}`,
     dates: (o) => `${o.dateOut}–${o.dateBack}`,
     cta: '👉 Link in der Bio – jetzt Angebot sichern.',
-    notice: 'Preise freibleibend, Verfügbarkeit vorbehalten.',
+    notice: 'Preise können sich je nach Verfügbarkeit ändern – wir beraten dich gern.',
     fallbackHook: (o) => `Während hier der Herbst beginnt: ${o.toName}.`,
     fallbackBody: 'Ein spontaner Tapetenwechsel kostet weniger, als du denkst – aber nicht mehr lange.',
   },
@@ -45,7 +53,7 @@ const FIXED = {
     from: 'ابتداءً من', perPerson: 'للشخص', route: (o) => `من ${o.from} إلى ${o.to}`,
     dates: (o) => `من ${o.dateOut} إلى ${o.dateBack}`,
     cta: '👈 الرابط في البايو – احجز الآن.',
-    notice: 'الأسعار غير ملزمة وحسب التوفر.',
+    notice: 'قد تتغير الأسعار حسب التوفر، ويسعدنا مساعدتك في اختيار الأنسب.',
     fallbackHook: (o) => `${o.toName}… بسعر لن تصدّقه.`,
     fallbackBody: 'المقاعد بهذا السعر محدودة، ومن يحجز أولاً يسافر أولاً.',
   },
@@ -53,7 +61,7 @@ const FIXED = {
     from: 'ژ', perPerson: 'بۆ هەر کەسەکی', route: (o) => `ژ ${o.from} بۆ ${o.to}`,
     dates: (o) => `ژ ${o.dateOut} بۆ ${o.dateBack}`,
     cta: '👈 لینک د بایۆیێ دایە – نوکە بوک بکە.',
-    notice: 'نرخ نە جێگیرن و ل دویڤ بەردەستبوونێ نە.',
+    notice: 'دبیت نرخ ل دویڤ بەردەستبوونێ بگوهۆڕن، ئەم ب دلخۆشی هاریکاریا تە دکەین.',
     fallbackHook: (o) => `${o.toName}، نێزیکترە ژ ئەوا تو هزر دکەی.`,
     fallbackBody: 'گەشتا تە یا بهێت ئێک کلیک دویرە.',
   },
@@ -67,7 +75,8 @@ function formatDate(iso) {
 
 /** 184.77 -> "184,77 €" (German format, also used in ar/ckb for clarity). */
 function formatPrice(n) {
-  return n.toFixed(2).replace('.', ',').replace(/,00$/, '') + ' €';
+  // LRI ... PDI keeps "184,77 €" left-to-right (euro sign on the right) inside Arabic/Kurdish text.
+  return '\u2066' + n.toFixed(2).replace('.', ',').replace(/,00$/, '') + ' €\u2069';
 }
 
 // Model output must never contain numbers, prices, links, contact data or free/discount promises.
@@ -86,7 +95,7 @@ function buildPrompt(offer, lang) {
     `You write one Instagram/Facebook caption part for a travel agency (MEDIA Travel & Tourism, Germany).`,
     `Language: ${LANG_NAME[lang]}. Destination: ${offer.toName}. Departure city: ${offer.fromName}. Product: ${offer.kind}.`,
     `Rules: no numbers, no prices, no dates, no links, no discounts or "free", no emojis in the hook, no religious references.`,
-    `Return ONLY JSON: {"hook": "<max 70 chars, strong emotional hook>", "body": "<max 220 chars, 1-2 sentences why this trip>", "hashtags": ["#...", 5 to 8 hashtags without numbers]}`,
+    `Return ONLY JSON: {"hook": "<max 70 chars, strong emotional hook, surprising or curious, not generic>", "body": "<max 220 chars, 1-2 vivid sentences why this trip>", "hashtags": ["#...", 8 to 12 specific hashtags about the destination and travel, without numbers]}`,
   ].join('\n');
 }
 
@@ -132,9 +141,9 @@ async function buildCaption(flight, lang, fetchImpl = fetch) {
   const hook = aiOk ? ai.hook.trim() : f.fallbackHook(offer);
   const body = aiOk ? ai.body.trim() : f.fallbackBody;
   const hashtags = ((aiOk && Array.isArray(ai.hashtags)) ? ai.hashtags.filter(isSafeHashtag) : [])
-    .concat(['#MediaTravel'])
-    .filter((t, i, all) => all.indexOf(t) === i)
-    .slice(0, 9);
+    .concat([tagWord(offer.toName), tagWord(offer.toName + (lang === 'de' ? 'Urlaub' : '')), ...BASE_TAGS[lang], '#MediaTravel', '#MediaTravelTourism'])
+    .filter((t, i, all) => isSafeHashtag(t) && all.indexOf(t) === i)
+    .slice(0, 22);
 
   // Facts are written by code only.
   const facts = [
@@ -146,4 +155,4 @@ async function buildCaption(flight, lang, fetchImpl = fetch) {
   return { lang, hook, body, facts, cta: f.cta, notice: f.notice, hashtags, text, aiWritten: Boolean(aiOk) };
 }
 
-module.exports = { buildCaption, isSafeText, isSafeHashtag, formatDate, formatPrice, cityName, LANGS };
+module.exports = { BASE_TAGS, buildCaption, isSafeText, isSafeHashtag, formatDate, formatPrice, cityName, LANGS };

@@ -8,11 +8,13 @@
 const path = require('path');
 const express = require('express');
 const store = require('./store');
-const { createDailyDraft, createManualDraft } = require('./planner');
+const { createDailyDraft, createManualDraft, regenerate } = require('./planner');
 const { STYLES } = require('./render');
 const { getFlightOffers } = require('./offers');
 
 const ID = /^[a-f0-9]{12}$/;
+const LANG_SET = ['de', 'ar', 'ckb'];
+const cleanLangs = (v) => (Array.isArray(v) && v.length && v.length <= 3 && v.every((l) => LANG_SET.includes(l)) ? [...new Set(v)] : null);
 let generating = false;
 
 module.exports = function mountStudio(app) {
@@ -30,7 +32,7 @@ module.exports = function mountStudio(app) {
     const day = typeof req.body.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(req.body.date) ? new Date(req.body.date + 'T12:00:00') : new Date();
     generating = true;
     try {
-      res.json(await createDailyDraft({ date: day }));
+      res.json(await createDailyDraft({ date: day, langs: cleanLangs(req.body.langs) }));
     } catch (err) {
       console.error('studio draft:', err.message);
       res.status(500).json({ error: err.message });
@@ -61,13 +63,30 @@ module.exports = function mountStudio(app) {
         from: { name: b.fromName.trim(), code: b.fromCode || '' }, to: { name: b.toName.trim(), code: b.toCode || '' },
         departureDate: b.departureDate, returnDate: b.returnDate || null, airline: b.airline || null, price,
       };
-      res.json(await createManualDraft({ offer, style: b.style || null, photo: b.photo || null }));
+      res.json(await createManualDraft({ offer, style: b.style || null, photo: b.photo || null, langs: cleanLangs(b.langs) }));
     } catch (err) {
       console.error('studio manual:', err.message);
       res.status(500).json({ error: err.message });
     } finally {
       generating = false;
     }
+  });
+
+  // Regenerate one part: { what: 'photo'|'text'|'all'|'style'|'langs'|'photo-upload', value }
+  router.post('/drafts/:id/regenerate', async (req, res) => {
+    if (!ID.test(req.params.id)) return res.status(400).json({ error: 'bad id' });
+    const draft = store.getDraft(req.params.id);
+    if (!draft) return res.status(404).json({ error: 'not found' });
+    const { what, value } = req.body || {};
+    if (!['photo', 'text', 'all', 'style', 'langs', 'photo-upload'].includes(what)) return res.status(400).json({ error: 'bad request' });
+    if (what === 'photo-upload' && !(typeof value === 'string' && value.length < 12000000 && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(value))) {
+      return res.status(400).json({ error: 'bad image' });
+    }
+    if (generating) return res.status(429).json({ error: 'already generating' });
+    generating = true;
+    try { res.json(await regenerate(draft, what, value)); }
+    catch (err) { console.error('studio regenerate:', err.message); res.status(500).json({ error: err.message }); }
+    finally { generating = false; }
   });
 
   // Approve / reject / edit a caption.
@@ -85,6 +104,7 @@ module.exports = function mountStudio(app) {
       const v = draft.versions.find((x) => x.lang === lang);
       if (!v || typeof caption !== 'string' || caption.length > 2200) return res.status(400).json({ error: 'bad caption' });
       v.caption = caption;
+      if (draft.texts && draft.texts[lang]) draft.texts[lang].caption = caption;
     }
     res.json(store.upsertDraft(draft));
   });

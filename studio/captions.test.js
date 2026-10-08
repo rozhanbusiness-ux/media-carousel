@@ -14,10 +14,10 @@ test('uses the model words but code-written facts', async () => {
   config.GEMINI_API_KEY = 'test';
   const c = await buildCaption(flight, 'de', fakeFetch({ hook: 'Zwei Kontinente, ein Wochenende.', body: 'Basare, Bosporus und Baklava.', hashtags: ['#Istanbul', '#Reisen'] }));
   assert.equal(c.aiWritten, true);
-  assert.match(c.text, /ab 184,77 € p\. P\./);
+  assert.match(c.text, /ab \u2066184,77 €\u2069 p\. P\./);
   assert.match(c.text, /23\.10\.2026–07\.11\.2026/);
-  assert.match(c.text, /Preise freibleibend/);
-  assert.deepEqual(c.hashtags, ['#Istanbul', '#Reisen', '#MediaTravel']);
+  assert.match(c.text, /Preise können sich/);
+  assert.ok(c.hashtags.length >= 15 && c.hashtags.includes('#Istanbul') && c.hashtags.includes('#MediaTravel'));
 });
 
 test('rejects model text with prices, links or free promises and falls back', async () => {
@@ -32,8 +32,8 @@ test('works without an API key (safe fixed caption) in ar and ckb', async () => 
   config.GEMINI_API_KEY = '';
   const ar = await buildCaption(flight, 'ar');
   assert.equal(ar.aiWritten, false);
-  assert.match(ar.text, /ابتداءً من 184,77 €/);
-  assert.match(ar.text, /الأسعار غير ملزمة/);
+  assert.match(ar.text, /ابتداءً من \u2066184,77 €\u2069/);
+  assert.match(ar.text, /قد تتغير الأسعار/);
   const ckb = await buildCaption(flight, 'ckb');
   assert.match(ckb.text, /بۆ هەر کەسەکی/);
 });

@@ -32,13 +32,24 @@
   .form label { font-size: 13px; color: #cfd6e6; display: flex; flex-direction: column; gap: 4px; }
   .form input, .form select { width: 100%; min-width: 0; font: inherit; padding: 9px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,.2); background: #08122b; color: #fff; }
   .full { grid-column: 1 / -1; }
+  .chk { font-size: 14px; display: inline-flex; gap: 4px; align-items: center; }
+  .tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0; padding: 10px; border-radius: 12px; background: rgba(0,0,0,.18); }
+  .tools select { font: inherit; padding: 8px; border-radius: 8px; background: #08122b; color: #fff; border: 1px solid rgba(255,255,255,.2); }
+  .busy { opacity: .5; pointer-events: none; }
   .pick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 </style>
 </head>
 <body>
 <header><b>MEDIA STUDIO</b><a href="/">← Carousel</a></header>
 <main>
-  <button class="primary" id="gen">Heutigen Entwurf erstellen</button>
+  <div class="row" style="align-items:center">
+    <button class="primary" id="gen">Heutigen Entwurf erstellen</button>
+    <span style="font-size:14px;color:#cfd6e6">Sprachen:</span>
+    <label class="chk"><input type="checkbox" name="deflang" value="de"> Deutsch</label>
+    <label class="chk"><input type="checkbox" name="deflang" value="ar"> العربية</label>
+    <label class="chk"><input type="checkbox" name="deflang" value="ckb"> کوردی</label>
+    <span style="font-size:12px;color:#8e98b3">(leer = automatisch)</span>
+  </div>
   <details class="manual">
     <summary>+ Eigenes Angebot (manuell, Screenshot oder PDF)</summary>
     <div class="row">
@@ -69,6 +80,11 @@
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const LANG = { de: 'Deutsch', ar: 'العربية', ckb: 'کوردی (بادینی)' };
+const STYLE_NAMES = [['flight', '1 Glas'], ['flight-ticket', '2 Bordkarte'], ['flight-split', '3 Geteilt'], ['flight-diagonal', '4 Diagonal'],
+  ['flight-postcard', '5 Postkarte'], ['flight-ribbon', '6 Schleife'], ['flight-band', '7 Goldband']];
+const defLangs = () => [...document.querySelectorAll('input[name=deflang]:checked')].map((i) => i.value);
+try { const saved = JSON.parse(localStorage.getItem('studioLangs') || '[]'); document.querySelectorAll('input[name=deflang]').forEach((i) => { i.checked = saved.includes(i.value); }); } catch {}
+document.querySelectorAll('input[name=deflang]').forEach((i) => i.onchange = () => { try { localStorage.setItem('studioLangs', JSON.stringify(defLangs())); } catch {} });
 
 async function api(url, opts = {}) {
   const res = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...opts });
@@ -82,7 +98,18 @@ function render(drafts) {
     <div class="draft" data-id="${esc(d.id)}">
       <div class="meta"><span class="badge ${esc(d.status)}">${esc(d.status)}</span>
         <span>${esc(d.forDate)}</span><span>${esc(d.offer.from.name)} → ${esc(d.offer.to.name)}</span>
-        <span>${esc(d.offer.price)} €</span><span>Stil: ${esc(d.style)}</span></div>
+        <span>${esc(d.offer.price)} €</span></div>
+      <div class="tools">
+        <select data-act="style">${STYLE_NAMES.map(([v, n]) => `<option value="${v}" ${v === d.style ? 'selected' : ''}>${n}</option>`).join('')}</select>
+        ${['de', 'ar', 'ckb'].map((l) => `<label class="chk"><input type="checkbox" data-lang-box value="${l}" ${(d.langs || []).includes(l) ? 'checked' : ''}> ${LANG[l]}</label>`).join('')}
+        <button class="ghost" data-act="langs">Sprachen übernehmen</button>
+      </div>
+      <div class="row">
+        <button class="ghost" data-act="photo">🖼 Neues Foto</button>
+        <label class="ghost" style="padding:10px 18px;border-radius:999px;cursor:pointer;font-weight:700">⬆ Eigenes Foto<input type="file" accept="image/jpeg,image/png,image/webp" data-act="upload" hidden></label>
+        <button class="ghost" data-act="text">✍ Neuer Text</button>
+        <button class="ghost" data-act="all">↻ Alles neu</button>
+      </div>
       ${d.versions.map((v) => `
         <h3>${esc(LANG[v.lang] || v.lang)} ${v.aiWritten ? '' : '(Standardtext)'}</h3>
         <div class="imgs">${v.files.map((f) => `<a href="${esc(f.url)}" download><img src="${esc(f.url)}" alt="${esc(f.size)} ${f.slide}" loading="lazy"></a>`).join('')}</div>
@@ -97,14 +124,26 @@ async function load() { render(await api('/api/studio/drafts')); }
 
 $('#gen').onclick = async () => {
   $('#gen').disabled = true; $('#msg').textContent = 'Erstelle Entwurf … (ca. 1 Minute)';
-  try { await api('/api/studio/drafts', { method: 'POST', body: '{}' }); $('#msg').textContent = 'Fertig.'; await load(); }
+  try { await api('/api/studio/drafts', { method: 'POST', body: JSON.stringify(defLangs().length ? { langs: defLangs() } : {}) }); $('#msg').textContent = 'Fertig.'; await load(); }
   catch (e) { $('#msg').textContent = 'Fehler: ' + e.message; }
   $('#gen').disabled = false;
 };
 
+async function regen(box, what, value) {
+  box.classList.add('busy'); $('#msg').textContent = 'Wird neu erstellt … (bis ca. 1 Minute)';
+  try { await api(`/api/studio/drafts/${box.dataset.id}/regenerate`, { method: 'POST', body: JSON.stringify({ what, value }) }); $('#msg').textContent = 'Fertig.'; await load(); }
+  catch (err) { $('#msg').textContent = 'Fehler: ' + err.message; box.classList.remove('busy'); }
+}
+$('#list').onchange = async (e) => {
+  const box = e.target.closest('.draft'); if (!box) return;
+  if (e.target.dataset.act === 'style') return regen(box, 'style', e.target.value);
+  if (e.target.dataset.act === 'upload' && e.target.files[0]) return regen(box, 'photo-upload', await readFile(e.target.files[0]));
+};
 $('#list').onclick = async (e) => {
   const b = e.target.closest('button'); if (!b) return;
   const box = b.closest('.draft'); const id = box.dataset.id; const act = b.dataset.act;
+  if (['photo', 'text', 'all'].includes(act)) return regen(box, act);
+  if (act === 'langs') return regen(box, 'langs', [...box.querySelectorAll('[data-lang-box]:checked')].map((i) => i.value));
   const ta = b.dataset.lang && box.querySelector(`textarea[data-lang="${b.dataset.lang}"]`);
   try {
     if (act === 'copy') { await navigator.clipboard.writeText(ta.value); $('#msg').textContent = 'Kopiert.'; return; }
@@ -143,6 +182,7 @@ $('#manualGo').onclick = async () => {
   const v = (id) => $('#' + id).value.trim();
   const body = { fromName: v('fromName'), fromCode: v('fromCode').toUpperCase(), toName: v('toName'), toCode: v('toCode').toUpperCase(),
     departureDate: v('departureDate'), returnDate: v('returnDate'), price: v('price'), airline: v('airline'), style: v('style') };
+  if (defLangs().length) body.langs = defLangs();
   const file = $('#photo').files[0]; if (file) body.photo = await readFile(file);
   $('#manualGo').disabled = true; $('#msg').textContent = 'Erstelle Entwurf … (ca. 1 Minute)';
   try { await api('/api/studio/manual', { method: 'POST', body: JSON.stringify(body) }); $('#msg').textContent = 'Fertig.'; await load(); }
