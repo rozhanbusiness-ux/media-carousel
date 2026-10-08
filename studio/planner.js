@@ -70,7 +70,7 @@ async function findCandidates(draft) {
   let list = [];
   try { list = await pexelsCandidates(queriesFor(draft.offer), used, 15); } catch (err) { console.error('studio pexels:', err.message); }
   const ranked = await rankPhotos(list, draft.offer.to.name);
-  draft.photoCandidates = ranked.map((c) => ({ id: c.id, url: c.url, thumb: c.thumb, score: c.score }));
+  draft.photoCandidates = ranked.map((c) => ({ id: c.id, url: c.url, thumb: c.thumb, score: c.score, why: c.why || '' }));
 }
 
 /** Use one candidate (by Pexels id) as the draft photo. */

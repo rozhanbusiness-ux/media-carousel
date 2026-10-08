@@ -13,10 +13,11 @@ function criteria(city) {
     `You are the photo editor of a luxury travel agency. Score each photo (0-10) as the background of an Instagram ad for a trip to ${city}.`,
     'High scores: bright, sunny, airy, light colours; clearly recognisable, attractive view or landmark of THIS destination; clean, elegant, luxurious travel feeling;',
     'calm area at the top (for a logo) and at the bottom (for text); sharp, professional, natural photo.',
-    'Score 0 if the photo shows a mosque, minaret, church, cathedral, temple, dome of a religious building or any religious symbol, even small or in the distance.',
+    'Score 0 only if a mosque, church, cathedral, temple or religious symbol is CLEARLY recognisable. Towers, palaces, schools or other buildings that merely look similar only lower the score a little.',
     'Low scores: dark, grey or gloomy; night; close-up faces; crowds; text, signs or logos; food or interiors; generic places that could be anywhere; blurry.',
     'Photos are numbered from 0 in the order given.',
-    'Return ONLY JSON: {"scores":[{"i":0,"score":7}, ...]} with one entry per photo.',
+    'Give each photo a very short German reason (max 4 words), e.g. "Bosporus, hell, elegant" or "Moschee sichtbar" or "zu dunkel".',
+    'Return ONLY JSON: {"scores":[{"i":0,"score":7,"why":"Bosporus, hell, elegant"}, ...]} with one entry per photo.',
   ].join('\n');
 }
 
@@ -39,7 +40,7 @@ async function fetchThumb(url, fetchImpl) {
  * ({ id, thumb, ... }) and returns them sorted best first.
  */
 async function rankPhotos(candidates, city, fetchImpl = fetch) {
-  const list = candidates.map((c) => ({ ...c, score: null }));
+  const list = candidates.map((c) => ({ ...c, score: null, why: '' }));
   if (!config.GEMINI_API_KEY || !list.length) return list;
   const thumbs = await Promise.all(list.map((c) => fetchThumb(c.thumb, fetchImpl)));
   const usable = list.map((c, i) => ({ c, t: thumbs[i] })).filter((x) => x.t);
@@ -61,6 +62,7 @@ async function rankPhotos(candidates, city, fetchImpl = fetch) {
     for (const s of scores) {
       if (Number.isInteger(s?.i) && s.i >= 0 && s.i < usable.length && Number.isFinite(s.score)) {
         usable[s.i].c.score = Math.max(0, Math.min(10, Math.round(s.score)));
+        if (typeof s.why === 'string') usable[s.i].c.why = s.why.replace(/[<>{}]/g, '').trim().slice(0, 40);
       }
     }
   } catch (err) { console.error('studio photo rank:', err.message); return list; }

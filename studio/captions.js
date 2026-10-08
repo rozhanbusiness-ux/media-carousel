@@ -40,13 +40,21 @@ const cityName = (place, lang) => (place.code && CITY[place.code] && CITY[place.
 
 const LANG_NAME = { de: 'German', ar: 'Arabic (Modern Standard, warm tone)', ckb: 'Kurdish Badini (Behdînî, Northern Kurdish of Duhok, written in Arabic script)' };
 
+// Random choice from a small pool, so default texts do not repeat every day.
+const pick = (list) => (o) => list[Math.floor(Math.random() * list.length)](o);
+
 const FIXED = {
   de: {
     from: 'ab', perPerson: 'p. P.', route: (o) => `${o.from} → ${o.to}`,
     dates: (o) => `${o.dateOut}–${o.dateBack}`,
     cta: '👉 Link in der Bio – jetzt Angebot sichern.',
     notice: 'Preise können sich je nach Verfügbarkeit ändern – wir beraten dich gern.',
-    fallbackHook: (o) => `Während hier der Herbst beginnt: ${o.toName}.`,
+    fallbackHook: pick([
+      (o) => `${o.toName} wartet schon auf dich.`,
+      (o) => `Dein nächster Sonnenuntergang: ${o.toName}.`,
+      (o) => `Koffer packen – ${o.toName} ruft.`,
+      (o) => `Mehr Meer, mehr Licht: ${o.toName}.`,
+    ]),
     fallbackBody: 'Ein spontaner Tapetenwechsel kostet weniger, als du denkst – aber nicht mehr lange.',
   },
   ar: {
@@ -54,7 +62,12 @@ const FIXED = {
     dates: (o) => `من ${o.dateOut} إلى ${o.dateBack}`,
     cta: '👈 الرابط في البايو – احجز الآن.',
     notice: 'قد تتغير الأسعار حسب التوفر، ويسعدنا مساعدتك في اختيار الأنسب.',
-    fallbackHook: (o) => `${o.toName}… بسعر لن تصدّقه.`,
+    fallbackHook: pick([
+      (o) => `${o.toName} بانتظارك…`,
+      (o) => `حان وقت ${o.toName}.`,
+      (o) => `حقيبتك جاهزة؟ ${o.toName} تناديك.`,
+      (o) => `${o.toName}… رحلة تستحقها.`,
+    ]),
     fallbackBody: 'المقاعد بهذا السعر محدودة، ومن يحجز أولاً يسافر أولاً.',
   },
   ckb: {
@@ -62,7 +75,11 @@ const FIXED = {
     dates: (o) => `ژ ${o.dateOut} بۆ ${o.dateBack}`,
     cta: '👈 لینک د بایۆیێ دایە – نوکە بوک بکە.',
     notice: 'دبیت نرخ ل دویڤ بەردەستبوونێ بگوهۆڕن، ئەم ب دلخۆشی هاریکاریا تە دکەین.',
-    fallbackHook: (o) => `${o.toName}، نێزیکترە ژ ئەوا تو هزر دکەی.`,
+    fallbackHook: pick([
+      (o) => `${o.toName}، نێزیکترە ژ ئەوا تو هزر دکەی.`,
+      (o) => `${o.toName} ل هیڤیا تە یە.`,
+      (o) => `دەمێ ${o.toName} هات.`,
+    ]),
     fallbackBody: 'گەشتا تە یا بهێت ئێک کلیک دویرە.',
   },
 };
@@ -94,8 +111,11 @@ function buildPrompt(offer, lang) {
   return [
     `You write one Instagram/Facebook caption part for a travel agency (MEDIA Travel & Tourism, Germany).`,
     `Language: ${LANG_NAME[lang]}. Destination: ${offer.toName}. Departure city: ${offer.fromName}. Product: ${offer.kind}.`,
-    `Rules: no numbers, no prices, no dates, no links, no discounts or "free", no emojis in the hook, no religious references.`,
-    `Return ONLY JSON: {"hook": "<max 70 chars, strong emotional hook, surprising or curious, not generic>", "body": "<max 220 chars, 1-2 vivid sentences why this trip>", "hashtags": ["#...", 8 to 12 specific hashtags about the destination and travel, without numbers]}`,
+    `Brand voice: luxurious, warm, elegant and confident; never cheap, pushy or loud. Write like a high-end travel magazine.`,
+    `Hook: max 55 characters, printed large on the photo. Evoke ONE concrete, sensory detail typical of ${offer.toName} (light, sea, a view, a taste, a sound, a famous place) so it could not be about any other city. Natural, native phrasing.`,
+    `Avoid clichés and generic openers such as "Entdecke", "Fernweh?", "Während hier...", "Lust auf...", "اكتشف", "هل تحلم".`,
+    `Rules: no numbers, no prices, no dates, no links, no discounts or "free", no emojis in the hook, no religious references or buildings.`,
+    `Return ONLY JSON: {"hook": "<the hook>", "body": "<max 220 chars, 1-2 vivid sentences why this trip is special now>", "hashtags": ["#...", 8 to 12 specific hashtags about the destination and travel, without numbers]}`,
   ].join('\n');
 }
 
@@ -107,11 +127,11 @@ async function askModel(offer, lang, fetchImpl) {
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': config.GEMINI_API_KEY },
     body: JSON.stringify({
       contents: [{ parts: [{ text: buildPrompt(offer, lang) }] }],
-      generationConfig: { responseMimeType: 'application/json', temperature: 0.9, maxOutputTokens: 1024 },
+      generationConfig: { responseMimeType: 'application/json', temperature: 0.9, maxOutputTokens: 1024, thinkingConfig: { thinkingBudget: 0 } },
     }),
     signal: AbortSignal.timeout(30000),
   });
-  if (!res.ok) return null;
+  if (!res.ok) { console.error('studio caption: HTTP', res.status); return null; }
   const json = await res.json();
   const text = (json?.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join('');
   try {

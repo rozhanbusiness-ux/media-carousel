@@ -20,6 +20,7 @@
   .cand:hover, .cand:focus { border-color: #e6c25a; }
   .cand img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .cand span { position: absolute; top: 6px; left: 6px; background: rgba(0,0,0,.7); color: #e6c25a; font-weight: 700; font-size: 13px; padding: 2px 8px; border-radius: 999px; }
+  .cand em { position: absolute; left: 0; right: 0; bottom: 0; padding: 14px 6px 5px; font-size: 11px; font-style: normal; line-height: 1.2; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,.8)); text-align: left; }
   .warn { background: #5a3d0a; color: #ffd98a; padding: 10px 14px; border-radius: 12px; margin: 8px 0; }
   .draft { background: rgba(255,255,255,.06); border: 1px solid rgba(230,194,90,.3); border-radius: 16px; padding: 16px; margin: 16px 0; }
   .meta { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; font-size: 14px; color: #cfd6e6; }
@@ -108,7 +109,7 @@ function render(drafts) {
       ${(d.photoCandidates || []).length ? `
         <div class="photo-pick"><h3>Foto wählen <small>(beste zuerst, Bewertung durch KI)</small></h3>
           <div class="row"><button class="ok" data-act="photo-auto">⚡ Automatisch: bestes Foto</button><button class="ghost" data-act="photo">Mehr Fotos</button></div>
-          <div class="cands">${d.photoCandidates.map((c) => `<button class="cand" data-act="photo-pick" data-pid="${Number(c.id)}"><img src="${esc(c.thumb)}" alt="" loading="lazy" referrerpolicy="no-referrer"><span>${c.score == null ? '–' : Number(c.score) + '/10'}</span></button>`).join('')}</div>
+          <div class="cands">${d.photoCandidates.map((c) => `<button class="cand" data-act="photo-pick" data-pid="${Number(c.id)}"><img src="${esc(c.thumb)}" alt="" loading="lazy" referrerpolicy="no-referrer"><span>${c.score == null ? '–' : Number(c.score) + '/10'}</span>${c.why ? `<em>${esc(c.why)}</em>` : ''}</button>`).join('')}</div>
         </div>` : (d.needsPhoto ? '<p class="warn">⚠ Kein passendes echtes Foto gefunden. Bitte eigenes Foto hochladen (⬆) oder im Notfall 🤖 KI-Foto.</p>' : '')}
       <div class="tools">
         <select data-act="style">${STYLE_NAMES.map(([v, n]) => `<option value="${v}" ${v === d.style ? 'selected' : ''}>${n}</option>`).join('')}</select>
