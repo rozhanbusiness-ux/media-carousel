@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="{{lang}}" dir="{{dir}}"><head><meta charset="utf-8" /><link rel="stylesheet" href="{{fontCss}}" />
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root { --w: 1080px; --h: 1350px; --gold: #e6c25a; --navy: #0a1838; --cream: #f6f0e1; --u: 1px; }
+.story { --h: 1920px; } .square { --h: 1080px; --u: .86px; }
+html, body { width: var(--w); height: var(--h); overflow: hidden; background: var(--navy); }
+.post { position: relative; width: var(--w); height: var(--h); overflow: hidden; color: #fff; font-family: "Plus Jakarta Sans", sans-serif; }
+.rtl .post, .rtl .post * { font-family: "IBM Plex Sans Arabic", sans-serif; }
+.gold { color: var(--gold); } .script { font-family: "Allura", cursive; font-weight: 400; } .serif { font-family: "DM Serif Display", serif; font-weight: 400; }
+.trk { letter-spacing: .4em; text-transform: uppercase; font-weight: 600; font-size: calc(20 * var(--u)); }
+.logo { position: absolute; top: calc(60 * var(--u)); left: 50%; transform: translateX(-50%); width: calc(200 * var(--u)); z-index: 5; }
+.cta { display: inline-block; padding: calc(24 * var(--u)) calc(56 * var(--u)); border-radius: 999px; font-weight: 800; font-size: calc(32 * var(--u)); color: var(--navy); background: linear-gradient(135deg,#f7e7a8,#c9a227); box-shadow: 0 14px 40px rgba(201,162,39,.35); }
+.notice { position: absolute; bottom: calc(46 * var(--u)); width: 100%; text-align: center; font-size: calc(17 * var(--u)); opacity: .7; z-index: 5; }
+[data-only] { display: none !important; } .s1 [data-only~="1"], .s2 [data-only~="2"], .s3 [data-only~="3"] { display: block !important; }
+.rtl .title, .rtl .big { font-weight: 700 !important; font-size: calc(96 * var(--u)) !important; line-height: 1.2 !important; }
+.post { background: var(--cream); color: var(--navy); }
+.card { position: absolute; inset: calc(150 * var(--u)) 60px calc(120 * var(--u)); background: #fffdf7; box-shadow: 0 30px 70px rgba(10,24,56,.25); border-radius: 10px; overflow: hidden; }
+.card img { position: absolute; left: 0; right: 0; top: 0; height: 62%; width: 100%; object-fit: cover; }
+.stamp { position: absolute; right: 40px; top: 40px; width: calc(170 * var(--u)); height: calc(200 * var(--u)); background: var(--navy); outline: 6px dotted #fffdf7; outline-offset: -3px; color: var(--gold); display: flex; flex-direction: column; align-items: center; justify-content: center; transform: rotate(4deg); }
+.rtl .stamp { right: auto; left: 40px; transform: rotate(-4deg); }
+.stamp small { font-size: calc(16 * var(--u)); letter-spacing: .25em; color: #fff; }
+.stamp b { font-size: calc(40 * var(--u)); line-height: 1.05; }
+.body { position: absolute; left: 50px; right: 50px; top: 66%; }
+.title { font-size: calc(150 * var(--u)); line-height: .95; color: var(--navy); }
+.h { font-size: calc(38 * var(--u)); font-weight: 600; margin-top: 12px; color: #3c4560; }
+.rows { font-size: calc(42 * var(--u)); line-height: 1.6; font-weight: 700; }
+.notice { color: var(--navy); }
+.logo { filter: drop-shadow(0 2px 6px rgba(0,0,0,.25)); top: calc(46 * var(--u)); }
+.greet { position: absolute; left: 50px; top: 24px; font-size: calc(60 * var(--u)); color: #fff; text-shadow: 0 4px 20px rgba(0,0,0,.5); }
+</style></head>
+<body class="{{size}} {{dir}}"><div class="post s{{slide}}">
+<img class="logo" src="{{logo}}" alt="MEDIA" />
+<div class="card"><img src="{{photo}}" style="object-position: {{photoPosition}}" alt="" />
+<div class="stamp" data-only="1 2"><small>{{priceLabel}}</small><b class="serif">{{price}}</b></div>
+<div class="body" data-only="1"><div class="trk" style="color:#b08a17">{{kicker}}</div><div class="title {{titleClass}}">{{destination}}</div><div class="h">{{hook}}</div></div>
+<div class="body" data-only="2"><div class="trk" style="color:#b08a17;margin-bottom:12px">{{detailsTitle}}</div><div class="rows">{{fromCity}} ✈ {{toCity}}<br />{{dates}}<br />{{airline}}</div></div>
+<div class="body" data-only="3"><div class="title {{titleClass}}" style="color:#b08a17">{{ctaTitle}}</div><div class="h" style="margin-bottom:22px">{{ctaText}}</div><span class="cta">{{ctaButton}}</span></div>
+</div>
+<div class="notice" data-only="2 3">{{notice}}</div>
+</div></body></html>

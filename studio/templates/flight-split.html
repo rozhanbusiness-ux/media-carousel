@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="{{lang}}" dir="{{dir}}"><head><meta charset="utf-8" /><link rel="stylesheet" href="{{fontCss}}" />
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root { --w: 1080px; --h: 1350px; --gold: #e6c25a; --navy: #0a1838; --cream: #f6f0e1; --u: 1px; }
+.story { --h: 1920px; } .square { --h: 1080px; --u: .86px; }
+html, body { width: var(--w); height: var(--h); overflow: hidden; background: var(--navy); }
+.post { position: relative; width: var(--w); height: var(--h); overflow: hidden; color: #fff; font-family: "Plus Jakarta Sans", sans-serif; }
+.rtl .post, .rtl .post * { font-family: "IBM Plex Sans Arabic", sans-serif; }
+.gold { color: var(--gold); } .script { font-family: "Allura", cursive; font-weight: 400; } .serif { font-family: "DM Serif Display", serif; font-weight: 400; }
+.trk { letter-spacing: .4em; text-transform: uppercase; font-weight: 600; font-size: calc(20 * var(--u)); }
+.logo { position: absolute; top: calc(60 * var(--u)); left: 50%; transform: translateX(-50%); width: calc(200 * var(--u)); z-index: 5; }
+.cta { display: inline-block; padding: calc(24 * var(--u)) calc(56 * var(--u)); border-radius: 999px; font-weight: 800; font-size: calc(32 * var(--u)); color: var(--navy); background: linear-gradient(135deg,#f7e7a8,#c9a227); box-shadow: 0 14px 40px rgba(201,162,39,.35); }
+.notice { position: absolute; bottom: calc(46 * var(--u)); width: 100%; text-align: center; font-size: calc(17 * var(--u)); opacity: .7; z-index: 5; }
+[data-only] { display: none !important; } .s1 [data-only~="1"], .s2 [data-only~="2"], .s3 [data-only~="3"] { display: block !important; }
+.rtl .title, .rtl .big { font-weight: 700 !important; font-size: calc(96 * var(--u)) !important; line-height: 1.2 !important; }
+.post { background: var(--navy); }
+.photo { position: absolute; top: 0; bottom: 0; left: 0; width: 52%; overflow: hidden; }
+.rtl .photo { left: auto; right: 0; }
+.photo img { width: 100%; height: 100%; object-fit: cover; }
+.photo::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent 60%, rgba(10,24,56,.9)); }
+.rtl .photo::after { background: linear-gradient(270deg, transparent 60%, rgba(10,24,56,.9)); }
+.goldline { position: absolute; top: 8%; bottom: 8%; left: 52%; width: 3px; background: linear-gradient(180deg, transparent, var(--gold), transparent); }
+.rtl .goldline { left: auto; right: 52%; }
+.panel { position: absolute; top: 50%; transform: translateY(-50%); left: 56%; right: 50px; }
+.rtl .panel { left: 50px; right: 56%; }
+.logo { left: auto; right: 50px; transform: none; width: calc(170 * var(--u)); }
+.rtl .logo { right: auto; left: 50px; }
+.title { font-size: calc(120 * var(--u)); line-height: .95; margin: 10px 0 18px; }
+.h { font-size: calc(32 * var(--u)); font-weight: 600; line-height: 1.35; opacity: .92; }
+.lbl { font-size: calc(17 * var(--u)); letter-spacing: .3em; text-transform: uppercase; color: rgba(255,255,255,.6); margin-top: 22px; }
+.val { font-size: calc(36 * var(--u)); font-weight: 800; line-height: 1.2; }
+.price { font-size: calc(110 * var(--u)); line-height: 1; margin-top: 6px; }
+.notice { left: 56%; right: 50px; width: auto; text-align: start; }
+</style></head>
+<body class="{{size}} {{dir}}"><div class="post s{{slide}}">
+<div class="photo"><img src="{{photo}}" style="object-position: {{photoPosition}}" alt="" /></div><div class="goldline"></div>
+<img class="logo" src="{{logo}}" alt="MEDIA" />
+<div class="panel" data-only="1"><div class="trk gold">{{kicker}}</div><div class="title {{titleClass}}">{{destination}}</div><div class="h">{{hook}}</div></div>
+<div class="panel" data-only="2"><div class="trk gold">{{detailsTitle}}</div><div class="lbl">{{fromLabel}}</div><div class="val">{{fromCity}}</div><div class="lbl">{{toLabel}}</div><div class="val">{{toCity}}</div><div class="lbl">{{datesLabel}}</div><div class="val" style="font-size:calc(28*var(--u))">{{dates}}</div><div class="lbl">{{priceLabel}}</div><div class="price serif gold">{{price}}</div></div>
+<div class="panel" data-only="3"><div class="title {{titleClass}} gold">{{ctaTitle}}</div><div class="h" style="margin-bottom:26px">{{ctaText}}</div><span class="cta" style="font-size:calc(28*var(--u))">{{ctaButton}}</span></div>
+<div class="notice" data-only="2 3">{{notice}}</div>
+</div></body></html>
