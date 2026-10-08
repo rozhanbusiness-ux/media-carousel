@@ -43,7 +43,7 @@ const FIXED = {
   },
   ar: {
     from: 'ابتداءً من', perPerson: 'للشخص', route: (o) => `من ${o.from} إلى ${o.to}`,
-    dates: (o) => `${o.dateOut} – ${o.dateBack}`,
+    dates: (o) => `من ${o.dateOut} إلى ${o.dateBack}`,
     cta: '👈 الرابط في البايو – احجز الآن.',
     notice: 'الأسعار غير ملزمة وحسب التوفر.',
     fallbackHook: (o) => `${o.toName}… بسعر لن تصدّقه.`,
@@ -51,7 +51,7 @@ const FIXED = {
   },
   ckb: {
     from: 'ژ', perPerson: 'بۆ هەر کەسەکی', route: (o) => `ژ ${o.from} بۆ ${o.to}`,
-    dates: (o) => `${o.dateOut} – ${o.dateBack}`,
+    dates: (o) => `ژ ${o.dateOut} بۆ ${o.dateBack}`,
     cta: '👈 لینک د بایۆیێ دایە – نوکە بوک بکە.',
     notice: 'نرخ نە جێگیرن و ل دویڤ بەردەستبوونێ نە.',
     fallbackHook: (o) => `${o.toName}، نێزیکترە ژ ئەوا تو هزر دکەی.`,
@@ -146,4 +146,4 @@ async function buildCaption(flight, lang, fetchImpl = fetch) {
   return { lang, hook, body, facts, cta: f.cta, notice: f.notice, hashtags, text, aiWritten: Boolean(aiOk) };
 }
 
-module.exports = { buildCaption, isSafeText, isSafeHashtag, formatDate, formatPrice, LANGS };
+module.exports = { buildCaption, isSafeText, isSafeHashtag, formatDate, formatPrice, cityName, LANGS };
