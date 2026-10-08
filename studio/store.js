@@ -39,4 +39,10 @@ function recentDestinations(days) {
   return new Set(load().drafts.filter((d) => d.status !== 'rejected' && Date.parse(d.createdAt) >= since).map((d) => d.offer.to.code));
 }
 
-module.exports = { listDrafts, getDraft, upsertDraft, recentDestinations };
+function removeDraft(id) {
+  const data = load();
+  data.drafts = data.drafts.filter((d) => d.id !== id);
+  save(data);
+}
+
+module.exports = { listDrafts, getDraft, upsertDraft, removeDraft, recentDestinations };

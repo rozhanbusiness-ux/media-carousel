@@ -116,7 +116,7 @@ function render(drafts) {
         <textarea dir="${v.lang === 'de' ? 'ltr' : 'rtl'}" data-lang="${esc(v.lang)}">${esc(v.caption)}</textarea>
         <div class="row"><button class="ghost" data-act="save" data-lang="${esc(v.lang)}">Text speichern</button>
           <button class="ghost" data-act="copy" data-lang="${esc(v.lang)}">Text kopieren</button></div>`).join('')}
-      <div class="row"><button class="ok" data-act="approved">Freigeben</button><button class="no" data-act="rejected">Ablehnen</button></div>
+      <div class="row"><button class="ok" data-act="approved">Freigeben</button><button class="no" data-act="rejected">Ablehnen</button>${d.status === 'rejected' ? '<button class="no" data-act="delete">🗑 Löschen</button>' : ''}</div>
     </div>`).join('') || '<p>Noch keine Entwürfe.</p>';
 }
 
@@ -144,6 +144,12 @@ $('#list').onclick = async (e) => {
   const box = b.closest('.draft'); const id = box.dataset.id; const act = b.dataset.act;
   if (['photo', 'text', 'all'].includes(act)) return regen(box, act);
   if (act === 'langs') return regen(box, 'langs', [...box.querySelectorAll('[data-lang-box]:checked')].map((i) => i.value));
+  if (act === 'delete') {
+    if (!confirm('Diesen abgelehnten Entwurf endgültig löschen?')) return;
+    try { await api('/api/studio/drafts/' + id, { method: 'DELETE' }); $('#msg').textContent = 'Gelöscht.'; await load(); }
+    catch (err) { $('#msg').textContent = 'Fehler: ' + err.message; }
+    return;
+  }
   const ta = b.dataset.lang && box.querySelector(`textarea[data-lang="${b.dataset.lang}"]`);
   try {
     if (act === 'copy') { await navigator.clipboard.writeText(ta.value); $('#msg').textContent = 'Kopiert.'; return; }

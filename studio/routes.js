@@ -8,7 +8,7 @@
 const path = require('path');
 const express = require('express');
 const store = require('./store');
-const { createDailyDraft, createManualDraft, regenerate } = require('./planner');
+const { deleteDraft, createDailyDraft, createManualDraft, regenerate } = require('./planner');
 const { STYLES } = require('./render');
 const { getFlightOffers } = require('./offers');
 
@@ -107,6 +107,17 @@ module.exports = function mountStudio(app) {
       if (draft.texts && draft.texts[lang]) draft.texts[lang].caption = caption;
     }
     res.json(store.upsertDraft(draft));
+  });
+
+  // Delete a draft; only rejected drafts can be deleted.
+  router.delete('/drafts/:id', (req, res) => {
+    if (!ID.test(req.params.id)) return res.status(400).json({ error: 'bad id' });
+    const draft = store.getDraft(req.params.id);
+    if (!draft) return res.status(404).json({ error: 'not found' });
+    if (draft.status !== 'rejected') return res.status(409).json({ error: 'only rejected drafts can be deleted' });
+    if (generating) return res.status(429).json({ error: 'busy' });
+    deleteDraft(draft);
+    res.json({ ok: true });
   });
 
   app.use('/api/studio', express.json({ limit: '15mb' }), router);

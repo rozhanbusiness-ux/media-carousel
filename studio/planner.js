@@ -144,4 +144,13 @@ async function regenerate(draft, what, value) {
   return renderDraft(draft);
 }
 
-module.exports = { createDailyDraft, createManualDraft, regenerate, pickOffer };
+/** Delete a draft with its rendered images and stored photo. */
+function deleteDraft(draft) {
+  for (const v of draft.versions || []) for (const f of v.files) {
+    try { fs.unlinkSync(path.join(OUTPUT, path.basename(f.url))); } catch { /* already gone */ }
+  }
+  try { fs.unlinkSync(photoPath(draft.id)); } catch { /* no photo */ }
+  store.removeDraft(draft.id);
+}
+
+module.exports = { deleteDraft, createDailyDraft, createManualDraft, regenerate, pickOffer };

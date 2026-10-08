@@ -14,7 +14,8 @@ const STYLES = ['flight', 'flight-ticket', 'flight-split', 'flight-diagonal', 'f
 const SIZES = ['story', 'portrait', 'square'];
 
 // Monday..Sunday -> style (client decision 2026-10-08).
-const STYLE_BY_WEEKDAY = { 1: 'flight', 2: 'flight-ticket', 3: 'flight-split', 4: 'flight-diagonal', 5: 'flight-postcard', 6: 'flight-ribbon', 0: 'flight-band' };
+// Client decision: the full-photo glass template is the default every day; others stay selectable per draft.
+const STYLE_BY_WEEKDAY = { 1: 'flight', 2: 'flight', 3: 'flight', 4: 'flight', 5: 'flight', 6: 'flight', 0: 'flight' };
 
 const LABELS = {
   de: { kicker: 'Flugangebot', swipe: 'Wischen für Details →', detailsTitle: 'Dein Flug', priceLabel: 'ab', perPerson: 'pro Person',
