@@ -27,14 +27,21 @@ const PACKAGE_LABELS = {
 const LABELS = {
   de: { kicker: 'Flugangebot', swipe: 'Wischen für Details →', detailsTitle: 'Dein Flug', priceLabel: 'ab', perPerson: 'pro Person',
     fromLabel: 'Ab', toLabel: 'Nach', datesLabel: 'Reisedatum', airlineLabel: 'Airline',
-    ctaTitle: 'Jetzt sichern', ctaText: 'Solange die Plätze reichen.', ctaButton: 'Link in der Bio', notice: 'Preise schwanken täglich – wer früh bucht, reist günstiger.' },
+    ctaTitle: 'Jetzt sichern', ctaText: 'Schreib uns auf WhatsApp – die Plätze sind begrenzt.', ctaButton: '', notice: 'Preise schwanken täglich – wer früh bucht, reist günstiger.' },
   ar: { kicker: 'عرض طيران', swipe: '← اسحب للتفاصيل', detailsTitle: 'رحلتك', priceLabel: 'ابتداءً من', perPerson: 'للشخص',
     fromLabel: 'من', toLabel: 'إلى', datesLabel: 'موعد السفر', airlineLabel: 'شركة الطيران',
-    ctaTitle: 'احجز الآن', ctaText: 'المقاعد محدودة بهذا السعر.', ctaButton: 'الرابط في البايو', notice: 'الأسعار تتغير باستمرار، ومن يحجز أولاً يسافر بسعر أفضل.' },
+    ctaTitle: 'احجز الآن', ctaText: 'راسلنا على واتساب – المقاعد محدودة بهذا السعر.', ctaButton: '', notice: 'الأسعار تتغير باستمرار، ومن يحجز أولاً يسافر بسعر أفضل.' },
   ckb: { kicker: 'پێشنیارا فرۆکێ', swipe: '← بکێشە بۆ وردەکاریان', detailsTitle: 'گەشتا تە', priceLabel: 'ژ', perPerson: 'بۆ هەر کەسەکی',
     fromLabel: 'ژ', toLabel: 'بۆ', datesLabel: 'دەمێ گەشتێ', airlineLabel: 'کۆمپانیا فرۆکێ',
-    ctaTitle: 'نوکە بوک بکە', ctaText: 'جهێن ب ڤی نرخی کێمن.', ctaButton: 'لینک د بایۆیێ دایە', notice: 'نرخ بەردەوام دگوهۆڕن، ئەوێ زوی بوک بکەت ب نرخەکێ باشتر گەشتێ دکەت.' },
+    ctaTitle: 'نوکە بوک بکە', ctaText: 'ل سەر واتسئاپێ نامەیەکێ بۆ مە بنێرە – جهێن ب ڤی نرخی کێمن.', ctaButton: '', notice: 'نرخ بەردەوام دگوهۆڕن، ئەوێ زوی بوک بکەت ب نرخەکێ باشتر گەشتێ دکەت.' },
 };
+
+// Slide 3 button: the business WhatsApp number from the server .env (STUDIO_WHATSAPP,
+// e.g. "+49 5241 123456"); without it the button shows the website.
+function ctaButton() {
+  const n = (process.env.STUDIO_WHATSAPP || '').trim();
+  return /^\+?[0-9 ]{6,20}$/.test(n) ? '\u2066WhatsApp ' + n + '\u2069' : 'media-travels.com';
+}
 
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -50,6 +57,22 @@ function fontCss() {
 const LOGO = 'data:image/png;base64,' + fs.readFileSync(path.join(DIR, '..', 'templates', 'logo.png')).toString('base64');
 
 // Price: big whole euros, small cents and euro sign top-right; long numbers shrink to stay inside badges.
+// Brand slogan on the last slide of every template (client decision; same look as the website:
+// Allura script, "YOU" in gold, gold swash below; never translated). Trusted static HTML.
+const SLOGAN_HTML = '<div class="slogan" dir="ltr" lang="en"><span>find your next <b>YOU</b></span>'
+  + '<svg viewBox="0 0 300 20" preserveAspectRatio="none" aria-hidden="true"><path d="M5 14 C 80 2, 160 2, 295 10" fill="none" stroke="#d9b445" stroke-width="2" stroke-linecap="round"/></svg></div>';
+const SLOGAN_CSS = '.slogan{display:block;width:max-content;margin:calc(34 * var(--u)) auto 0;position:relative;padding-bottom:calc(14 * var(--u));text-shadow:none}'
+  + '.slogan,.slogan *{font-family:"Allura",cursive!important}.slogan{max-width:100%}.slogan span{padding:0 .18em;font-size:calc(66 * var(--u));line-height:1;color:#fff;white-space:nowrap;font-weight:400;text-shadow:0 2px 14px rgba(0,0,0,.45)}'
+  + '.slogan b{font-weight:400;font-size:1.28em;background:linear-gradient(135deg,#f7e7a8,#c9a227);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:none;filter:drop-shadow(0 2px 8px rgba(0,0,0,.4))}'
+  + '.panel .slogan{margin-left:0;margin-right:0}.panel .slogan span{font-size:calc(50 * var(--u))}.panel .cta{white-space:nowrap}'
+  + '.body .slogan span{color:#0a1838;text-shadow:none}.card .body:has(.slogan){top:auto;bottom:calc(40 * var(--u))}'
+  + '.slogan svg{position:absolute;left:0;right:0;bottom:0;width:100%;height:calc(14 * var(--u))}';
+
+// Gold frame (client: slightly thicker, metallic gold): a brushed-gold gradient border with a soft glow.
+const FRAME_CSS = '.frame,.lines{border:3px solid transparent!important;border-radius:0!important;'
+  + 'border-image:linear-gradient(135deg,#8c6b1c 0%,#f6e3a1 18%,#c9a227 36%,#fff4cc 50%,#b8901f 66%,#f2d98a 82%,#8c6b1c 100%) 1!important;'
+  + 'box-shadow:0 0 18px rgba(201,162,39,.25),inset 0 0 0 1px rgba(0,0,0,.18)}';
+
 const PRICE_CSS = '.pr{font-family:"Plus Jakarta Sans",sans-serif;font-weight:800;letter-spacing:-.01em;display:inline-flex;align-items:flex-start;direction:ltr;unicode-bidi:isolate;white-space:nowrap;line-height:1}'
   + '.pr.l4{font-size:.8em}.pr.l5{font-size:.68em}.pr .pm{font-size:1em!important}.pr .pt span{font-size:1em!important;line-height:1.05}'
   + '.pr .pt{font-size:.4em!important;display:flex;flex-direction:column;align-items:flex-start;font-size:.4em;line-height:1.05;margin-left:.1em;padding-top:.14em}';
@@ -76,7 +99,7 @@ async function renderSlide(post, size, slide) {
   const L = LABELS[post.lang] || LABELS.de;
   const rtl = post.lang !== 'de';
   const values = {
-    ...L, lang: post.lang, dir: rtl ? 'rtl' : 'ltr', size, slide,
+    ...L, ctaButton: ctaButton(), lang: post.lang, dir: rtl ? 'rtl' : 'ltr', size, slide,
     titleClass: rtl ? '' : 'script', photoPosition: 'center', logo: LOGO,
     destination: post.destination, hook: post.hook,
     fromCity: post.from.city, fromCode: post.from.code, toCity: post.to.city, toCode: post.to.code,
@@ -84,6 +107,7 @@ async function renderSlide(post, size, slide) {
     kind: post.card ? 'package' : 'flight', // every non-flight offer uses the hotel-style card
     country: post.country || '', hotel: '', stars: '', pkgLine: '', place: '',
   };
+  if (post.labels) Object.assign(values, post.labels); // bundle cover: own kicker / swipe text
   if (post.card) {
     const c = post.card;
     Object.assign(values, PACKAGE_LABELS[post.lang] || PACKAGE_LABELS.de);
@@ -96,10 +120,11 @@ async function renderSlide(post, size, slide) {
   let html = tpl.replace(/\{\{(\w+)\}\}/g, (_, k) => (k === 'fontCss' || k === 'photo' ? `{{${k}}}` : esc(values[k])));
   // Trusted data URIs are inserted last (they are built here, never from user input).
   // Readability on busy photos: soft shadow behind light text (not on the light-background styles).
-  const shadow = PRICE_CSS + (['flight-postcard'].includes(post.style) ? ''
+  const shadow = PRICE_CSS + SLOGAN_CSS + FRAME_CSS + (post.bundle ? '.dots{display:none!important}' : '') + (['flight-postcard'].includes(post.style) ? ''
     : '.post :is(.title,.hook,.h,.big,.sub,.kicker,.trk,.caps,.swipe){text-shadow:0 2px 18px rgba(0,0,0,.65),0 0 2px rgba(0,0,0,.35)}');
   html = html.replace('<link rel="stylesheet" href="{{fontCss}}" />', `<style>${fontCss()}${shadow}</style>`)
     .replace(/%%PRICE%%/g, priceHtml)
+    .replace(/%%SLOGAN%%/g, SLOGAN_HTML)
     .replace(/\{\{photo\}\}/g, /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(post.photo) ? post.photo : '');
   return renderToJpeg(html, size);
 }

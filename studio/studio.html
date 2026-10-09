@@ -52,6 +52,7 @@
   <div class="row" style="align-items:center">
     <button class="primary" id="gen">Heutigen Entwurf erstellen</button>
     <button class="primary" id="genPkg">Paket-Entwurf erstellen</button>
+    <button class="primary" id="bundleOpen">🗂 Mehrere Angebote</button>
     <span style="font-size:14px;color:#cfd6e6">Sprachen:</span>
     <label class="chk"><input type="checkbox" name="deflang" value="de"> Deutsch</label>
     <label class="chk"><input type="checkbox" name="deflang" value="ar"> العربية</label>
@@ -114,6 +115,19 @@
       <div class="full"><button class="primary" id="manualGo">Entwurf erstellen</button></div>
     </div>
   </details>
+  <div id="bundleBox" class="manual" hidden>
+    <h3>Mehrere Angebote in einem Beitrag <small>(2 bis 6 wählen, Reihenfolge = Reihenfolge der Auswahl)</small></h3>
+    <div class="row"><label>Art <select id="bundleKind"><option value="flight">✈️ Flugangebote</option><option value="package">🏨 Pauschalreisen</option></select></label></div>
+    <div id="bundleList" class="pick" style="max-height:340px;overflow:auto"></div>
+    <div class="row"><button class="primary" id="bundleGo">Sammel-Beitrag erstellen</button><span id="bundleCount"></span></div>
+  </div>
+  <details id="music">
+    <summary>🎵 Reel-Musik (eigene MP3, z. B. Pixabay Music)</summary>
+    <div class="row">
+      <label class="ghost" style="padding:10px 16px;border-radius:999px;cursor:pointer">🎵 Musik hochladen<input id="musicFile" type="file" accept="audio/mpeg,.mp3" hidden></label>
+    </div>
+    <div id="tracks"></div>
+  </details>
   <div id="msg"></div>
   <div id="list"></div>
 </main>
@@ -138,19 +152,19 @@ function render(drafts) {
   $('#list').innerHTML = drafts.map((d) => `
     <div class="draft" data-id="${esc(d.id)}">
       <div class="meta"><span class="badge ${esc(d.status)}">${esc(d.status)}</span>
-        <span>${esc(d.forDate)}</span><span>${d.offer.kind && d.offer.kind !== 'flight' ? ({ package: '🏨 ', cruise: '🚢 ', home: '🏡 ' })[d.offer.kind] + esc(d.offer.to.name) + (d.offer.country ? ', ' + esc(d.offer.country) : '') + ' – ' + esc(d.offer.hotel || d.offer.ship || d.offer.home) : esc(d.offer.from.name) + ' → ' + esc(d.offer.to.name)}</span>
-        <span>${esc(d.offer.price)} €</span></div>
+        <span>${esc(d.forDate)}</span>${d.bundle ? `<span>🗂 ${d.offers.length} Angebote: ${d.offers.map((o) => esc(o.to.name)).join(' · ')}</span>` : `<span>${d.offer.kind && d.offer.kind !== 'flight' ? ({ package: '🏨 ', cruise: '🚢 ', home: '🏡 ' })[d.offer.kind] + esc(d.offer.to.name) + (d.offer.country ? ', ' + esc(d.offer.country) : '') + ' – ' + esc(d.offer.hotel || d.offer.ship || d.offer.home) : esc(d.offer.from.name) + ' → ' + esc(d.offer.to.name)}</span>
+        <span>${esc(d.offer.price)} €</span>`}</div>
       ${(d.photoCandidates || []).length ? `
         <div class="photo-pick"><h3>Foto wählen <small>(beste zuerst, Bewertung durch KI)</small></h3>
           <div class="row"><button class="ok" data-act="photo-auto">⚡ Automatisch: bestes Foto</button><button class="ghost" data-act="photo">Mehr Fotos</button></div>
           <div class="cands">${d.photoCandidates.map((c) => `<button class="cand" data-act="photo-pick" data-pid="${Number(c.id)}"><img src="${esc(c.thumb)}" alt="" loading="lazy" referrerpolicy="no-referrer"><span>${c.score == null ? '–' : Number(c.score) + '/10'}</span>${c.why ? `<em>${esc(c.why)}</em>` : ''}</button>`).join('')}</div>
         </div>` : (d.needsPhoto ? '<p class="warn">⚠ Kein passendes echtes Foto gefunden. Bitte eigenes Foto hochladen (⬆) oder im Notfall 🤖 KI-Foto.</p>' : '')}
       <div class="tools">
-        <select data-act="style">${STYLE_NAMES.map(([v, n]) => `<option value="${v}" ${v === d.style ? 'selected' : ''}>${n}</option>`).join('')}</select>
+        ${d.bundle ? '' : `<select data-act="style">${STYLE_NAMES.map(([v, n]) => `<option value="${v}" ${v === d.style ? 'selected' : ''}>${n}</option>`).join('')}</select>`}
         ${['de', 'ar', 'ckb'].map((l) => `<label class="chk"><input type="checkbox" data-lang-box value="${l}" ${(d.langs || []).includes(l) ? 'checked' : ''}> ${LANG[l]}</label>`).join('')}
         <button class="ghost" data-act="langs">Sprachen übernehmen</button>
       </div>
-      <div class="row">
+      ${d.bundle ? '<div class="row"><button class="ghost" data-act="all">↻ Neue Fotos</button></div>' : `<div class="row">
         <button class="ghost" data-act="offer-next">🔀 Andere Destination</button>
         <button class="ghost" data-act="offer-list">📋 Angebot wählen</button>
         <select data-act="offer-pick" hidden></select>
@@ -159,7 +173,7 @@ function render(drafts) {
         <button class="ghost" data-act="text">✍ Neuer Text</button>
         <button class="ghost" data-act="all">↻ Alles neu</button>
         <button class="ghost" data-act="photo-ai" title="Nur wenn kein echtes Foto passt">🤖 KI-Foto (Notfall)</button>
-      </div>
+      </div>`}
       ${d.versions.map((v) => `
         <h3>${esc(LANG[v.lang] || v.lang)} ${v.aiWritten ? '' : '(Standardtext)'}</h3>
         <div class="imgs">${v.files.map((f) => `<a href="${esc(f.url)}" download><img src="${esc(f.url)}" alt="${esc(f.size)} ${f.slide}" loading="lazy"></a>`).join('')}</div>
@@ -176,6 +190,91 @@ function render(drafts) {
 }
 
 let drafts = [];
+// ---- Reel music: the client's own licensed MP3s; one is picked at random per Reel ----
+let tracks = [];
+async function loadTracks() {
+  try { tracks = await api('/api/studio/music'); } catch { tracks = []; }
+  $('#tracks').innerHTML = tracks.length ? tracks.map((t) => `<div class="row" style="align-items:center;gap:8px">
+    <audio controls preload="none" src="/api/studio/music/${esc(t.id)}" style="height:32px;max-width:220px"></audio>
+    <span>${esc(t.name)}</span><button class="ghost" data-del-track="${esc(t.id)}">Löschen</button></div>`).join('')
+    : '<p>Noch keine Musik – Reels sind dann ohne Ton.</p>';
+}
+$('#musicFile').onchange = async (e) => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  if (f.size > 10 * 1024 * 1024) { $('#msg').textContent = 'Datei zu groß (max. 10 MB).'; return; }
+  $('#msg').textContent = 'Musik wird hochgeladen …';
+  try {
+    const res = await fetch('/api/studio/music', { method: 'POST', headers: { 'Content-Type': 'audio/mpeg', 'X-Track-Name': encodeURIComponent(f.name.replace(/\.mp3$/i, '')) }, body: f });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || res.status);
+    $('#msg').textContent = 'Musik gespeichert.'; await loadTracks();
+  } catch (err) { $('#msg').textContent = 'Fehler: ' + err.message; }
+};
+$('#tracks').onclick = async (e) => {
+  const id = e.target.dataset.delTrack;
+  if (!id || !confirm('Diese Musik löschen?')) return;
+  try { await api('/api/studio/music/' + id, { method: 'DELETE' }); await loadTracks(); } catch (err) { $('#msg').textContent = 'Fehler: ' + err.message; }
+};
+loadTracks();
+
+// Random track → AudioBuffer (stereo, 48 kHz) cut to `seconds`, with a soft fade in/out. null if none.
+async function reelAudio(seconds) {
+  if (!tracks.length || !window.OfflineAudioContext) return null;
+  const t = tracks[Math.floor(Math.random() * tracks.length)];
+  const raw = await (await fetch('/api/studio/music/' + t.id)).arrayBuffer();
+  const RATE = 48000, ctx = new OfflineAudioContext(2, Math.round(seconds * RATE), RATE);
+  const src = ctx.createBufferSource(); src.buffer = await ctx.decodeAudioData(raw);
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0, 0); gain.gain.linearRampToValueAtTime(0.9, 0.6);
+  gain.gain.setValueAtTime(0.9, seconds - 1.5); gain.gain.linearRampToValueAtTime(0, seconds);
+  src.connect(gain).connect(ctx.destination);
+  const start = Math.max(0, Math.min(15, src.buffer.duration - seconds)) * Math.random(); // not always the intro
+  src.start(0, start);
+  return ctx.startRendering();
+}
+async function aacConfig() {
+  if (!window.AudioEncoder) return null;
+  const cfg = { codec: 'mp4a.40.2', sampleRate: 48000, numberOfChannels: 2, bitrate: 192000 };
+  try { return (await AudioEncoder.isConfigSupported(cfg)).supported ? cfg : null; } catch { return null; }
+}
+
+// ---- "Mehrere Angebote": pick 2-6 of today's flight and package offers ----
+let bundlePick = [];
+$('#bundleOpen').onclick = () => {
+  const box = $('#bundleBox');
+  box.hidden = !box.hidden;
+  if (!box.hidden) loadBundleList();
+};
+$('#bundleKind').onchange = loadBundleList;
+// Only one offer kind per post (client rule): the list shows the chosen kind only.
+async function loadBundleList() {
+  const kind = $('#bundleKind').value, icon = kind === 'package' ? '🏨' : '✈️';
+  bundlePick = []; $('#bundleList').textContent = 'Angebote werden geladen …';
+  try {
+    const list = await api('/api/studio/offer-choices?kind=' + kind);
+    $('#bundleList').innerHTML = list.map((o) =>
+      `<label style="display:block;margin:4px 0"><input type="checkbox" data-key="${esc(o.key)}"> ${icon} ${esc(o.label)} – ${esc(o.price)} €</label>`).join('') || 'Keine Angebote.';
+  } catch (err) { $('#bundleList').textContent = 'Fehler: ' + err.message; }
+  updateBundleCount();
+}
+$('#bundleList').onchange = (e) => {
+  const k = e.target.dataset.key; if (!k) return;
+  if (e.target.checked) { if (bundlePick.length >= 6) { e.target.checked = false; return; } bundlePick.push(k); }
+  else bundlePick = bundlePick.filter((x) => x !== k);
+  updateBundleCount();
+};
+function updateBundleCount() { $('#bundleCount').textContent = `${bundlePick.length} / 6 gewählt`; }
+$('#bundleGo').onclick = async () => {
+  if (bundlePick.length < 2) { $('#msg').textContent = 'Bitte mindestens 2 Angebote wählen.'; return; }
+  $('#bundleGo').disabled = true; $('#msg').textContent = 'Sammel-Beitrag wird erstellt … (ca. 1 Minute)';
+  try {
+    await api('/api/studio/drafts/bundle', { method: 'POST', body: JSON.stringify({ kind: $('#bundleKind').value, keys: bundlePick, ...(defLangs().length ? { langs: defLangs() } : {}) }) });
+    $('#msg').textContent = 'Fertig.'; $('#bundleBox').hidden = true; await load();
+  } catch (err) { $('#msg').textContent = 'Fehler: ' + err.message; }
+  $('#bundleGo').disabled = false;
+};
+
 async function load() { drafts = await api('/api/studio/drafts'); render(drafts); }
 
 $('#xKind').onchange = () => document.querySelectorAll('[data-x]').forEach((el) => { el.hidden = el.dataset.x !== $('#xKind').value; });
@@ -295,11 +394,118 @@ async function shareSlides(b, box) {
   }
 }
 
-// Reel: the 3 story slides as a 12-second 1080x1920 video (slow zoom, soft cross-fades),
-// recorded in this browser. No music: add licensed "commercial" music inside the app.
+// Reel: the 3 story slides as a 12-second 1080x1920 video (slow zoom, soft cross-fades).
+// Preferred: H.264 via WebCodecs in a standard (non-fragmented, fast-start) MP4, which
+// Instagram/TikTok/Facebook accept as video. Fallback: MediaRecorder.
+const REEL = { W: 1080, H: 1920, PER: 4000, FADE: 900, FPS: 30 };
+// Calm, clean transitions (client: smooth, soft, luxurious, no chaos). One style is picked at
+// random per Reel and used for every cut in it, so a single video never mixes styles.
+const TRANSITIONS = ['fade', 'blur', 'dip', 'glow'];
+// Only in-place transitions: frame and logo are part of every slide, so moving them would look restless.
+function loadImages(urls) {
+  return Promise.all(urls.map((u) => new Promise((ok, fail) => { const i = new Image(); i.onload = () => ok(i); i.onerror = fail; i.src = u; })));
+}
+const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2); // easeInOutCubic
+function drawReelFrame(g, imgs, now, style = 'fade') { // now: ms since start
+  const { W, H, PER, FADE } = REEL;
+  // t: 0..1 progress of the slide → very slow zoom 1.0 → 1.025 (small, so frames do not double in a crossfade)
+  const draw = (img, t, alpha, extra = 1, dx = 0, blur = 0) => {
+    const s = (1 + 0.025 * t) * extra; const w = W * s, h = H * s;
+    g.save(); g.globalAlpha = alpha; if (blur) g.filter = `blur(${blur}px)`;
+    g.drawImage(img, (W - w) / 2 + dx, (H - h) / 2, w, h); g.restore();
+  };
+  const i = Math.min(imgs.length - 1, Math.floor(now / PER)), local = now - i * PER;
+  g.globalAlpha = 1; g.fillStyle = '#0a1838'; g.fillRect(0, 0, W, H);
+  const inFade = i < imgs.length - 1 && local > PER - FADE;
+  if (!inFade) return draw(imgs[i], local / PER, 1);
+  const p = ease((local - (PER - FADE)) / FADE), cur = imgs[i], next = imgs[i + 1], t = local / PER;
+  switch (style) {
+    case 'glow': { // crossfade through a faint warm golden light
+      draw(cur, t, 1); draw(next, 0, p);
+      g.save(); g.globalAlpha = 0.14 * Math.sin(Math.PI * p); g.fillStyle = '#f7e7a8'; g.fillRect(0, 0, W, H); g.restore(); break;
+    }
+    case 'blur': // the current image softens while the next one fades in sharp
+      draw(cur, t, 1, 1, 0, 14 * p); draw(next, 0, p); break;
+    case 'dip': // fade through the brand navy
+      if (p < 0.5) draw(cur, t, 1 - p * 2); else draw(next, 0, (p - 0.5) * 2); break;
+    default: // classic soft crossfade
+      draw(cur, t, 1); draw(next, 0, p);
+  }
+}
+let muxerLoad = null;
+function loadMuxer() {
+  muxerLoad ??= new Promise((ok, fail) => {
+    const s = document.createElement('script'); s.src = '/studio/mp4-muxer.js';
+    s.onload = () => ok(window.Mp4Muxer); s.onerror = () => { muxerLoad = null; fail(new Error('mp4-muxer')); };
+    document.head.appendChild(s);
+  });
+  return muxerLoad;
+}
+async function h264Config() {
+  if (!window.VideoEncoder) return null;
+  for (const codec of ['avc1.640028', 'avc1.4d0028', 'avc1.42e028']) {
+    const cfg = { codec, width: REEL.W, height: REEL.H, bitrate: 8_000_000, framerate: REEL.FPS, avc: { format: 'avc' } };
+    try { if ((await VideoEncoder.isConfigSupported(cfg)).supported) return cfg; } catch { /* try next */ }
+  }
+  return null;
+}
 async function makeReel(urls, name) {
-  const imgs = await Promise.all(urls.map((u) => new Promise((ok, fail) => { const i = new Image(); i.onload = () => ok(i); i.onerror = fail; i.src = u; })));
-  const W = 1080, H = 1920, PER = 4000, FADE = 600, FPS = 30;
+  const imgs = await loadImages(urls);
+  REEL.style = TRANSITIONS[Math.floor(Math.random() * TRANSITIONS.length)];
+  const cfg = await h264Config();
+  if (cfg) {
+    try { return await makeReelH264(imgs, name, cfg); } catch (err) { console.error('H.264 reel failed, using fallback', err); }
+  }
+  return makeReelRecorder(imgs, name);
+}
+// Frame by frame (not real time): every frame is encoded exactly once at a fixed timestamp.
+async function makeReelH264(imgs, name, cfg) {
+  const { W, H, PER, FPS } = REEL;
+  const { Muxer, ArrayBufferTarget } = await loadMuxer();
+  const seconds = PER * imgs.length / 1000;
+  let audio = null, acfg = null;
+  try { acfg = await aacConfig(); if (acfg) audio = await reelAudio(seconds); } catch (err) { console.error('reel music skipped', err); }
+  if (tracks.length && !audio) $('#msg').textContent = 'Hinweis: Musik wird auf diesem Gerät nicht unterstützt – Reel ohne Ton.';
+  const muxer = new Muxer({ target: new ArrayBufferTarget(), video: { codec: 'avc', width: W, height: H, frameRate: FPS },
+    ...(audio ? { audio: { codec: 'aac', sampleRate: 48000, numberOfChannels: 2 } } : {}), fastStart: 'in-memory' });
+  let failure = null;
+  const enc = new VideoEncoder({ output: (chunk, meta) => muxer.addVideoChunk(chunk, meta), error: (e) => { failure = e; } });
+  enc.configure(cfg);
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  const frames = Math.round(PER * imgs.length / 1000 * FPS);
+  for (let n = 0; n < frames; n++) {
+    if (failure) throw failure;
+    drawReelFrame(g, imgs, n * 1000 / FPS, REEL.style);
+    const frame = new VideoFrame(c, { timestamp: Math.round(n * 1e6 / FPS), duration: Math.round(1e6 / FPS) });
+    enc.encode(frame, { keyFrame: n % (FPS * 2) === 0 });
+    frame.close();
+    if (enc.encodeQueueSize > 8) await new Promise((ok) => enc.addEventListener('dequeue', ok, { once: true }));
+  }
+  await enc.flush(); enc.close();
+  if (failure) throw failure;
+  if (audio) await encodeAudio(audio, acfg, muxer);
+  muxer.finalize();
+  return new File([muxer.target.buffer], `${name}.mp4`, { type: 'video/mp4' });
+}
+// AudioBuffer → AAC chunks in the muxer, in 1024-sample frames (planar float32).
+async function encodeAudio(buf, cfg, muxer) {
+  let failure = null;
+  const enc = new AudioEncoder({ output: (chunk, meta) => muxer.addAudioChunk(chunk, meta), error: (e) => { failure = e; } });
+  enc.configure(cfg);
+  const L = buf.getChannelData(0), R = buf.getChannelData(1), N = 1024;
+  for (let i = 0; i < buf.length; i += N) {
+    if (failure) throw failure;
+    const n = Math.min(N, buf.length - i), data = new Float32Array(n * 2);
+    data.set(L.subarray(i, i + n), 0); data.set(R.subarray(i, i + n), n);
+    const ad = new AudioData({ format: 'f32-planar', sampleRate: buf.sampleRate, numberOfFrames: n, numberOfChannels: 2, timestamp: Math.round(i * 1e6 / buf.sampleRate), data });
+    enc.encode(ad); ad.close();
+  }
+  await enc.flush(); enc.close();
+  if (failure) throw failure;
+}
+async function makeReelRecorder(imgs, name) {
+  const { W, H, PER, FPS } = REEL;
   const c = document.createElement('canvas'); c.width = W; c.height = H;
   const g = c.getContext('2d');
   const type = ['video/mp4;codecs=avc1.640028', 'video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm']
@@ -308,20 +514,13 @@ async function makeReel(urls, name) {
   const rec = new MediaRecorder(c.captureStream(FPS), { mimeType: type, videoBitsPerSecond: 8_000_000 });
   const chunks = []; rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
   const done = new Promise((ok) => { rec.onstop = ok; });
-  const draw = (img, t, alpha) => { // t: 0..1 progress of this slide → zoom 1.0 → 1.06
-    const s = 1 + 0.06 * t; const w = W * s, h = H * s;
-    g.globalAlpha = alpha; g.drawImage(img, (W - w) / 2, (H - h) / 2, w, h);
-  };
   rec.start(250);
   const total = PER * imgs.length, start = performance.now();
   await new Promise((ok) => {
     const frame = () => {
       const now = performance.now() - start;
       if (now >= total) return ok();
-      const i = Math.min(imgs.length - 1, Math.floor(now / PER)), local = now - i * PER;
-      g.globalAlpha = 1; g.fillStyle = '#0a1838'; g.fillRect(0, 0, W, H);
-      draw(imgs[i], local / PER, 1);
-      if (i < imgs.length - 1 && local > PER - FADE) draw(imgs[i + 1], 0, (local - (PER - FADE)) / FADE);
+      drawReelFrame(g, imgs, now, REEL.style);
       requestAnimationFrame(frame);
     };
     frame();

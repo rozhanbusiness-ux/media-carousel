@@ -16,6 +16,7 @@ const { generatePhoto } = require('./image');
 const { candidates: pexelsCandidates, download: pexelsDownload } = require('./pexels');
 const { rankPhotos } = require('./photo-rank');
 const store = require('./store');
+const { createBundleDraft: buildBundle, regenerateBundle, deleteBundlePhotos } = require('./bundle');
 
 const ROOT = path.join(__dirname, '..');
 const OUTPUT = path.join(ROOT, 'output');
@@ -238,6 +239,7 @@ async function createManualDraft({ offer, style, photo = null, date = new Date()
 
 /** Re-generate one part of an existing draft: 'photo' | 'text' | 'all' | {style} | {langs}. */
 async function regenerate(draft, what, value) {
+  if (draft.bundle) return regenerateBundle(draft, what, value, queriesFor, choosePhoto, LANGS);
   if (what === 'photo') { // show (new) ranked candidates; current photo stays until one is picked
     await findCandidates(draft);
     if (!draft.photoCandidates.length) throw new Error('Kein weiteres echtes Foto gefunden – bitte eigenes Foto hochladen oder KI-Foto (Notfall) nutzen.');
@@ -276,7 +278,13 @@ function deleteDraft(draft) {
     try { fs.unlinkSync(path.join(OUTPUT, path.basename(f.url))); } catch { /* already gone */ }
   }
   try { fs.unlinkSync(photoPath(draft.id)); } catch { /* no photo */ }
+  if (draft.bundle) deleteBundlePhotos(draft);
   store.removeDraft(draft.id);
 }
 
-module.exports = { offerChoices, createPackageDraft, saveToLibrary, deleteDraft, createDailyDraft, createManualDraft, regenerate, pickOffer };
+/** "Mehrere Angebote": one post with 2-6 offers (studio/bundle.js). */
+async function createBundleDraft({ kind, keys, date = new Date(), langs = null }) {
+  return buildBundle({ kind, keys, langs: langs || defaultLangs(date), date, liveOffers, queriesFor, choosePhoto });
+}
+
+module.exports = { createBundleDraft, offerChoices, createPackageDraft, saveToLibrary, deleteDraft, createDailyDraft, createManualDraft, regenerate, pickOffer };

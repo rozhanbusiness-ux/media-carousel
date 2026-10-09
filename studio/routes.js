@@ -8,8 +8,9 @@
 const path = require('path');
 const express = require('express');
 const store = require('./store');
+const music = require('./music');
 const { FEATURES, BOARD_KEYS } = require('./packages');
-const { offerChoices, createPackageDraft, saveToLibrary, deleteDraft, createDailyDraft, createManualDraft, regenerate } = require('./planner');
+const { createBundleDraft, offerChoices, createPackageDraft, saveToLibrary, deleteDraft, createDailyDraft, createManualDraft, regenerate } = require('./planner');
 const { STYLES } = require('./render');
 const { getFlightOffers } = require('./offers');
 
@@ -31,6 +32,20 @@ module.exports = function mountStudio(app) {
   router.get('/offer-choices', async (req, res) => {
     try { res.json(await offerChoices(req.query.kind === 'package' ? 'package' : 'flight')); }
     catch { res.status(502).json({ error: 'offers unavailable' }); }
+  });
+
+  // "Mehrere Angebote": 2-6 offers of ONE kind (flight or package) in one post.
+  router.post('/drafts/bundle', async (req, res) => {
+    const { kind, keys, langs } = req.body || {};
+    if (!['flight', 'package'].includes(kind)) return res.status(400).json({ error: 'bad kind' });
+    if (!Array.isArray(keys) || keys.length < 2 || keys.length > 6 || !keys.every((k) => typeof k === 'string' && /^[A-Za-z0-9-]{3,40}$/.test(k)) || new Set(keys).size !== keys.length) {
+      return res.status(400).json({ error: 'Bitte 2 bis 6 verschiedene Angebote wählen.' });
+    }
+    if (generating) return res.status(429).json({ error: 'already generating' });
+    generating = true;
+    try { res.json(await createBundleDraft({ kind, keys, langs: cleanLangs(langs) })); }
+    catch (err) { console.error('studio bundle:', err.message); res.status(500).json({ error: err.message }); }
+    finally { generating = false; }
   });
 
   // Package draft (hotel + flight), on demand.
@@ -179,6 +194,21 @@ module.exports = function mountStudio(app) {
     res.json({ ok: true });
   });
 
+  // Reel music: the client's own licensed MP3s (studio/music.js).
+  router.get('/music', (req, res) => res.json(music.list()));
+  router.post('/music', express.raw({ type: 'audio/mpeg', limit: music.MAX_BYTES }), (req, res) => {
+    let name = '';
+    try { name = decodeURIComponent(String(req.get('X-Track-Name') || '')); } catch { /* keep default */ }
+    try { res.json(music.add(req.body, name)); } catch (err) { res.status(400).json({ error: err.message === 'too many tracks' ? 'too many tracks' : 'only mp3 files up to 10 MB' }); }
+  });
+  router.get('/music/:id', (req, res) => {
+    if (!music.ID.test(req.params.id)) return res.status(400).json({ error: 'bad id' });
+    res.type('audio/mpeg').sendFile(music.file(req.params.id), (err) => { if (err && !res.headersSent) res.status(404).end(); });
+  });
+  router.delete('/music/:id', (req, res) => res.status(music.remove(req.params.id) ? 200 : 404).json({}));
+
   app.use('/api/studio', express.json({ limit: '15mb' }), router);
   app.get('/studio', (req, res) => res.sendFile(path.join(__dirname, 'studio.html')));
+  // Vendored MP4 muxer for the in-browser Reel (studio/vendor, MIT).
+  app.get('/studio/mp4-muxer.js', (req, res) => res.type('application/javascript').sendFile(path.join(__dirname, 'vendor', 'mp4-muxer.js')));
 };

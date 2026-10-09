@@ -200,4 +200,4 @@ async function buildCaption(flight, lang, fetchImpl = fetch) {
   return { lang, hook, body, facts, cta: f.cta, notice: f.notice, hashtags, text, aiWritten: Boolean(aiOk) };
 }
 
-module.exports = { BASE_TAGS, buildCaption, isSafeText, isSafeHashtag, formatDate, formatPrice, cityName, LANGS };
+module.exports = { FIXED, BASE_TAGS, buildCaption, isSafeText, isSafeHashtag, formatDate, formatPrice, cityName, LANGS };
