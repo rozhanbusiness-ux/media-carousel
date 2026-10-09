@@ -165,7 +165,12 @@ function render(drafts) {
         <div class="imgs">${v.files.map((f) => `<a href="${esc(f.url)}" download><img src="${esc(f.url)}" alt="${esc(f.size)} ${f.slide}" loading="lazy"></a>`).join('')}</div>
         <textarea dir="${v.lang === 'de' ? 'ltr' : 'rtl'}" data-lang="${esc(v.lang)}">${esc(v.caption)}</textarea>
         <div class="row"><button class="ghost" data-act="save" data-lang="${esc(v.lang)}">Text speichern</button>
-          <button class="ghost" data-act="copy" data-lang="${esc(v.lang)}">Text kopieren</button></div>`).join('')}
+          <button class="ghost" data-act="copy" data-lang="${esc(v.lang)}">Text kopieren</button></div>
+        <div class="row">
+          <button class="ok" data-act="share" data-kind="portrait" data-lang="${esc(v.lang)}">📲 Beitrag teilen</button>
+          <button class="ok" data-act="share" data-kind="story" data-lang="${esc(v.lang)}">📲 Story teilen</button>
+          <button class="ok" data-act="share" data-kind="reel" data-lang="${esc(v.lang)}">🎬 Reel teilen</button>
+        </div>`).join('')}
       <div class="row"><button class="ok" data-act="approved">Freigeben</button><button class="no" data-act="rejected">Ablehnen</button>${d.status === 'rejected' ? '<button class="no" data-act="delete">🗑 Löschen</button>' : ''}</div>
     </div>`).join('') || '<p>Noch keine Entwürfe.</p>';
 }
@@ -225,6 +230,7 @@ $('#list').onclick = async (e) => {
   if (act === 'photo-pick') return regen(box, 'photo-pick', Number(b.dataset.pid));
   if (['photo', 'photo-auto', 'photo-ai', 'text', 'all'].includes(act)) return regen(box, act);
   if (act === 'langs') return regen(box, 'langs', [...box.querySelectorAll('[data-lang-box]:checked')].map((i) => i.value));
+  if (act === 'share') return shareSlides(b, box);
   if (act === 'offer-next') return regen(box, 'offer-next');
   if (act === 'offer-list') {
     const sel = box.querySelector('select[data-act="offer-pick"]');
@@ -251,6 +257,80 @@ $('#list').onclick = async (e) => {
     $('#msg').textContent = 'Gespeichert.'; await load();
   } catch (err) { $('#msg').textContent = 'Fehler: ' + err.message; }
 };
+
+// ---- share to Instagram / Facebook / TikTok / WhatsApp via the phone's share menu ----
+// The phone's share sheet must open within a few seconds of the tap, so the slides are
+// loaded on the first tap ("vorbereiten") and shared on the second tap.
+const shareCache = new Map();
+async function shareSlides(b, box) {
+  const d = drafts.find((x) => x.id === box.dataset.id);
+  const v = d && d.versions.find((x) => x.lang === b.dataset.lang);
+  if (!v) return;
+  const key = `${d.id}|${v.lang}|${b.dataset.kind}|${d.updatedAt || ''}`;
+  const caption = box.querySelector(`textarea[data-lang="${b.dataset.lang}"]`).value;
+  if (!shareCache.has(key)) {
+    b.disabled = true; $('#msg').textContent = 'Bilder werden vorbereitet …';
+    try {
+      const reel = b.dataset.kind === 'reel';
+      const list = v.files.filter((f) => f.size === (reel ? 'story' : b.dataset.kind)).sort((x, y) => x.slide - y.slide);
+      if (reel) $('#msg').textContent = 'Reel wird erstellt … (ca. 15 Sekunden)';
+      const files = reel ? [await makeReel(list.map((f) => f.url), `media-${d.offer.to.name}-reel`.replace(/[^\w.-]+/g, '_'))] : await Promise.all(list.map(async (f) => {
+        const blob = await (await fetch(f.url)).blob();
+        return new File([blob], `media-${d.offer.to.name}-${f.size}-${f.slide}.jpg`.replace(/[^\w.-]+/g, '_'), { type: blob.type || 'image/jpeg' });
+      }));
+      shareCache.set(key, files);
+      b.textContent = '📲 Jetzt teilen'; $('#msg').textContent = 'Bereit – bitte nochmal tippen.';
+    } catch (err) { $('#msg').textContent = 'Fehler: ' + err.message; }
+    b.disabled = false;
+    return;
+  }
+  const files = shareCache.get(key);
+  try { await navigator.clipboard.writeText(caption); } catch { /* clipboard may be blocked; text is still in the box */ }
+  if (navigator.canShare && navigator.canShare({ files })) {
+    try { await navigator.share({ files }); $('#msg').textContent = 'Text ist kopiert – in der App einfügen.'; }
+    catch (err) { if (err.name !== 'AbortError') $('#msg').textContent = 'Fehler: ' + err.message; }
+  } else { // desktop: download the slides instead
+    for (const f of files) { const a = document.createElement('a'); a.href = URL.createObjectURL(f); a.download = f.name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000); }
+    $('#msg').textContent = 'Bilder heruntergeladen, Text kopiert.';
+  }
+}
+
+// Reel: the 3 story slides as a 12-second 1080x1920 video (slow zoom, soft cross-fades),
+// recorded in this browser. No music: add licensed "commercial" music inside the app.
+async function makeReel(urls, name) {
+  const imgs = await Promise.all(urls.map((u) => new Promise((ok, fail) => { const i = new Image(); i.onload = () => ok(i); i.onerror = fail; i.src = u; })));
+  const W = 1080, H = 1920, PER = 4000, FADE = 600, FPS = 30;
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  const type = ['video/mp4;codecs=avc1.640028', 'video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm']
+    .find((t) => window.MediaRecorder && MediaRecorder.isTypeSupported(t));
+  if (!type) throw new Error('Video wird von diesem Browser nicht unterstützt.');
+  const rec = new MediaRecorder(c.captureStream(FPS), { mimeType: type, videoBitsPerSecond: 8_000_000 });
+  const chunks = []; rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+  const done = new Promise((ok) => { rec.onstop = ok; });
+  const draw = (img, t, alpha) => { // t: 0..1 progress of this slide → zoom 1.0 → 1.06
+    const s = 1 + 0.06 * t; const w = W * s, h = H * s;
+    g.globalAlpha = alpha; g.drawImage(img, (W - w) / 2, (H - h) / 2, w, h);
+  };
+  rec.start(250);
+  const total = PER * imgs.length, start = performance.now();
+  await new Promise((ok) => {
+    const frame = () => {
+      const now = performance.now() - start;
+      if (now >= total) return ok();
+      const i = Math.min(imgs.length - 1, Math.floor(now / PER)), local = now - i * PER;
+      g.globalAlpha = 1; g.fillStyle = '#0a1838'; g.fillRect(0, 0, W, H);
+      draw(imgs[i], local / PER, 1);
+      if (i < imgs.length - 1 && local > PER - FADE) draw(imgs[i + 1], 0, (local - (PER - FADE)) / FADE);
+      requestAnimationFrame(frame);
+    };
+    frame();
+  });
+  rec.stop(); await done;
+  const mp4 = type.startsWith('video/mp4');
+  if (!mp4) $('#msg').textContent = 'Hinweis: Video im WebM-Format (Instagram/TikTok bevorzugen MP4).';
+  return new File(chunks, `${name}.${mp4 ? 'mp4' : 'webm'}`, { type: mp4 ? 'video/mp4' : 'video/webm' });
+}
 
 // ---- manual offers ----
 const readFile = (file) => new Promise((ok, fail) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = fail; r.readAsDataURL(file); });
