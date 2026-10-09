@@ -9,8 +9,8 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { getFlightOffers, getPackageOffers } = require('./offers');
-const { toDraftOffer, factLine, starText, offerKey } = require('./packages');
-const { buildCaption, formatDate, cityName, LANGS } = require('./captions');
+const { toDraftOffer, offerKey, countryName, cardFor } = require('./packages');
+const { buildCaption, formatDate, formatPrice, cityName, LANGS } = require('./captions');
 const { renderSlide, STYLE_BY_WEEKDAY, STYLES } = require('./render');
 const { generatePhoto } = require('./image');
 const { candidates: pexelsCandidates, download: pexelsDownload } = require('./pexels');
@@ -56,8 +56,13 @@ const QUERIES = {
   LIS: ['Lisbon tram sunny', 'Lisbon viewpoint', 'Lisbon city'],
   FCO: ['Rome Colosseum sunny', 'Rome street', 'Rome city view'],
 };
-const queriesFor = (offer) => QUERIES[offer.to.code] || (offer.kind === 'package'
-  ? [`${offer.to.name} beach sunny`, `${offer.to.name} ${offer.region || offer.country}`.trim(), `${offer.region || offer.country} coast`.trim()]
+const queriesFor = (offer) => QUERIES[offer.to.code] || (offer.kind === 'cruise'
+  ? [`${offer.to.name} river cruise`, `${offer.to.name} river sunny`, `${(offer.route || '').split(/[–,-]/)[0].trim()} river`]
+  : offer.kind === 'home'
+    ? [`${offer.to.name} ${offer.country} villa`.trim(), `${offer.to.name} ${offer.country}`.trim(), `${offer.country} countryside sunny`.trim()]
+    : offer.kind === 'package'
+  // Small towns have few photos: search town + country first, then the country's best-known views.
+  ? [`${offer.to.name} ${offer.country}`.trim(), `${offer.country || offer.region} coast sunny`.trim(), `${offer.country || offer.region} landmark`.trim(), `${offer.region} ${offer.country}`.trim()]
   : [`${offer.to.name} city sunny`, `${offer.to.name} travel`, offer.to.name]);
 
 /** Library photo (client decision: our library comes first), or null. */
@@ -72,7 +77,7 @@ async function findCandidates(draft) {
   for (const c of draft.photoCandidates || []) used.add(c.id); // "more photos" shows new ones
   let list = [];
   try { list = await pexelsCandidates(queriesFor(draft.offer), used, 15); } catch (err) { console.error('studio pexels:', err.message); }
-  const ranked = await rankPhotos(list, draft.offer.to.name);
+  const ranked = await rankPhotos(list, [draft.offer.to.name, draft.offer.country].filter(Boolean).join(', '));
   draft.photoCandidates = ranked.map((c) => ({ id: c.id, url: c.url, thumb: c.thumb, score: c.score, why: c.why || '' }));
 }
 
@@ -138,10 +143,8 @@ async function renderDraft(draft) {
       to: { city: local(draft.offer.to), code: draft.offer.to.code || '' },
       dates: datesText(draft.offer, lang), airline: draft.offer.airline,
       price: draft.offer.price,
-      kind: draft.offer.kind, hotel: draft.offer.hotel, stars: starText(draft.offer.stars),
-      pkgLine: draft.offer.kind === 'package' ? factLine(draft.offer, lang) : '',
-      // Country names come in German from specials, so they are shown on German slides only.
-      place: draft.offer.kind === 'package' ? [local(draft.offer.to), lang === 'de' ? draft.offer.country : ''].filter(Boolean).join(', ') : '',
+      kind: draft.offer.kind, card: draft.offer.kind === 'flight' || !draft.offer.kind ? null : cardFor(draft.offer, lang, formatPrice),
+      country: draft.offer.kind && draft.offer.kind !== 'flight' && draft.offer.country ? countryName(draft.offer.country, lang) : '',
     };
     const files = [];
     for (const size of ['story', 'portrait']) { // story first: it is posted first
@@ -204,6 +207,7 @@ async function createPackageDraft({ date = new Date(), offers = null, langs = nu
 
 /** Replace the offer of a draft (another destination); keeps style and languages. */
 async function changeOffer(draft, key) {
+  if (!['flight', 'package', undefined].includes(draft.offer.kind)) throw new Error('Nur bei Flug- und Paketangeboten möglich.');
   const kind = draft.offer.kind === 'package' ? 'package' : 'flight';
   const list = await liveOffers(kind);
   draft.skippedOffers = [...new Set([...(draft.skippedOffers || []), offerKey(draft.offer)])].slice(-50);
@@ -253,7 +257,7 @@ async function regenerate(draft, what, value) {
   if (what === 'all') await findCandidates(draft); // new ranked photos to choose from
   if (what === 'style') {
     if (!STYLES.includes(value)) throw new Error('unknown style');
-    if (draft.offer.kind === 'package' && value !== 'flight') throw new Error('Pauschalreisen nutzen die Glas-Vorlage.');
+    if (draft.offer.kind && draft.offer.kind !== 'flight' && value !== 'flight') throw new Error('Dieses Angebot nutzt die Glas-Vorlage.');
     draft.style = value;
   }
   if (what === 'langs') {

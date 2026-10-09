@@ -81,11 +81,17 @@ async function renderSlide(post, size, slide) {
     destination: post.destination, hook: post.hook,
     fromCity: post.from.city, fromCode: post.from.code, toCity: post.to.city, toCode: post.to.code,
     dates: '\u2066' + post.dates + '\u2069', price: '%%PRICE%%',
-    kind: post.kind === 'package' ? 'package' : 'flight',
-    hotel: post.hotel || '', stars: post.stars || '', pkgLine: post.pkgLine || '', place: post.place || '',
+    kind: post.card ? 'package' : 'flight', // every non-flight offer uses the hotel-style card
+    country: post.country || '', hotel: '', stars: '', pkgLine: '', place: '',
   };
-  if (post.kind === 'package') Object.assign(values, PACKAGE_LABELS[post.lang] || PACKAGE_LABELS.de);
-  const priceHtml = buildPriceHtml(post.price);
+  if (post.card) {
+    const c = post.card;
+    Object.assign(values, PACKAGE_LABELS[post.lang] || PACKAGE_LABELS.de);
+    if (c.kicker) values.kicker = c.kicker;
+    if (c.detailsTitle) values.detailsTitle = c.detailsTitle;
+    Object.assign(values, { hotel: c.title || '', stars: c.stars || '', place: c.place || '', pkgLine: c.line || '', perPerson: c.per || values.perPerson });
+  }
+  const priceHtml = buildPriceHtml(post.card ? post.card.priceValue : post.price);
   const tpl = fs.readFileSync(path.join(DIR, 'templates', post.style + '.html'), 'utf8');
   let html = tpl.replace(/\{\{(\w+)\}\}/g, (_, k) => (k === 'fontCss' || k === 'photo' ? `{{${k}}}` : esc(values[k])));
   // Trusted data URIs are inserted last (they are built here, never from user input).

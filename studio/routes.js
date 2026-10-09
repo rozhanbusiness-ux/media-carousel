@@ -8,6 +8,7 @@
 const path = require('path');
 const express = require('express');
 const store = require('./store');
+const { FEATURES, BOARD_KEYS } = require('./packages');
 const { offerChoices, createPackageDraft, saveToLibrary, deleteDraft, createDailyDraft, createManualDraft, regenerate } = require('./planner');
 const { STYLES } = require('./render');
 const { getFlightOffers } = require('./offers');
@@ -60,6 +61,38 @@ module.exports = function mountStudio(app) {
     } finally {
       generating = false;
     }
+  });
+
+  // Manual river cruise or holiday home (client decision: entered by hand, not available from specials).
+  router.post('/manual-extra', async (req, res) => {
+    const b = req.body || {};
+    const text = (v, min, max) => typeof v === 'string' && v.trim().length >= min && v.length <= max && !/[<>{}]/.test(v);
+    const int = (v, min, max) => Number.isInteger(v) && v >= min && v <= max;
+    const money = (v) => v === null || v === undefined || v === '' || (Number(v) > 0 && Number(v) < 100000);
+    const iso = (v) => v === '' || v === undefined || (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v)));
+    const photoOk = !b.photo || (typeof b.photo === 'string' && b.photo.length < 12000000 && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(b.photo));
+    const id = require('crypto').randomBytes(4).toString('hex');
+    let offer = null;
+    if (b.kind === 'cruise' && text(b.ship, 2, 80) && text(b.river, 2, 60) && text(b.route, 2, 120) && int(b.nights, 1, 60)
+      && iso(b.startDate) && (b.board === '' || Object.hasOwn(BOARD_KEYS, b.board)) && Number(b.price) > 0 && Number(b.price) < 100000) {
+      offer = { kind: 'cruise', key: 'c-' + id, to: { code: '', name: b.river.trim() }, ship: b.ship.trim(), route: b.route.trim(),
+        nights: b.nights, startDate: b.startDate || '', board: b.board, price: Number(b.price), country: '' };
+    }
+    const feats = Array.isArray(b.features) ? b.features : [];
+    if (b.kind === 'home' && text(b.home, 2, 80) && text(b.place, 2, 60) && (b.country === '' || text(b.country, 2, 60))
+      && int(b.persons, 1, 40) && int(b.bedrooms, 0, 20) && (b.nights === null || int(b.nights, 1, 60))
+      && feats.length <= 6 && feats.every((f) => typeof f === 'string' && Object.hasOwn(FEATURES, f)) && money(b.priceNight) && money(b.priceTotal)
+      && (Number(b.priceNight) > 0 || (Number(b.priceTotal) > 0 && b.nights))) {
+      offer = { kind: 'home', key: 'h-' + id, to: { code: '', name: b.place.trim() }, country: (b.country || '').trim(), home: b.home.trim(),
+        persons: b.persons, bedrooms: b.bedrooms, nights: b.nights || null, features: [...new Set(feats)],
+        priceNight: Number(b.priceNight) || 0, priceTotal: Number(b.priceTotal) || 0, price: Number(b.priceNight) || Number(b.priceTotal) };
+    }
+    if (!offer || !photoOk) return res.status(400).json({ error: 'invalid offer data' });
+    if (generating) return res.status(429).json({ error: 'already generating' });
+    generating = true;
+    try { res.json(await createManualDraft({ offer, style: 'flight', photo: b.photo || null, langs: cleanLangs(b.langs) })); }
+    catch (err) { console.error('studio manual extra:', err.message); res.status(500).json({ error: err.message }); }
+    finally { generating = false; }
   });
 
   // Manual offer (typed in, or extracted from a screenshot/PDF in the page first).

@@ -39,6 +39,7 @@
   .s1 .title { font-size: calc(230 * var(--u)); line-height: .95; margin: 0 0 calc(34 * var(--u));
     text-shadow: 0 6px 30px rgba(0,0,0,.45); }
   .rtl .s1 .title { font-weight: 700; font-size: calc(140 * var(--u)); line-height: 1.15; margin-bottom: calc(26 * var(--u)); }
+  .s1 .country { font-size: calc(26 * var(--u)); margin: calc(-18 * var(--u)) 0 calc(30 * var(--u)); }
   .s1 .hook { font-size: calc(44 * var(--u)); font-weight: 700; line-height: 1.32; max-width: calc(840 * var(--u)); margin: 0 auto; text-wrap: balance; }
   .s1 .swipe { margin-top: calc(34 * var(--u)); font-size: calc(20 * var(--u)); color: rgba(255,255,255,.75); }
   .story .s1 .block { bottom: 300px; }
@@ -98,6 +99,7 @@
     <div class="block" data-only="1">
       <div class="kicker tracking gold">{{kicker}}</div>
       <div class="title {{titleClass}}">{{destination}}</div>
+      <div class="country tracking gold pkg">{{country}}</div>
       <div class="hook">{{hook}}</div>
       <div class="swipe">{{swipe}}</div>
     </div>

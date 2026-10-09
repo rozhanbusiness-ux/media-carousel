@@ -8,7 +8,7 @@
 // ============================================================
 
 const config = require('../config');
-const { factLine, starText } = require('./packages');
+const { factLine, starText, countryName, cardFor } = require('./packages');
 
 const TEXT_MODEL = 'gemini-2.5-flash';
 const LANGS = ['de', 'ar', 'ckb'];
@@ -151,9 +151,11 @@ async function buildCaption(flight, lang, fetchImpl = fetch) {
   if (!LANGS.includes(lang)) throw new Error('unsupported language: ' + lang);
   const f = FIXED[lang];
   const isPackage = flight.kind === 'package';
-  const offer = isPackage ? {
-    kind: 'package holiday (hotel + flight)', toName: cityName(flight.to, lang), fromName: 'Germany',
-    hotel: flight.hotel, region: flight.region, country: flight.country,
+  const isCard = ['package', 'cruise', 'home'].includes(flight.kind);
+  const PRODUCT = { package: 'package holiday (hotel + flight)', cruise: 'river cruise', home: 'holiday home / villa rental' };
+  const offer = isCard ? {
+    kind: PRODUCT[flight.kind], toName: cityName(flight.to, lang), fromName: 'Germany',
+    hotel: flight.hotel || flight.ship || flight.home, region: flight.region || flight.route || '', country: flight.country || '',
   } : {
     kind: flight.kind || 'flight',
     fromName: cityName(flight.from, lang), toName: cityName(flight.to, lang),
@@ -173,14 +175,20 @@ async function buildCaption(flight, lang, fetchImpl = fetch) {
   const body = aiOk ? ai.body.trim() : f.fallbackBody;
   const hashtags = ((aiOk && Array.isArray(ai.hashtags)) ? ai.hashtags.filter(isSafeHashtag) : [])
     .concat([tagWord(offer.toName), tagWord(offer.toName + (lang === 'de' ? 'Urlaub' : '')), ...BASE_TAGS[lang], '#MediaTravel', '#MediaTravelTourism'])
-    .map((t) => (isPackage && t === '#Flugangebot' ? '#Pauschalreise' : t))
+    .map((t) => (isCard && t === '#Flugangebot' ? ({ package: '#Pauschalreise', cruise: '#Flusskreuzfahrt', home: '#Ferienhaus' })[flight.kind] : t))
     .filter((t, i, all) => isSafeHashtag(t) && all.indexOf(t) === i)
     .slice(0, 22);
 
   // Facts are written by code only.
-  const facts = isPackage ? [
+  const card = isCard && !isPackage ? cardFor(flight, lang, formatPrice) : null;
+  const facts = card ? [
+    `${flight.kind === 'cruise' ? '🚢' : '🏡'} ${card.title}`,
+    card.place ? `📍 ${card.place}` : '',
+    card.line ? `✨ ${card.line}` : '',
+    `💶 ${f.from} ${formatPrice(card.priceValue)} ${card.per}`,
+  ].filter(Boolean) : isPackage ? [
     `🏨 ${flight.hotel} ${starText(flight.stars)}`.trim(),
-    `📍 ${[offer.toName, flight.region, flight.country].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).join(', ')}`,
+    `📍 ${[offer.toName, lang === 'de' ? flight.region : '', countryName(flight.country, lang)].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).join(', ')}`,
     factLine(flight, lang) ? `🌙 ${factLine(flight, lang)}` : '',
     `💶 ${f.from} ${formatPrice(flight.price)} ${f.perPerson}`,
   ].filter(Boolean) : [

@@ -59,6 +59,39 @@
     <span style="font-size:12px;color:#8e98b3">(leer = automatisch)</span>
   </div>
   <details class="manual">
+    <summary>+ Flusskreuzfahrt oder Ferienhaus (manuell)</summary>
+    <div class="row"><label>Art <select id="xKind"><option value="cruise">🚢 Flusskreuzfahrt</option><option value="home">🏡 Ferienhaus</option></select></label></div>
+    <div class="form" data-x="cruise">
+      <label>Schiff<input id="xShip" maxlength="80"></label>
+      <label>Fluss<input id="xRiver" maxlength="60" placeholder="Donau"></label>
+      <label class="full">Route<input id="xRoute" maxlength="120" placeholder="Passau – Wien – Budapest"></label>
+      <label>Start<input id="xStart" type="date"></label>
+      <label>Nächte<input id="xNightsC" type="number" min="1" max="60"></label>
+      <label>Verpflegung<select id="xBoard"><option value="">–</option><option value="full">Vollpension</option><option value="half">Halbpension</option><option value="breakfast">Frühstück</option><option value="all">All Inclusive</option><option value="none">Nur Übernachtung</option></select></label>
+      <label>Preis ab (€ p. P.)<input id="xPriceC" type="number" min="1" step="0.01"></label>
+    </div>
+    <div class="form" data-x="home" hidden>
+      <label>Name des Hauses<input id="xHome" maxlength="80"></label>
+      <label>Ort<input id="xPlace" maxlength="60"></label>
+      <label>Land<input id="xCountry" maxlength="60" placeholder="Spanien"></label>
+      <label>Personen (max.)<input id="xPersons" type="number" min="1" max="40"></label>
+      <label>Schlafzimmer<input id="xBedrooms" type="number" min="0" max="20"></label>
+      <label>Nächte (optional)<input id="xNightsH" type="number" min="1" max="60"></label>
+      <label>Preis pro Nacht (€)<input id="xPriceN" type="number" min="1" step="0.01"></label>
+      <label>Preis gesamt (€, optional)<input id="xPriceT" type="number" min="1" step="0.01"></label>
+      <div class="full pick" id="xFeatures">
+        <label><input type="checkbox" value="pool"> Pool</label><label><input type="checkbox" value="sea"> Meerblick</label>
+        <label><input type="checkbox" value="garden"> Garten</label><label><input type="checkbox" value="wifi"> WLAN</label>
+        <label><input type="checkbox" value="parking"> Parkplatz</label><label><input type="checkbox" value="pets"> Haustiere</label>
+      </div>
+    </div>
+    <div class="form">
+      <label>Eigenes Foto (empfohlen)<input id="xPhoto" type="file" accept="image/jpeg,image/png,image/webp"></label>
+      <div class="full"><button class="primary" id="xGo">Entwurf erstellen</button></div>
+    </div>
+  </details>
+
+  <details class="manual">
     <summary>+ Eigenes Angebot (manuell, Screenshot oder PDF)</summary>
     <div class="row">
       <label class="ghost" style="padding:10px 16px;border-radius:999px;cursor:pointer">📷 Screenshot<input id="shot" type="file" accept="image/*" hidden></label>
@@ -105,7 +138,7 @@ function render(drafts) {
   $('#list').innerHTML = drafts.map((d) => `
     <div class="draft" data-id="${esc(d.id)}">
       <div class="meta"><span class="badge ${esc(d.status)}">${esc(d.status)}</span>
-        <span>${esc(d.forDate)}</span><span>${d.offer.kind === 'package' ? '🏨 ' + esc(d.offer.to.name) + ' – ' + esc(d.offer.hotel) : esc(d.offer.from.name) + ' → ' + esc(d.offer.to.name)}</span>
+        <span>${esc(d.forDate)}</span><span>${d.offer.kind && d.offer.kind !== 'flight' ? ({ package: '🏨 ', cruise: '🚢 ', home: '🏡 ' })[d.offer.kind] + esc(d.offer.to.name) + (d.offer.country ? ', ' + esc(d.offer.country) : '') + ' – ' + esc(d.offer.hotel || d.offer.ship || d.offer.home) : esc(d.offer.from.name) + ' → ' + esc(d.offer.to.name)}</span>
         <span>${esc(d.offer.price)} €</span></div>
       ${(d.photoCandidates || []).length ? `
         <div class="photo-pick"><h3>Foto wählen <small>(beste zuerst, Bewertung durch KI)</small></h3>
@@ -140,6 +173,21 @@ function render(drafts) {
 let drafts = [];
 async function load() { drafts = await api('/api/studio/drafts'); render(drafts); }
 
+$('#xKind').onchange = () => document.querySelectorAll('[data-x]').forEach((el) => { el.hidden = el.dataset.x !== $('#xKind').value; });
+$('#xGo').onclick = async () => {
+  const kind = $('#xKind').value; const num = (id) => ($(id).value === '' ? null : Number($(id).value));
+  const body = kind === 'cruise'
+    ? { kind, ship: $('#xShip').value, river: $('#xRiver').value, route: $('#xRoute').value, startDate: $('#xStart').value, nights: num('#xNightsC'), board: $('#xBoard').value, price: num('#xPriceC') }
+    : { kind, home: $('#xHome').value, place: $('#xPlace').value, country: $('#xCountry').value, persons: num('#xPersons'), bedrooms: num('#xBedrooms') ?? 0,
+        nights: num('#xNightsH'), priceNight: num('#xPriceN'), priceTotal: num('#xPriceT'), features: [...document.querySelectorAll('#xFeatures input:checked')].map((i) => i.value) };
+  if ($('#xPhoto').files[0]) body.photo = await readFile($('#xPhoto').files[0]);
+  if (defLangs().length) body.langs = defLangs();
+  $('#xGo').disabled = true; $('#msg').textContent = 'Erstelle Entwurf … (ca. 1 Minute)';
+  try { await api('/api/studio/manual-extra', { method: 'POST', body: JSON.stringify(body) }); $('#msg').textContent = 'Fertig.'; await load(); }
+  catch (e) { $('#msg').textContent = 'Fehler: ' + (e.message === 'invalid offer data' ? 'Bitte alle Pflichtfelder prüfen.' : e.message); }
+  $('#xGo').disabled = false;
+};
+
 $('#genPkg').onclick = async () => {
   $('#genPkg').disabled = true; $('#msg').textContent = 'Erstelle Paket-Entwurf … (ca. 1 Minute)';
   try { await api('/api/studio/drafts/package', { method: 'POST', body: JSON.stringify(defLangs().length ? { langs: defLangs() } : {}) }); $('#msg').textContent = 'Fertig.'; await load(); }
@@ -149,7 +197,12 @@ $('#genPkg').onclick = async () => {
 
 $('#gen').onclick = async () => {
   $('#gen').disabled = true; $('#msg').textContent = 'Erstelle Entwurf … (ca. 1 Minute)';
-  try { await api('/api/studio/drafts', { method: 'POST', body: JSON.stringify(defLangs().length ? { langs: defLangs() } : {}) }); $('#msg').textContent = 'Fertig.'; await load(); }
+  try {
+    await api('/api/studio/drafts', { method: 'POST', body: JSON.stringify(defLangs().length ? { langs: defLangs() } : {}) });
+    // Weekly plan: Tuesday river cruise, Friday holiday home (entered by hand).
+    const extra = { 2: ' Heute zusätzlich: Flusskreuzfahrt manuell anlegen.', 5: ' Heute zusätzlich: Ferienhaus manuell anlegen.' }[new Date().getDay()] || '';
+    $('#msg').textContent = 'Fertig.' + extra; await load();
+  }
   catch (e) { $('#msg').textContent = 'Fehler: ' + e.message; }
   $('#gen').disabled = false;
 };
