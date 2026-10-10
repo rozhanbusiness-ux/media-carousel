@@ -9,6 +9,7 @@ const path = require('path');
 const express = require('express');
 const store = require('./store');
 const music = require('./music');
+const ownOffers = require('./own-offers');
 const { FEATURES, BOARD_KEYS } = require('./packages');
 const { createBundleDraft, offerChoices, createPackageDraft, saveToLibrary, deleteDraft, createDailyDraft, createManualDraft, regenerate } = require('./planner');
 const { STYLES } = require('./render');
@@ -192,6 +193,17 @@ module.exports = function mountStudio(app) {
     if (generating) return res.status(429).json({ error: 'busy' });
     deleteDraft(draft);
     res.json({ ok: true });
+  });
+
+  // "Eigene Angebote": the client's own offers (studio/own-offers.js).
+  router.get('/own-offers', (req, res) => res.json(ownOffers.list()));
+  router.post('/own-offers', (req, res) => {
+    try { res.json(ownOffers.add(req.body)); }
+    catch (err) { res.status(400).json({ error: err.message === 'full' ? `Maximal ${ownOffers.MAX} eigene Angebote.` : 'Bitte alle Pflichtfelder korrekt ausfüllen.' }); }
+  });
+  router.delete('/own-offers/:key', (req, res) => {
+    if (!ownOffers.isOwnKey(req.params.key)) return res.status(400).json({ error: 'bad key' });
+    res.status(ownOffers.remove(req.params.key) ? 200 : 404).json({});
   });
 
   // Reel music: the client's own licensed MP3s (studio/music.js).

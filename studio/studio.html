@@ -121,6 +121,33 @@
     <div id="bundleList" class="pick" style="max-height:340px;overflow:auto"></div>
     <div class="row"><button class="primary" id="bundleGo">Sammel-Beitrag erstellen</button><span id="bundleCount"></span></div>
   </div>
+  <details class="manual" id="own">
+    <summary>📝 Eigene Angebote (bleiben gespeichert bis zum Ablaufdatum)</summary>
+    <div class="row"><label>Art <select id="oKind"><option value="flight">✈️ Flug</option><option value="package">🏨 Pauschalreise</option></select></label></div>
+    <div class="form" data-o="flight">
+      <label>Von (Stadt)<input id="oFrom" maxlength="60"></label>
+      <label>Flughafen-Code (optional)<input id="oFromCode" maxlength="3" placeholder="DUS"></label>
+      <label>Nach (Stadt)<input id="oTo" maxlength="60"></label>
+      <label>Flughafen-Code (optional)<input id="oToCode" maxlength="3" placeholder="EBL"></label>
+      <label>Hinflug<input id="oDep" type="date"></label>
+      <label>Rückflug (optional)<input id="oRet" type="date"></label>
+    </div>
+    <div class="form" data-o="package" hidden>
+      <label>Hotel<input id="oHotel" maxlength="120"></label>
+      <label>Sterne<select id="oStars"><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option><option value="0">–</option></select></label>
+      <label>Ort<input id="oCity" maxlength="60"></label>
+      <label>Land (deutsch)<input id="oCountry" maxlength="60" placeholder="Türkei"></label>
+      <label>Nächte<input id="oNights" type="number" min="1" max="60" value="7"></label>
+      <label>Verpflegung<select id="oBoard"><option value="all">All Inclusive</option><option value="full">Vollpension</option><option value="half">Halbpension</option><option value="breakfast">Frühstück</option><option value="none">Nur Übernachtung</option></select></label>
+      <label class="chk"><input type="checkbox" id="oFlight" checked> inkl. Flug</label>
+    </div>
+    <div class="form">
+      <label>Preis ab (€ p. P.)<input id="oPrice" type="number" min="1" step="0.01"></label>
+      <label>Gültig bis<input id="oValid" type="date"></label>
+      <div class="full"><button class="primary" id="oGo">Angebot speichern</button></div>
+    </div>
+    <div id="ownList"></div>
+  </details>
   <details id="music">
     <summary>🎵 Reel-Musik (eigene MP3, z. B. Pixabay Music)</summary>
     <div class="row">
@@ -279,6 +306,34 @@ $('#bundleGo').onclick = async () => {
   } catch (err) { $('#msg').textContent = 'Fehler: ' + err.message; }
   $('#bundleGo').disabled = false;
 };
+
+// ---- "Eigene Angebote": saved own offers, listed with the specials offers of their kind ----
+$('#oKind').onchange = () => document.querySelectorAll('[data-o]').forEach((f) => { f.hidden = f.dataset.o !== $('#oKind').value; });
+async function loadOwn() {
+  let list = [];
+  try { list = await api('/api/studio/own-offers'); } catch { /* shown empty */ }
+  $('#ownList').innerHTML = list.length ? list.map((o) => `<div class="row" style="align-items:center;gap:8px">
+    <span>${o.kind === 'package' ? '🏨 ' + esc(o.to.name) + ' – ' + esc(o.hotel) : '✈️ ' + esc(o.from.name) + ' → ' + esc(o.to.name) + ' (' + esc(o.departureDate) + ')'}
+    · ${esc(o.price)} € · bis ${esc(o.validUntil)}</span><button class="ghost" data-del-own="${esc(o.key)}">Löschen</button></div>`).join('')
+    : '<p>Noch keine eigenen Angebote.</p>';
+}
+$('#ownList').onclick = async (e) => {
+  const k = e.target.dataset.delOwn;
+  if (!k || !confirm('Dieses Angebot löschen?')) return;
+  try { await api('/api/studio/own-offers/' + k, { method: 'DELETE' }); await loadOwn(); } catch (err) { $('#msg').textContent = 'Fehler: ' + err.message; }
+};
+$('#oGo').onclick = async () => {
+  const kind = $('#oKind').value;
+  const body = kind === 'flight'
+    ? { kind, fromName: $('#oFrom').value, fromCode: $('#oFromCode').value.toUpperCase(), toName: $('#oTo').value, toCode: $('#oToCode').value.toUpperCase(),
+        departureDate: $('#oDep').value, returnDate: $('#oRet').value }
+    : { kind, hotel: $('#oHotel').value, stars: Number($('#oStars').value), city: $('#oCity').value, country: $('#oCountry').value,
+        nights: Number($('#oNights').value), board: $('#oBoard').value, withFlight: $('#oFlight').checked };
+  Object.assign(body, { price: $('#oPrice').value, validUntil: $('#oValid').value || (kind === 'flight' ? $('#oDep').value : '') });
+  try { await api('/api/studio/own-offers', { method: 'POST', body: JSON.stringify(body) }); $('#msg').textContent = 'Angebot gespeichert.'; await loadOwn(); }
+  catch (err) { $('#msg').textContent = 'Fehler: ' + err.message; }
+};
+loadOwn();
 
 async function load() { drafts = await api('/api/studio/drafts'); render(drafts); }
 

@@ -16,6 +16,7 @@ const { generatePhoto } = require('./image');
 const { candidates: pexelsCandidates, download: pexelsDownload } = require('./pexels');
 const { rankPhotos } = require('./photo-rank');
 const store = require('./store');
+const ownOffers = require('./own-offers');
 const { createBundleDraft: buildBundle, regenerateBundle, deleteBundlePhotos } = require('./bundle');
 
 const ROOT = path.join(__dirname, '..');
@@ -56,8 +57,16 @@ const QUERIES = {
   HRG: ['Hurghada beach', 'Red Sea beach Egypt'],
   LIS: ['Lisbon tram sunny', 'Lisbon viewpoint', 'Lisbon city'],
   FCO: ['Rome Colosseum sunny', 'Rome street', 'Rome city view'],
+  ISU: ['Sulaymaniyah city', 'Sulaymaniyah Kurdistan', 'Kurdistan mountains green', 'Iraqi Kurdistan landscape'],
 };
-const queriesFor = (offer) => QUERIES[offer.to.code] || (offer.kind === 'cruise'
+// Places without an airport code (e.g. own offers), by name.
+const NAME_QUERIES = {
+  erbil: QUERIES.EBL, sulaymaniyah: QUERIES.ISU, slemani: QUERIES.ISU,
+  duhok: ['Duhok city', 'Duhok Kurdistan', 'Duhok dam lake', 'Kurdistan mountains green'],
+  dohuk: ['Duhok city', 'Duhok Kurdistan', 'Duhok dam lake', 'Kurdistan mountains green'],
+  zakho: ['Zakho Delal bridge', 'Zakho Kurdistan', 'Kurdistan river mountains'],
+};
+const queriesFor = (offer) => QUERIES[offer.to.code] || NAME_QUERIES[(offer.to.name || '').trim().toLowerCase()] || (offer.kind === 'cruise'
   ? [`${offer.to.name} river cruise`, `${offer.to.name} river sunny`, `${(offer.route || '').split(/[–,-]/)[0].trim()} river`]
   : offer.kind === 'home'
     ? [`${offer.to.name} ${offer.country} villa`.trim(), `${offer.to.name} ${offer.country}`.trim(), `${offer.country} countryside sunny`.trim()]
@@ -118,15 +127,16 @@ const pickOffer = (offers, recent, skip = new Set()) => offers.find((o) => !rece
 /** Live offers of one kind, in the draft offer shape. */
 // Packages: specials top offers + last-minute offers, cheapest hotel per destination only
 // (the feed lists each destination several times with different hotels).
+// The client's own offers ("Eigene Angebote") are always added to their kind's list.
 async function liveOffers(kind) {
-  if (kind !== 'package') return getFlightOffers();
+  if (kind !== 'package') return [...ownOffers.list('flight'), ...(await getFlightOffers())].sort((a, b) => a.price - b.price);
   const [top, last] = await Promise.all([getPackageOffers('package'), getPackageOffers('lastminute')]);
   const best = new Map();
   for (const o of [...top, ...last].map(toDraftOffer).filter((x) => x.to.name)) {
     const k = destKey(o) + '|' + (o.country || '');
     if (!best.has(k) || o.price < best.get(k).price) best.set(k, o);
   }
-  return [...best.values()].sort((a, b) => a.price - b.price);
+  return [...ownOffers.list('package'), ...best.values()].sort((a, b) => a.price - b.price);
 }
 
 function datesText(offer, lang) {
@@ -237,7 +247,7 @@ async function changeOffer(draft, key) {
 async function offerChoices(kind) {
   return (await liveOffers(kind === 'package' ? 'package' : 'flight')).map((o) => ({
     key: offerKey(o), price: o.price, dest: destKey(o),
-    label: o.kind === 'package' ? `${o.to.name} – ${o.hotel}` : `${o.from.name} → ${o.to.name} (${o.departureDate})`,
+    label: (o.own ? '⭐ ' : '') + (o.kind === 'package' ? `${o.to.name} – ${o.hotel}` : `${o.from.name} → ${o.to.name} (${o.departureDate})`),
   }));
 }
 

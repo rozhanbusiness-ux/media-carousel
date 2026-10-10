@@ -74,6 +74,25 @@ async function photoFor(offer, used, queriesFor, choosePhoto) {
   return { file: null, pexelsId: best.id, dataUri: await pexelsDownload(best.url) };
 }
 
+// Cover photo: about the offer TYPE, not a destination (client decision), e.g. a passenger plane.
+const COVER_QUERIES = {
+  flight: ['airplane flying blue sky', 'passenger airplane clouds sunny', 'airplane wing above clouds', 'airliner sky'],
+  package: ['luxury beach resort pool', 'resort pool sea view sunny', 'luxury hotel pool palm trees', 'beach resort aerial'],
+};
+const COVER_SUBJECT = {
+  flight: 'a flight offer (a passenger airplane in a bright sky, elegant; any destination)',
+  package: 'a holiday package offer (a bright, luxurious beach resort or hotel pool; any destination)',
+};
+async function coverPhoto(kind, used) {
+  let list = [];
+  try { list = await pexelsCandidates(COVER_QUERIES[kind], used, 10); } catch (err) { console.error('studio bundle cover:', err.message); }
+  const ranked = await rankPhotos(list, COVER_SUBJECT[kind]);
+  const best = ranked.find((c) => c.score == null || c.score >= 5) || ranked[0];
+  if (!best) return null;
+  used.add(best.id);
+  return { pexelsId: best.id, dataUri: await pexelsDownload(best.url) };
+}
+
 async function pickPhotos(draft, queriesFor, choosePhoto) {
   const used = new Set(store.listDrafts().flatMap((d) => [d.pexelsId, ...(d.pexelsIds || []), d.photoFile]).filter(Boolean));
   for (const id of draft.pexelsIds || []) used.add(id); // "new photos" shows other ones
@@ -84,6 +103,9 @@ async function pickPhotos(draft, queriesFor, choosePhoto) {
     fs.writeFileSync(photoPath(draft.id, n), p.dataUri);
     draft.pexelsIds.push(p.pexelsId || p.file);
   }
+  const cover = await coverPhoto(draft.bundleKind || 'flight', used);
+  fs.writeFileSync(photoPath(draft.id, 'cover'), cover ? cover.dataUri : ''); // empty: first offer's photo is used
+  if (cover) draft.pexelsIds.push(cover.pexelsId);
 }
 
 function postFor(o, lang, photo) {
@@ -99,12 +121,14 @@ function postFor(o, lang, photo) {
 
 async function renderBundle(draft) {
   const photos = draft.offers.map((_, n) => fs.readFileSync(photoPath(draft.id, n), 'utf8'));
+  let coverImg = '';
+  try { coverImg = fs.readFileSync(photoPath(draft.id, 'cover'), 'utf8'); } catch { /* older draft */ }
   const stamp = Date.now().toString(36);
   const versions = [];
   for (const lang of draft.langs) {
     const posts = draft.offers.map((o, n) => postFor(o, lang, photos[n]));
     const title = titleOf(draft, lang);
-    const cover = { ...posts[0], kind: 'flight', card: null, country: '', destination: title,
+    const cover = { ...posts[0], photo: coverImg || photos[0], kind: 'flight', card: null, country: '', destination: title,
       hook: draft.offers.map((o) => local(o.to, lang)).join(' · '), labels: { kicker: COVER[lang].kicker, swipe: COVER[lang].swipe } };
     const slides = [[cover, 1], ...posts.map((p) => [p, 2]), [posts[0], 3]];
     const files = [];
@@ -130,7 +154,7 @@ async function createBundleDraft({ kind, keys, langs, date, liveOffers, queriesF
   if (!KINDS.includes(kind)) throw new Error('unknown kind');
   if (!Array.isArray(keys) || keys.length < MIN || keys.length > MAX) throw new Error(`Bitte ${MIN} bis ${MAX} Angebote wählen.`);
   const all = await liveOffers(kind);
-  if (keys.some((k) => (kind === 'package') !== k.startsWith('p-'))) throw new Error('Nur eine Angebotsart pro Beitrag.');
+  if (keys.some((k) => (kind === 'package') !== /^m?p-/.test(k))) throw new Error('Nur eine Angebotsart pro Beitrag.');
   const offers = keys.map((k) => all.find((o) => offerKey(o) === k));
   if (offers.some((o) => !o || (o.kind || 'flight') !== kind)) throw new Error('Ein Angebot ist nicht mehr verfügbar – bitte Liste neu laden.');
   if (new Set(offers.map((o) => o.to.code || o.to.name)).size !== offers.length) throw new Error('Jede Destination nur einmal pro Beitrag.');
@@ -162,6 +186,7 @@ function deleteBundlePhotos(draft) {
   for (let n = 0; n < (draft.offers || []).length; n++) {
     try { fs.unlinkSync(photoPath(draft.id, n)); } catch { /* none */ }
   }
+  try { fs.unlinkSync(photoPath(draft.id, 'cover')); } catch { /* none */ }
 }
 
 module.exports = { KINDS, TITLES, MIN, MAX, bundleCaption, offerLine, createBundleDraft, regenerateBundle, deleteBundlePhotos };
