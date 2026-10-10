@@ -43,6 +43,8 @@ function ctaButton() {
   return /^\+?[0-9 ]{6,20}$/.test(n) ? '\u2066WhatsApp ' + n + '\u2069' : 'media-travels.com';
 }
 
+const validPhoto = (p) => /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(p || '');
+
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 let FONT_CSS = null;
@@ -120,12 +122,12 @@ async function renderSlide(post, size, slide) {
   let html = tpl.replace(/\{\{(\w+)\}\}/g, (_, k) => (k === 'fontCss' || k === 'photo' ? `{{${k}}}` : esc(values[k])));
   // Trusted data URIs are inserted last (they are built here, never from user input).
   // Readability on busy photos: soft shadow behind light text (not on the light-background styles).
-  const shadow = PRICE_CSS + SLOGAN_CSS + FRAME_CSS + (post.bundle ? '.dots{display:none!important}' : '') + (['flight-postcard'].includes(post.style) ? ''
+  const shadow = PRICE_CSS + SLOGAN_CSS + FRAME_CSS + (post.bundle ? '.dots{display:none!important}' : '') + (validPhoto(post.photo) ? '' : 'img[src=""]{visibility:hidden!important}') + (['flight-postcard'].includes(post.style) ? ''
     : '.post :is(.title,.hook,.h,.big,.sub,.kicker,.trk,.caps,.swipe){text-shadow:0 2px 18px rgba(0,0,0,.65),0 0 2px rgba(0,0,0,.35)}');
   html = html.replace('<link rel="stylesheet" href="{{fontCss}}" />', `<style>${fontCss()}${shadow}</style>`)
     .replace(/%%PRICE%%/g, priceHtml)
     .replace(/%%SLOGAN%%/g, SLOGAN_HTML)
-    .replace(/\{\{photo\}\}/g, /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(post.photo) ? post.photo : '');
+    .replace(/\{\{photo\}\}/g, validPhoto(post.photo) ? post.photo : '');
   return renderToJpeg(html, size);
 }
 

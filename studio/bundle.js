@@ -15,6 +15,7 @@ const { renderSlide } = require('./render');
 const { candidates: pexelsCandidates, download: pexelsDownload } = require('./pexels');
 const { rankPhotos } = require('./photo-rank');
 const store = require('./store');
+const covers = require('./covers');
 
 const ROOT = path.join(__dirname, '..');
 const OUTPUT = path.join(ROOT, 'output');
@@ -74,23 +75,10 @@ async function photoFor(offer, used, queriesFor, choosePhoto) {
   return { file: null, pexelsId: best.id, dataUri: await pexelsDownload(best.url) };
 }
 
-// Cover photo: about the offer TYPE, not a destination (client decision), e.g. a passenger plane.
-const COVER_QUERIES = {
-  flight: ['airplane flying blue sky', 'passenger airplane clouds sunny', 'airplane wing above clouds', 'airliner sky'],
-  package: ['luxury beach resort pool', 'resort pool sea view sunny', 'luxury hotel pool palm trees', 'beach resort aerial'],
-};
-const COVER_SUBJECT = {
-  flight: 'a flight offer (a passenger airplane in a bright sky, elegant; any destination)',
-  package: 'a holiday package offer (a bright, luxurious beach resort or hotel pool; any destination)',
-};
+// Cover photo: about the offer TYPE, never a destination (client decision). The client's saved
+// covers come first (rotating), else the best-ranked Pexels photo (studio/covers.js).
 async function coverPhoto(kind, used) {
-  let list = [];
-  try { list = await pexelsCandidates(COVER_QUERIES[kind], used, 10); } catch (err) { console.error('studio bundle cover:', err.message); }
-  const ranked = await rankPhotos(list, COVER_SUBJECT[kind]);
-  const best = ranked.find((c) => c.score == null || c.score >= 5) || ranked[0];
-  if (!best) return null;
-  used.add(best.id);
-  return { pexelsId: best.id, dataUri: await pexelsDownload(best.url) };
+  return covers.next(kind) || (await covers.auto(kind, used));
 }
 
 async function pickPhotos(draft, queriesFor, choosePhoto) {
@@ -104,8 +92,9 @@ async function pickPhotos(draft, queriesFor, choosePhoto) {
     draft.pexelsIds.push(p.pexelsId || p.file);
   }
   const cover = await coverPhoto(draft.bundleKind || 'flight', used);
-  fs.writeFileSync(photoPath(draft.id, 'cover'), cover ? cover.dataUri : ''); // empty: first offer's photo is used
-  if (cover) draft.pexelsIds.push(cover.pexelsId);
+  if (!cover) throw new Error('Kein Cover-Foto gefunden – bitte unter „📸 Cover-Fotos“ eines speichern.');
+  fs.writeFileSync(photoPath(draft.id, 'cover'), cover.dataUri);
+  draft.pexelsIds.push(cover.pexelsId);
 }
 
 function postFor(o, lang, photo) {
@@ -128,7 +117,8 @@ async function renderBundle(draft) {
   for (const lang of draft.langs) {
     const posts = draft.offers.map((o, n) => postFor(o, lang, photos[n]));
     const title = titleOf(draft, lang);
-    const cover = { ...posts[0], photo: coverImg || photos[0], kind: 'flight', card: null, country: '', destination: title,
+    // Never a destination photo on the cover (client rule).
+    const cover = { ...posts[0], photo: coverImg, kind: 'flight', card: null, country: '', destination: title,
       hook: draft.offers.map((o) => local(o.to, lang)).join(' · '), labels: { kicker: COVER[lang].kicker, swipe: COVER[lang].swipe } };
     const slides = [[cover, 1], ...posts.map((p) => [p, 2]), [posts[0], 3]];
     const files = [];

@@ -10,6 +10,7 @@ const express = require('express');
 const store = require('./store');
 const music = require('./music');
 const ownOffers = require('./own-offers');
+const covers = require('./covers');
 const { FEATURES, BOARD_KEYS } = require('./packages');
 const { createBundleDraft, offerChoices, createPackageDraft, saveToLibrary, deleteDraft, createDailyDraft, createManualDraft, regenerate } = require('./planner');
 const { STYLES } = require('./render');
@@ -204,6 +205,30 @@ module.exports = function mountStudio(app) {
   router.delete('/own-offers/:key', (req, res) => {
     if (!ownOffers.isOwnKey(req.params.key)) return res.status(400).json({ error: 'bad key' });
     res.status(ownOffers.remove(req.params.key) ? 200 : 404).json({});
+  });
+
+  // Cover photos per offer type for multi-offer posts (studio/covers.js).
+  const coverKind = (k) => covers.KINDS.includes(k);
+  router.get('/covers', (req, res) => res.json(coverKind(req.query.kind) ? covers.list(req.query.kind) : []));
+  router.post('/covers/suggest', async (req, res) => {
+    if (!coverKind((req.body || {}).kind)) return res.status(400).json({ error: 'bad kind' });
+    try { res.json(await covers.suggest(req.body.kind)); } catch (err) { console.error('studio covers:', err.message); res.status(502).json({ error: 'Keine Vorschläge verfügbar.' }); }
+  });
+  router.post('/covers', async (req, res) => {
+    const { kind, id } = req.body || {};
+    if (!coverKind(kind) || !Number.isInteger(id)) return res.status(400).json({ error: 'bad request' });
+    try { await covers.save(kind, id); res.json({ ok: true }); }
+    catch (err) { res.status(400).json({ error: err.message === 'full' ? `Maximal ${covers.MAX_PER_KIND} Cover-Fotos pro Art.` : 'Foto nicht verfügbar – bitte Vorschläge neu laden.' }); }
+  });
+  router.get('/covers/:kind/:id', (req, res) => {
+    const uri = coverKind(req.params.kind) && /^\d{1,12}$/.test(req.params.id) ? covers.read(req.params.kind, Number(req.params.id)) : null;
+    const m = uri && /^data:(image\/(?:jpeg|png|webp));base64,(.+)$/.exec(uri);
+    if (!m) return res.status(404).end();
+    res.type(m[1]).send(Buffer.from(m[2], 'base64'));
+  });
+  router.delete('/covers/:kind/:id', (req, res) => {
+    const ok = coverKind(req.params.kind) && /^\d{1,12}$/.test(req.params.id) && covers.remove(req.params.kind, Number(req.params.id));
+    res.status(ok ? 200 : 404).json({});
   });
 
   // Reel music: the client's own licensed MP3s (studio/music.js).
