@@ -10,7 +10,7 @@ const path = require('path');
 const { renderToJpeg } = require('./browser');
 
 const DIR = __dirname;
-const STYLES = ['flight', 'flight-ticket', 'flight-split', 'flight-diagonal', 'flight-postcard', 'flight-ribbon', 'flight-band'];
+const STYLES = ['flight', 'flight-cover', 'flight-ticket', 'flight-split', 'flight-diagonal', 'flight-postcard', 'flight-ribbon', 'flight-band'];
 const SIZES = ['story', 'portrait', 'square'];
 
 // Monday..Sunday -> style (client decision 2026-10-08).
@@ -131,4 +131,7 @@ async function renderSlide(post, size, slide) {
   return renderToJpeg(html, size);
 }
 
-module.exports = { renderSlide, buildPriceHtml, STYLES, SIZES, STYLE_BY_WEEKDAY, LABELS };
+// Templates that also have the hotel card (package, cruise, holiday home posts).
+const PACKAGE_STYLES = ['flight', 'flight-cover'];
+
+module.exports = { PACKAGE_STYLES, renderSlide, buildPriceHtml, STYLES, SIZES, STYLE_BY_WEEKDAY, LABELS };

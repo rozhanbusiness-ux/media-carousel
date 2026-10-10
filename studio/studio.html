@@ -109,7 +109,7 @@
       <label>Preis ab (€)<input id="price" type="number" min="1" step="0.01" required></label>
       <label>Airline (optional)<input id="airline" maxlength="60"></label>
       <label>Design<select id="style"><option value="">Design des Tages</option>
-        <option value="flight">1 Glas</option><option value="flight-ticket">2 Bordkarte</option><option value="flight-split">3 Geteilt</option>
+        <option value="flight">1 Glas</option><option value="flight-cover">★ Magazin</option><option value="flight-ticket">2 Bordkarte</option><option value="flight-split">3 Geteilt</option>
         <option value="flight-diagonal">4 Diagonal</option><option value="flight-postcard">5 Postkarte</option><option value="flight-ribbon">6 Schleife</option><option value="flight-band">7 Goldband</option></select></label>
       <label>Eigenes Foto (optional)<input id="photo" type="file" accept="image/jpeg,image/png,image/webp"></label>
       <div class="full"><button class="primary" id="manualGo">Entwurf erstellen</button></div>
@@ -171,7 +171,7 @@
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const LANG = { de: 'Deutsch', ar: 'العربية', ckb: 'کوردی (بادینی)' };
-const STYLE_NAMES = [['flight', '1 Glas'], ['flight-ticket', '2 Bordkarte'], ['flight-split', '3 Geteilt'], ['flight-diagonal', '4 Diagonal'],
+const STYLE_NAMES = [['flight', '1 Glas'], ['flight-cover', '★ Magazin'], ['flight-ticket', '2 Bordkarte'], ['flight-split', '3 Geteilt'], ['flight-diagonal', '4 Diagonal'],
   ['flight-postcard', '5 Postkarte'], ['flight-ribbon', '6 Schleife'], ['flight-band', '7 Goldband']];
 const defLangs = () => [...document.querySelectorAll('input[name=deflang]:checked')].map((i) => i.value);
 try { const saved = JSON.parse(localStorage.getItem('studioLangs') || '[]'); document.querySelectorAll('input[name=deflang]').forEach((i) => { i.checked = saved.includes(i.value); }); } catch {}

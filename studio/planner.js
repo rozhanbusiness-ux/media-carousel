@@ -11,7 +11,7 @@ const crypto = require('crypto');
 const { getFlightOffers, getPackageOffers } = require('./offers');
 const { toDraftOffer, offerKey, countryName, cardFor } = require('./packages');
 const { buildCaption, formatDate, formatPrice, cityName, LANGS } = require('./captions');
-const { renderSlide, STYLE_BY_WEEKDAY, STYLES } = require('./render');
+const { renderSlide, STYLE_BY_WEEKDAY, STYLES, PACKAGE_STYLES } = require('./render');
 const { generatePhoto } = require('./image');
 const { candidates: pexelsCandidates, download: pexelsDownload } = require('./pexels');
 const { rankPhotos } = require('./photo-rank');
@@ -277,7 +277,7 @@ async function regenerate(draft, what, value) {
   if (what === 'all') await findCandidates(draft); // new ranked photos to choose from
   if (what === 'style') {
     if (!STYLES.includes(value)) throw new Error('unknown style');
-    if (draft.offer.kind && draft.offer.kind !== 'flight' && value !== 'flight') throw new Error('Dieses Angebot nutzt die Glas-Vorlage.');
+    if (draft.offer.kind && draft.offer.kind !== 'flight' && !PACKAGE_STYLES.includes(value)) throw new Error('Für dieses Angebot: Glas oder Magazin.');
     draft.style = value;
   }
   if (what === 'langs') {
