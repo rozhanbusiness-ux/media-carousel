@@ -125,15 +125,15 @@ const destKey = (o) => o.to.code || o.to.name;
 const pickOffer = (offers, recent, skip = new Set()) => offers.find((o) => !recent.has(destKey(o)) && !skip.has(offerKey(o))) || null;
 
 /** Live offers of one kind, in the draft offer shape. */
-// Packages: specials top offers + last-minute offers, cheapest hotel per destination only
-// (the feed lists each destination several times with different hotels).
+// Packages: specials top offers + last-minute offers, ONE package per country (client rule),
+// the cheapest. The client's own offers are always kept.
 // The client's own offers ("Eigene Angebote") are always added to their kind's list.
 async function liveOffers(kind) {
   if (kind !== 'package') return [...ownOffers.list('flight'), ...(await getFlightOffers())].sort((a, b) => a.price - b.price);
   const [top, last] = await Promise.all([getPackageOffers('package'), getPackageOffers('lastminute')]);
   const best = new Map();
   for (const o of [...top, ...last].map(toDraftOffer).filter((x) => x.to.name)) {
-    const k = destKey(o) + '|' + (o.country || '');
+    const k = o.country || destKey(o);
     if (!best.has(k) || o.price < best.get(k).price) best.set(k, o);
   }
   return [...ownOffers.list('package'), ...best.values()].sort((a, b) => a.price - b.price);
@@ -246,7 +246,7 @@ async function changeOffer(draft, key) {
 /** Today's offers of the draft's kind, for the "choose offer" list. */
 async function offerChoices(kind) {
   return (await liveOffers(kind === 'package' ? 'package' : 'flight')).map((o) => ({
-    key: offerKey(o), price: o.price, dest: destKey(o),
+    key: offerKey(o), price: o.price, dest: o.kind === 'package' ? (o.country || destKey(o)) : destKey(o),
     label: (o.own ? '⭐ ' : '') + (o.kind === 'package' ? `${o.to.name} – ${o.hotel}` : `${o.from.name} → ${o.to.name} (${o.departureDate})`),
   }));
 }

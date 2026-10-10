@@ -360,7 +360,7 @@ $('#bundleList').onchange = (e) => {
   if (e.target.checked) {
     const dest = e.target.dataset.dest;
     const dup = dest && [...$('#bundleList').querySelectorAll('input:checked')].some((i) => i !== e.target && i.dataset.dest === dest);
-    if (bundlePick.length >= 6 || dup) { e.target.checked = false; $('#msg').textContent = dup ? 'Diese Destination ist schon gewählt.' : 'Maximal 6 Angebote.'; return; }
+    if (bundlePick.length >= 6 || dup) { e.target.checked = false; $('#msg').textContent = dup ? 'Diese Destination bzw. dieses Land ist schon gewählt.' : 'Maximal 6 Angebote.'; return; }
     bundlePick.push(k);
   }
   else bundlePick = bundlePick.filter((x) => x !== k);
