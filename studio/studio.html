@@ -158,6 +158,8 @@
   <details id="music">
     <summary>🎵 Reel-Musik (eigene MP3, z. B. Pixabay Music)</summary>
     <div class="row">
+      <label>Passt zu <select id="mKind"><option value="all">Alle</option><option value="flight">✈️ Flug</option><option value="package">🏨 Paket</option></select></label>
+      <label>Stimmung <select id="mMood"><option value="calm">ruhig</option><option value="lively">lebhaft</option></select></label>
       <label class="ghost" style="padding:10px 16px;border-radius:999px;cursor:pointer">🎵 Musik hochladen<input id="musicFile" type="file" accept="audio/mpeg,.mp3" hidden></label>
     </div>
     <div id="tracks"></div>
@@ -224,13 +226,19 @@ function render(drafts) {
 }
 
 let drafts = [];
-// ---- Reel music: the client's own licensed MP3s; one is picked at random per Reel ----
-let tracks = [];
+// ---- Reel music: the client's own licensed MP3s, tagged by offer type and mood ----
+// Selection rules (client): a track for this post type, not used in the last 3 Reels; the
+// best-balanced part of it (no weak intro), starting on a beat; soft fades; equal loudness.
+let tracks = [], recentTracks = [];
+const KIND_NAMES = { all: 'Alle', flight: '✈️ Flug', package: '🏨 Paket' }, MOOD_NAMES = { calm: 'ruhig', lively: 'lebhaft' };
+const opts = (names, cur) => Object.entries(names).map(([v, n]) => `<option value="${v}" ${v === cur ? 'selected' : ''}>${n}</option>`).join('');
 async function loadTracks() {
-  try { tracks = await api('/api/studio/music'); } catch { tracks = []; }
-  $('#tracks').innerHTML = tracks.length ? tracks.map((t) => `<div class="row" style="align-items:center;gap:8px">
+  try { const r = await api('/api/studio/music'); tracks = r.tracks || []; recentTracks = r.recent || []; } catch { tracks = []; }
+  $('#tracks').innerHTML = tracks.length ? tracks.map((t) => `<div class="row" style="align-items:center;gap:8px" data-track="${esc(t.id)}">
     <audio controls preload="none" src="/api/studio/music/${esc(t.id)}" style="height:32px;max-width:220px"></audio>
-    <span>${esc(t.name)}</span><button class="ghost" data-del-track="${esc(t.id)}">Löschen</button></div>`).join('')
+    <span>${esc(t.name)}</span>
+    <select data-tag="kind">${opts(KIND_NAMES, t.kind || 'all')}</select><select data-tag="mood">${opts(MOOD_NAMES, t.mood || 'calm')}</select>
+    <button class="ghost" data-del-track="${esc(t.id)}">Löschen</button></div>`).join('')
     : '<p>Noch keine Musik – Reels sind dann ohne Ton.</p>';
 }
 $('#musicFile').onchange = async (e) => {
@@ -239,11 +247,17 @@ $('#musicFile').onchange = async (e) => {
   if (f.size > 10 * 1024 * 1024) { $('#msg').textContent = 'Datei zu groß (max. 10 MB).'; return; }
   $('#msg').textContent = 'Musik wird hochgeladen …';
   try {
-    const res = await fetch('/api/studio/music', { method: 'POST', headers: { 'Content-Type': 'audio/mpeg', 'X-Track-Name': encodeURIComponent(f.name.replace(/\.mp3$/i, '')) }, body: f });
+    const res = await fetch('/api/studio/music', { method: 'POST', headers: { 'Content-Type': 'audio/mpeg', 'X-Track-Name': encodeURIComponent(f.name.replace(/\.mp3$/i, '')),
+      'X-Track-Kind': $('#mKind').value, 'X-Track-Mood': $('#mMood').value }, body: f });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || res.status);
     $('#msg').textContent = 'Musik gespeichert.'; await loadTracks();
   } catch (err) { $('#msg').textContent = 'Fehler: ' + err.message; }
+};
+$('#tracks').onchange = async (e) => {
+  const row = e.target.closest('[data-track]'); if (!row || !e.target.dataset.tag) return;
+  const body = { kind: row.querySelector('[data-tag=kind]').value, mood: row.querySelector('[data-tag=mood]').value };
+  try { await api('/api/studio/music/' + row.dataset.track, { method: 'PATCH', body: JSON.stringify(body) }); await loadTracks(); } catch (err) { $('#msg').textContent = 'Fehler: ' + err.message; }
 };
 $('#tracks').onclick = async (e) => {
   const id = e.target.dataset.delTrack;
@@ -252,20 +266,69 @@ $('#tracks').onclick = async (e) => {
 };
 loadTracks();
 
-// Random track → AudioBuffer (stereo, 48 kHz) cut to `seconds`, with a soft fade in/out. null if none.
-async function reelAudio(seconds) {
+/** Track for a post type: matching tag, not among the last 3 used (relaxed if nothing is left). */
+function pickTrack(kind) {
+  const fits = tracks.filter((t) => (t.kind || 'all') === 'all' || t.kind === kind);
+  const pool = fits.length ? fits : tracks;
+  const fresh = pool.filter((t) => !recentTracks.slice(0, 3).includes(t.id));
+  const list = fresh.length ? fresh : pool;
+  return list[Math.floor(Math.random() * list.length)] || null;
+}
+
+/**
+ * Best part of a decoded track for `seconds`: loudness per 50 ms, skip a weak intro, score each
+ * candidate start by steady, full energy (no quiet gaps), then snap to the nearest beat (onset).
+ * Returns { start, gain } (gain brings the part to a common loudness).
+ */
+function bestSegment(buf, seconds) {
+  const sr = buf.sampleRate, hop = Math.round(sr * 0.05), ch = [...Array(buf.numberOfChannels)].map((_, c) => buf.getChannelData(c));
+  const n = Math.floor(buf.length / hop), rms = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    let sum = 0;
+    for (const d of ch) for (let k = i * hop; k < (i + 1) * hop; k += 4) sum += d[k] * d[k];
+    rms[i] = Math.sqrt(sum / (hop / 4) / ch.length);
+  }
+  const win = Math.round(seconds / 0.05), sorted = [...rms].sort((a, b) => a - b), median = sorted[Math.floor(n / 2)] || 0;
+  if (n <= win || median === 0) return { start: 0, gain: 1 };
+  let first = 0; while (first < n - win && rms[first] < 0.6 * median) first++; // skip a weak intro
+  let best = first, bestScore = -Infinity;
+  for (let s = first; s <= n - win; s += 10) { // every 0.5 s
+    let sum = 0, sq = 0, gaps = 0;
+    for (let i = s; i < s + win; i++) { sum += rms[i]; sq += rms[i] * rms[i]; if (rms[i] < 0.3 * median) gaps++; }
+    const mean = sum / win, std = Math.sqrt(Math.max(0, sq / win - mean * mean));
+    const score = mean / median - 1.5 * (std / (mean || 1)) - 3 * (gaps / win) - (s > n * 0.75 ? 0.5 : 0);
+    if (score > bestScore) { bestScore = score; best = s; }
+  }
+  let snap = best, jump = 0; // nearest onset (biggest rise in loudness) within ±0.5 s
+  for (let i = Math.max(1, best - 10); i <= Math.min(n - win, best + 10); i++) {
+    const rise = rms[i] - rms[i - 1];
+    if (rise > jump) { jump = rise; snap = i; }
+  }
+  let sum = 0; for (let i = snap; i < snap + win; i++) sum += rms[i];
+  const level = sum / win;
+  return { start: snap * 0.05, gain: Math.min(4, 0.12 / (level || 0.12)) }; // target loudness ~ -18 dBFS RMS
+}
+
+// Track for this post type → AudioBuffer (stereo, 48 kHz) of its best part, fades, equal loudness. null if none.
+async function reelAudio(seconds, kind) {
   if (!tracks.length || !window.OfflineAudioContext) return null;
-  const t = tracks[Math.floor(Math.random() * tracks.length)];
+  const t = pickTrack(kind);
+  if (!t) return null;
   const raw = await (await fetch('/api/studio/music/' + t.id)).arrayBuffer();
   const RATE = 48000, ctx = new OfflineAudioContext(2, Math.round(seconds * RATE), RATE);
-  const src = ctx.createBufferSource(); src.buffer = await ctx.decodeAudioData(raw);
-  const gain = ctx.createGain();
-  gain.gain.setValueAtTime(0, 0); gain.gain.linearRampToValueAtTime(0.9, 0.6);
-  gain.gain.setValueAtTime(0.9, seconds - 1.5); gain.gain.linearRampToValueAtTime(0, seconds);
-  src.connect(gain).connect(ctx.destination);
-  const start = Math.max(0, Math.min(15, src.buffer.duration - seconds)) * Math.random(); // not always the intro
+  const decoded = await ctx.decodeAudioData(raw);
+  const { start, gain: level } = bestSegment(decoded, seconds);
+  const src = ctx.createBufferSource(); src.buffer = decoded;
+  const gain = ctx.createGain(), peak = 0.9 * level;
+  gain.gain.setValueAtTime(0, 0); gain.gain.linearRampToValueAtTime(peak, 0.8);
+  gain.gain.setValueAtTime(peak, seconds - 1.8); gain.gain.linearRampToValueAtTime(0, seconds);
+  const comp = ctx.createDynamicsCompressor(); // keeps the louder parts from clipping after the level boost
+  comp.threshold.value = -6; comp.ratio.value = 12;
+  src.connect(gain).connect(comp).connect(ctx.destination);
   src.start(0, start);
-  return ctx.startRendering();
+  const out = await ctx.startRendering();
+  api(`/api/studio/music/${t.id}/used`, { method: 'POST' }).then(() => { recentTracks = [t.id, ...recentTracks.filter((x) => x !== t.id)]; }).catch(() => {});
+  return out;
 }
 async function aacConfig() {
   if (!window.AudioEncoder) return null;
@@ -467,7 +530,7 @@ async function shareSlides(b, box) {
       const reel = b.dataset.kind === 'reel';
       const list = v.files.filter((f) => f.size === (reel ? 'story' : b.dataset.kind)).sort((x, y) => x.slide - y.slide);
       if (reel) $('#msg').textContent = 'Reel wird erstellt … (ca. 15 Sekunden)';
-      const files = reel ? [await makeReel(list.map((f) => f.url), `media-${d.offer.to.name}-reel`.replace(/[^\w.-]+/g, '_'))] : await Promise.all(list.map(async (f) => {
+      const files = reel ? [await makeReel(list.map((f) => f.url), `media-${d.offer.to.name}-reel`.replace(/[^\w.-]+/g, '_'), (d.bundleKind || d.offer.kind || 'flight') === 'flight' ? 'flight' : 'package')] : await Promise.all(list.map(async (f) => {
         const blob = await (await fetch(f.url)).blob();
         return new File([blob], `media-${d.offer.to.name}-${f.size}-${f.slide}.jpg`.replace(/[^\w.-]+/g, '_'), { type: blob.type || 'image/jpeg' });
       }));
@@ -543,9 +606,10 @@ async function h264Config() {
   }
   return null;
 }
-async function makeReel(urls, name) {
+async function makeReel(urls, name, kind = 'flight') {
   const imgs = await loadImages(urls);
   REEL.style = TRANSITIONS[Math.floor(Math.random() * TRANSITIONS.length)];
+  REEL.kind = kind;
   const cfg = await h264Config();
   if (cfg) {
     try { return await makeReelH264(imgs, name, cfg); } catch (err) { console.error('H.264 reel failed, using fallback', err); }
@@ -558,7 +622,7 @@ async function makeReelH264(imgs, name, cfg) {
   const { Muxer, ArrayBufferTarget } = await loadMuxer();
   const seconds = PER * imgs.length / 1000;
   let audio = null, acfg = null;
-  try { acfg = await aacConfig(); if (acfg) audio = await reelAudio(seconds); } catch (err) { console.error('reel music skipped', err); }
+  try { acfg = await aacConfig(); if (acfg) audio = await reelAudio(seconds, REEL.kind); } catch (err) { console.error('reel music skipped', err); }
   if (tracks.length && !audio) $('#msg').textContent = 'Hinweis: Musik wird auf diesem Gerät nicht unterstützt – Reel ohne Ton.';
   const muxer = new Muxer({ target: new ArrayBufferTarget(), video: { codec: 'avc', width: W, height: H, frameRate: FPS },
     ...(audio ? { audio: { codec: 'aac', sampleRate: 48000, numberOfChannels: 2 } } : {}), fastStart: 'in-memory' });

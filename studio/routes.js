@@ -232,16 +232,21 @@ module.exports = function mountStudio(app) {
   });
 
   // Reel music: the client's own licensed MP3s (studio/music.js).
-  router.get('/music', (req, res) => res.json(music.list()));
+  router.get('/music', (req, res) => res.json({ tracks: music.list(), recent: music.history() }));
   router.post('/music', express.raw({ type: 'audio/mpeg', limit: music.MAX_BYTES }), (req, res) => {
     let name = '';
     try { name = decodeURIComponent(String(req.get('X-Track-Name') || '')); } catch { /* keep default */ }
-    try { res.json(music.add(req.body, name)); } catch (err) { res.status(400).json({ error: err.message === 'too many tracks' ? 'too many tracks' : 'only mp3 files up to 10 MB' }); }
+    try { res.json(music.add(req.body, name, req.get('X-Track-Kind') || 'all', req.get('X-Track-Mood') || 'calm')); } catch (err) { res.status(400).json({ error: err.message === 'too many tracks' ? 'too many tracks' : 'only mp3 files up to 10 MB' }); }
   });
   router.get('/music/:id', (req, res) => {
     if (!music.ID.test(req.params.id)) return res.status(400).json({ error: 'bad id' });
     res.type('audio/mpeg').sendFile(music.file(req.params.id), (err) => { if (err && !res.headersSent) res.status(404).end(); });
   });
+  router.patch('/music/:id', (req, res) => {
+    const { kind, mood } = req.body || {};
+    res.status(music.tag(req.params.id, kind, mood) ? 200 : 400).json({});
+  });
+  router.post('/music/:id/used', (req, res) => res.status(music.used(req.params.id) ? 200 : 404).json({}));
   router.delete('/music/:id', (req, res) => res.status(music.remove(req.params.id) ? 200 : 404).json({}));
 
   app.use('/api/studio', express.json({ limit: '15mb' }), router);
