@@ -116,9 +116,17 @@ const destKey = (o) => o.to.code || o.to.name;
 const pickOffer = (offers, recent, skip = new Set()) => offers.find((o) => !recent.has(destKey(o)) && !skip.has(offerKey(o))) || null;
 
 /** Live offers of one kind, in the draft offer shape. */
+// Packages: specials top offers + last-minute offers, cheapest hotel per destination only
+// (the feed lists each destination several times with different hotels).
 async function liveOffers(kind) {
-  if (kind === 'package') return (await getPackageOffers('package')).map(toDraftOffer).filter((o) => o.to.name);
-  return getFlightOffers();
+  if (kind !== 'package') return getFlightOffers();
+  const [top, last] = await Promise.all([getPackageOffers('package'), getPackageOffers('lastminute')]);
+  const best = new Map();
+  for (const o of [...top, ...last].map(toDraftOffer).filter((x) => x.to.name)) {
+    const k = destKey(o) + '|' + (o.country || '');
+    if (!best.has(k) || o.price < best.get(k).price) best.set(k, o);
+  }
+  return [...best.values()].sort((a, b) => a.price - b.price);
 }
 
 function datesText(offer, lang) {
@@ -228,7 +236,7 @@ async function changeOffer(draft, key) {
 /** Today's offers of the draft's kind, for the "choose offer" list. */
 async function offerChoices(kind) {
   return (await liveOffers(kind === 'package' ? 'package' : 'flight')).map((o) => ({
-    key: offerKey(o), price: o.price,
+    key: offerKey(o), price: o.price, dest: destKey(o),
     label: o.kind === 'package' ? `${o.to.name} – ${o.hotel}` : `${o.from.name} → ${o.to.name} (${o.departureDate})`,
   }));
 }

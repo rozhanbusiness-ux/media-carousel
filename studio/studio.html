@@ -254,13 +254,18 @@ async function loadBundleList() {
   try {
     const list = await api('/api/studio/offer-choices?kind=' + kind);
     $('#bundleList').innerHTML = list.map((o) =>
-      `<label style="display:block;margin:4px 0"><input type="checkbox" data-key="${esc(o.key)}"> ${icon} ${esc(o.label)} – ${esc(o.price)} €</label>`).join('') || 'Keine Angebote.';
+      `<label style="display:block;margin:4px 0"><input type="checkbox" data-key="${esc(o.key)}" data-dest="${esc(o.dest || '')}"> ${icon} ${esc(o.label)} – ${esc(o.price)} €</label>`).join('') || 'Keine Angebote.';
   } catch (err) { $('#bundleList').textContent = 'Fehler: ' + err.message; }
   updateBundleCount();
 }
 $('#bundleList').onchange = (e) => {
   const k = e.target.dataset.key; if (!k) return;
-  if (e.target.checked) { if (bundlePick.length >= 6) { e.target.checked = false; return; } bundlePick.push(k); }
+  if (e.target.checked) {
+    const dest = e.target.dataset.dest;
+    const dup = dest && [...$('#bundleList').querySelectorAll('input:checked')].some((i) => i !== e.target && i.dataset.dest === dest);
+    if (bundlePick.length >= 6 || dup) { e.target.checked = false; $('#msg').textContent = dup ? 'Diese Destination ist schon gewählt.' : 'Maximal 6 Angebote.'; return; }
+    bundlePick.push(k);
+  }
   else bundlePick = bundlePick.filter((x) => x !== k);
   updateBundleCount();
 };

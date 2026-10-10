@@ -133,6 +133,7 @@ async function createBundleDraft({ kind, keys, langs, date, liveOffers, queriesF
   if (keys.some((k) => (kind === 'package') !== k.startsWith('p-'))) throw new Error('Nur eine Angebotsart pro Beitrag.');
   const offers = keys.map((k) => all.find((o) => offerKey(o) === k));
   if (offers.some((o) => !o || (o.kind || 'flight') !== kind)) throw new Error('Ein Angebot ist nicht mehr verfügbar – bitte Liste neu laden.');
+  if (new Set(offers.map((o) => o.to.code || o.to.name)).size !== offers.length) throw new Error('Jede Destination nur einmal pro Beitrag.');
   const draft = {
     id: crypto.randomBytes(6).toString('hex'), createdAt: new Date().toISOString(), forDate: date.toISOString().slice(0, 10),
     status: 'pending', style: 'flight', source: 'specials', bundle: true, bundleKind: kind,
