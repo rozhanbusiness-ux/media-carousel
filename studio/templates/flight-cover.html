@@ -14,13 +14,13 @@
   .story { --h: 1920px; }
   .square { --h: 1080px; --u: 0.86px; }
   html, body { width: var(--w); height: var(--h); overflow: hidden; background: var(--navy); }
-  .post { position: relative; width: var(--w); height: var(--h); overflow: hidden; color: #fff; font-family: "Plus Jakarta Sans", sans-serif; }
+  .post { position: relative; width: var(--w); height: var(--h); overflow: hidden; color: #fff; font-family: "Plus Jakarta Sans", "IBM Plex Sans Arabic", sans-serif; }
   .rtl .post, .rtl .post * { font-family: "IBM Plex Sans Arabic", sans-serif; }
   .bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
   .shade { position: absolute; inset: 0; }
   .gold { color: var(--gold); }
   .script { font-family: "Allura", cursive; font-weight: 400; }
-  .serif { font-family: "DM Serif Display", serif; font-weight: 400; }
+  .serif { font-family: "DM Serif Display", "IBM Plex Sans Arabic", serif; font-weight: 400; }
   .caps { letter-spacing: .38em; text-transform: uppercase; font-weight: 700; }
   .metal { background: linear-gradient(135deg, #8c6b1c, #f6e3a1 22%, #c9a227 45%, #fff4cc 55%, #b8901f 75%, #f2d98a); }
 
@@ -40,7 +40,7 @@
   .s1 .block { position: absolute; left: 96px; right: 96px; bottom: calc(150 * var(--u)); }
   .s1 .kicker { font-size: calc(20 * var(--u)); margin-bottom: calc(18 * var(--u)); display: flex; align-items: center; gap: 16px; }
   .s1 .kicker::after { content: ""; flex: 0 0 90px; height: 1px; background: var(--gold); }
-  .s1 .title { font-family: "DM Serif Display", serif; font-size: calc(190 * var(--u)); line-height: .92; letter-spacing: -.01em;
+  .s1 .title { font-family: "DM Serif Display", "IBM Plex Sans Arabic", serif; font-size: calc(190 * var(--u)); line-height: .92; letter-spacing: -.01em;
     text-shadow: 0 10px 40px rgba(0,0,0,.5); text-wrap: balance; }
   .rtl .s1 .title { font-weight: 700; font-size: calc(132 * var(--u)); line-height: 1.12; }
   .s1 .country { font-size: calc(24 * var(--u)); margin-top: calc(14 * var(--u)); }
@@ -59,12 +59,12 @@
   .s2 .kicker { font-size: calc(19 * var(--u)); display: flex; align-items: center; justify-content: center; gap: 18px; }
   .s2 .kicker::before, .s2 .kicker::after { content: ""; width: 70px; height: 1px; background: var(--gold); }
   .s2 .route { display: flex; align-items: center; justify-content: center; gap: 30px; margin: calc(28 * var(--u)) 0 calc(18 * var(--u)); }
-  .s2 .city b { display: block; font-family: "DM Serif Display", serif; font-weight: 400; font-size: calc(70 * var(--u)); line-height: 1.05; }
+  .s2 .city b { display: block; font-family: "DM Serif Display", "IBM Plex Sans Arabic", serif; font-weight: 400; font-size: calc(70 * var(--u)); line-height: 1.05; }
   .rtl .s2 .city b { font-weight: 700; font-size: calc(54 * var(--u)); }
   .s2 .city span { font-size: calc(20 * var(--u)); letter-spacing: .32em; color: rgba(255,255,255,.65); }
   .s2 .plane { font-size: calc(40 * var(--u)); color: var(--gold); }
   .s2 .row { font-size: calc(27 * var(--u)); line-height: 1.7; color: rgba(255,255,255,.9); }
-  .s2 .hotel { font-family: "DM Serif Display", serif; font-weight: 400; font-size: calc(66 * var(--u)); line-height: 1.1; margin-top: calc(22 * var(--u)); text-wrap: balance; }
+  .s2 .hotel { font-family: "DM Serif Display", "IBM Plex Sans Arabic", serif; font-weight: 400; font-size: calc(66 * var(--u)); line-height: 1.1; margin-top: calc(22 * var(--u)); text-wrap: balance; }
   .rtl .s2 .hotel { font-weight: 700; font-size: calc(52 * var(--u)); }
   .s2 .stars { font-size: calc(30 * var(--u)); letter-spacing: .25em; margin: calc(10 * var(--u)) 0; }
   .s2 .place { color: rgba(255,255,255,.75); font-size: calc(24 * var(--u)) !important; }

@@ -45,6 +45,8 @@ function ctaButton() {
 
 const validPhoto = (p) => /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(p || '');
 
+const STAR_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true" style="width:.85em;height:.85em;vertical-align:-.06em;fill:currentColor;margin:0 .06em"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></svg>';
+
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 let FONT_CSS = null;
@@ -128,6 +130,8 @@ async function renderSlide(post, size, slide) {
     .replace(/%%PRICE%%/g, priceHtml)
     .replace(/%%SLOGAN%%/g, SLOGAN_HTML)
     .replace(/\{\{photo\}\}/g, validPhoto(post.photo) ? post.photo : '');
+  // Stars as drawn icons: the server has no font with the "★" glyph (it rendered as boxes).
+  html = html.replace(/★/g, STAR_SVG);
   return renderToJpeg(html, size);
 }
 
