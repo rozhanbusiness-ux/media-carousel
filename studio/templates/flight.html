@@ -45,8 +45,8 @@
   .story .s1 .block { bottom: 300px; }
 
   /* Slide 2: details */
-  .s2 .bg { filter: blur(6px) brightness(.78); transform: scale(1.08); }
-  .s2 .shade { background: radial-gradient(120% 80% at 50% 30%, rgba(10,24,56,.12), rgba(4,10,28,.6)); }
+  /* Slide 2: the photo stays sharp (client); only the card is glass. */
+  .s2 .shade { background: radial-gradient(45% 12% at 50% 6%, rgba(4,10,28,.4), rgba(4,10,28,0)); }
   .s2 .card { position: absolute; left: 80px; right: 80px; top: 50%; transform: translateY(-46%);
     padding: calc(56 * var(--u)) calc(56 * var(--u)); text-align: center; }
   .s2 .kicker { font-size: calc(20 * var(--u)); }

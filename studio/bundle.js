@@ -11,7 +11,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { cardFor, countryName, offerKey } = require('./packages');
 const { formatDate, formatPrice, cityName, BASE_TAGS, FIXED } = require('./captions');
-const { renderSlide } = require('./render');
+const { renderSlide, PACKAGE_STYLES } = require('./render');
 const { candidates: pexelsCandidates, download: pexelsDownload } = require('./pexels');
 const { rankPhotos } = require('./photo-rank');
 const store = require('./store');
@@ -97,10 +97,10 @@ async function pickPhotos(draft, queriesFor, choosePhoto) {
   draft.pexelsIds.push(cover.pexelsId);
 }
 
-function postFor(o, lang, photo) {
+function postFor(o, lang, photo, style = 'flight') {
   const card = o.kind === 'package' ? cardFor(o, lang, formatPrice) : null;
   return {
-    style: 'flight', lang, photo, bundle: true, destination: local(o.to, lang), hook: '',
+    style, lang, photo, bundle: true, destination: local(o.to, lang), hook: '',
     from: o.from ? { city: local(o.from, lang), code: o.from.code || '' } : { city: '', code: '' },
     to: { city: local(o.to, lang), code: o.to.code || '' },
     dates: o.kind === 'package' ? '' : formatDate(o.departureDate) + (o.returnDate ? ' – ' + formatDate(o.returnDate) : ''),
@@ -115,14 +115,14 @@ async function renderBundle(draft) {
   const stamp = Date.now().toString(36);
   const versions = [];
   for (const lang of draft.langs) {
-    const posts = draft.offers.map((o, n) => postFor(o, lang, photos[n]));
+    const posts = draft.offers.map((o, n) => postFor(o, lang, photos[n], PACKAGE_STYLES.includes(draft.style) ? draft.style : 'flight'));
     const title = titleOf(draft, lang);
     // Never a destination photo on the cover (client rule).
     const cover = { ...posts[0], photo: coverImg, kind: 'flight', card: null, country: '', destination: title,
       hook: draft.offers.map((o) => local(o.to, lang)).join(' · '), labels: { kicker: COVER[lang].kicker, swipe: COVER[lang].swipe } };
     const slides = [[cover, 1], ...posts.map((p) => [p, 2]), [posts[0], 3]];
     const files = [];
-    for (const size of ['story', 'portrait']) {
+    for (const size of ['story', 'square']) {
       for (let i = 0; i < slides.length; i++) {
         const name = `studio_${draft.id}_${stamp}_${lang}_${size}_${i + 1}.jpg`;
         fs.writeFileSync(path.join(OUTPUT, name), await renderSlide(slides[i][0], size, slides[i][1]));
@@ -160,9 +160,53 @@ async function createBundleDraft({ kind, keys, langs, date, liveOffers, queriesF
   return renderBundle(draft);
 }
 
-/** Bundle actions: 'langs' (value: list) or 'all' (new photos and texts). */
+// Photo of one slide: n = offer index (0..), or -1 for the cover.
+const slotPath = (draft, n) => photoPath(draft.id, n === -1 ? 'cover' : n);
+const validSlot = (draft, n) => Number.isInteger(n) && n >= -1 && n < draft.offers.length;
+
+/** Ranked photo suggestions for one slide; kept on the draft so only suggested photos can be picked. */
+async function slotCandidates(draft, n, queriesFor) {
+  const used = new Set(draft.pexelsIds || []);
+  for (const c of (draft.bundlePick && draft.bundlePick.n === n ? draft.bundlePick.list : [])) used.add(c.id); // "more" shows new ones
+  let ranked;
+  if (n === -1) ranked = (await covers.suggest(draft.bundleKind || 'flight')).map((c) => ({ ...c, cover: true }));
+  else {
+    const o = draft.offers[n];
+    let list = [];
+    try { list = await pexelsCandidates(queriesFor(o), used, 15); } catch (err) { console.error('studio bundle pexels:', err.message); }
+    ranked = await rankPhotos(list, [o.to.name, o.country].filter(Boolean).join(', '));
+  }
+  if (!ranked.length) throw new Error('Keine weiteren Fotos gefunden – bitte eigenes Foto hochladen.');
+  draft.bundlePick = { n, list: ranked.map((c) => ({ id: c.id, url: c.url || '', thumb: c.thumb, score: c.score, why: c.why || '', cover: !!c.cover })) };
+}
+
+/** Bundle actions: 'langs', 'all' (new photos), 'style', 'bundle-photos' (show suggestions for a slide),
+ *  'bundle-photo-pick' ({ n, id }), 'bundle-photo-upload' ({ n, data }). */
 async function regenerateBundle(draft, what, value, queriesFor, choosePhoto, LANGS) {
-  if (what === 'langs') {
+  if (what === 'bundle-photos') {
+    if (!validSlot(draft, value)) throw new Error('bad slide');
+    await slotCandidates(draft, value, queriesFor);
+    return store.upsertDraft(draft); // nothing to render until a photo is picked
+  }
+  if (what === 'bundle-photo-pick' || what === 'bundle-photo-upload') {
+    const n = value && value.n;
+    if (!validSlot(draft, n)) throw new Error('bad slide');
+    let dataUri;
+    if (what === 'bundle-photo-upload') dataUri = value.data;
+    else {
+      const c = draft.bundlePick && draft.bundlePick.n === n && draft.bundlePick.list.find((x) => x.id === value.id);
+      if (!c) throw new Error('Foto nicht mehr verfügbar – bitte Vorschläge neu laden.');
+      const url = c.cover ? covers.urlOf(draft.bundleKind || 'flight', c.id) : c.url;
+      if (!url) throw new Error('Foto nicht mehr verfügbar – bitte Vorschläge neu laden.');
+      dataUri = await pexelsDownload(url);
+      draft.pexelsIds = [...(draft.pexelsIds || []), c.id];
+    }
+    fs.writeFileSync(slotPath(draft, n), dataUri);
+    draft.bundlePick = null;
+  } else if (what === 'style') {
+    if (!PACKAGE_STYLES.includes(value)) throw new Error('Für Sammel-Beiträge: Glas oder Magazin.');
+    draft.style = value;
+  } else if (what === 'langs') {
     if (!Array.isArray(value) || !value.length || value.length > 3 || !value.every((l) => LANGS.includes(l))) throw new Error('bad languages');
     draft.langs = [...new Set(value)];
   } else if (what === 'all') {

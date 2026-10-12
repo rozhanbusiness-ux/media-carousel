@@ -24,7 +24,7 @@ const OUTPUT = path.join(ROOT, 'output');
 const CACHE = path.join(ROOT, 'cache');
 const PHOTOS = path.join(__dirname, 'photos');
 const LIBRARY = path.join(CACHE, 'studio-library'); // approved photos, kept across deploys (cache volume)
-const REPEAT_DAYS = 3;
+const REPEAT_DAYS = 14; // no destination (packages: no country) again within 14 days (client plan)
 const KURDISH_DAYS = new Set([1, 3, 5]);
 
 const defaultLangs = (date) => ['de', KURDISH_DAYS.has(date.getDay()) ? 'ckb' : 'ar'];
@@ -166,7 +166,7 @@ async function renderDraft(draft) {
       country: draft.offer.kind && draft.offer.kind !== 'flight' && draft.offer.country ? countryName(draft.offer.country, lang) : '',
     };
     const files = [];
-    for (const size of ['story', 'portrait']) { // story first: it is posted first
+    for (const size of ['story', 'square']) { // story first: it is posted first
       for (const slide of [1, 2, 3]) {
         const name = `studio_${draft.id}_${stamp}_${lang}_${size}_${slide}.jpg`;
         fs.writeFileSync(path.join(OUTPUT, name), await renderSlide(post, size, slide));
@@ -193,12 +193,12 @@ async function writeTexts(draft, langs = draft.langs) {
   });
 }
 
-async function buildDraft({ offer, style, date, source, photo = null, langs = null }) {
+async function buildDraft({ offer, style, date, source, photo = null, langs = null, warning = '' }) {
   const id = crypto.randomBytes(6).toString('hex');
   const picture = photo ? { file: null, pexelsId: null, dataUri: photo } : choosePhoto(offer);
   const draft = {
     id, createdAt: new Date().toISOString(), forDate: date.toISOString().slice(0, 10),
-    status: 'pending', style, source, offer, langs: langs || defaultLangs(date), versions: [],
+    status: 'pending', style, source, offer, langs: langs || defaultLangs(date), versions: [], warning,
   };
   setPhoto(draft, picture);
   await writeTexts(draft);
@@ -209,19 +209,43 @@ async function buildDraft({ offer, style, date, source, photo = null, langs = nu
   return renderDraft(draft);
 }
 
+// Repeat rule: a flight destination (packages: a country) is not used again within REPEAT_DAYS,
+// counting every offer of every draft (also multi-offer posts). When today's offers contain no
+// fresh one, the least recently used is taken and the draft carries a visible warning.
+const placeOf = (o) => (o.kind === 'package' ? o.country || destKey(o) : destKey(o));
+function lastUse() {
+  const last = new Map();
+  for (const d of store.listDrafts()) {
+    if (d.status === 'rejected') continue;
+    const t = Date.parse(d.createdAt) || 0;
+    for (const o of d.offers || [d.offer]) if (o) last.set(placeOf(o), Math.max(last.get(placeOf(o)) || 0, t));
+  }
+  return last;
+}
+const REPEAT_WARNING = 'Keine neue Destination verfügbar – diese wurde in den letzten 14 Tagen schon verwendet. Mehr Angebote: „📝 Eigene Angebote“ oder neue specials-Angebotsboxen.';
+function pickFresh(list, skip = new Set()) {
+  const pool = list.filter((o) => !skip.has(offerKey(o)));
+  if (!pool.length) return { offer: null };
+  const last = lastUse(), since = Date.now() - REPEAT_DAYS * 86400000;
+  const fresh = pool.find((o) => (last.get(placeOf(o)) || 0) < since);
+  if (fresh) return { offer: fresh, warning: '' };
+  const oldest = [...pool].sort((a, b) => (last.get(placeOf(a)) || 0) - (last.get(placeOf(b)) || 0))[0];
+  return { offer: oldest, warning: REPEAT_WARNING };
+}
+
 async function createDailyDraft({ date = new Date(), offers = null, langs = null } = {}) {
-  const list = offers || (await getFlightOffers());
-  const offer = pickOffer(list, store.recentDestinations(REPEAT_DAYS));
-  if (!offer) throw new Error('no suitable flight offer today');
-  return buildDraft({ offer, style: STYLE_BY_WEEKDAY[date.getDay()], date, source: 'specials', langs });
+  const list = offers || (await liveOffers('flight'));
+  const { offer, warning } = pickFresh(list);
+  if (!offer) throw new Error('Heute keine Flugangebote verfügbar.');
+  return buildDraft({ offer, style: STYLE_BY_WEEKDAY[date.getDay()], date, source: 'specials', langs, warning });
 }
 
 /** Package draft (hotel + flight) from today's specials top offers. */
 async function createPackageDraft({ date = new Date(), offers = null, langs = null } = {}) {
   const list = offers || (await liveOffers('package'));
-  const offer = pickOffer(list, store.recentDestinations(REPEAT_DAYS));
-  if (!offer) throw new Error('no suitable package offer today');
-  return buildDraft({ offer, style: 'flight', date, source: 'specials', langs });
+  const { offer, warning } = pickFresh(list);
+  if (!offer) throw new Error('Heute keine Pauschalreisen verfügbar.');
+  return buildDraft({ offer, style: 'flight', date, source: 'specials', langs, warning });
 }
 
 /** Replace the offer of a draft (another destination); keeps style and languages. */
@@ -230,12 +254,12 @@ async function changeOffer(draft, key) {
   const kind = draft.offer.kind === 'package' ? 'package' : 'flight';
   const list = await liveOffers(kind);
   draft.skippedOffers = [...new Set([...(draft.skippedOffers || []), offerKey(draft.offer)])].slice(-50);
-  const offer = key
-    ? list.find((o) => offerKey(o) === key)
-    : pickOffer(list, store.recentDestinations(REPEAT_DAYS), new Set(draft.skippedOffers))
-      || pickOffer(list, new Set(), new Set(draft.skippedOffers));
-  if (!offer) throw new Error(key ? 'Angebot nicht mehr verfügbar.' : 'Kein weiteres Angebot verfügbar.');
+  const others = list.filter((o) => placeOf(o) !== placeOf(draft.offer)); // "another destination" really means another one
+  const picked = key ? { offer: list.find((o) => offerKey(o) === key), warning: '' } : pickFresh(others, new Set(draft.skippedOffers));
+  const offer = picked.offer;
+  if (!offer) throw new Error(key ? 'Angebot nicht mehr verfügbar.' : 'Kein weiteres Angebot verfügbar – bitte „📝 Eigene Angebote“ ergänzen.');
   draft.offer = offer;
+  draft.warning = picked.warning || '';
   draft.texts = {};
   await writeTexts(draft);
   const lib = choosePhoto(offer);
@@ -258,6 +282,7 @@ async function createManualDraft({ offer, style, photo = null, date = new Date()
 /** Re-generate one part of an existing draft: 'photo' | 'text' | 'all' | {style} | {langs}. */
 async function regenerate(draft, what, value) {
   if (draft.bundle) return regenerateBundle(draft, what, value, queriesFor, choosePhoto, LANGS);
+  if (String(what).startsWith('bundle-')) throw new Error('bad request');
   if (what === 'photo') { // show (new) ranked candidates; current photo stays until one is picked
     await findCandidates(draft);
     if (!draft.photoCandidates.length) throw new Error('Kein weiteres echtes Foto gefunden – bitte eigenes Foto hochladen oder KI-Foto (Notfall) nutzen.');

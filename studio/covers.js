@@ -82,4 +82,7 @@ async function auto(kind, used) {
   return best ? { pexelsId: best.id, dataUri: await pexelsDownload(best.url) } : null;
 }
 
-module.exports = { KINDS, MAX_PER_KIND, list, suggest, save, remove, read, next, auto };
+/** Pexels URL of a photo from the last suggestions of this type (server-side only), or null. */
+const urlOf = (kind, id) => ((lastSuggestions[kind] || []).find((x) => x.id === id) || {}).url || null;
+
+module.exports = { urlOf, KINDS, MAX_PER_KIND, list, suggest, save, remove, read, next, auto };
