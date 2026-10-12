@@ -9,18 +9,32 @@
 const PARTNER_ID = '993036';
 const TOP_OFFERS_ENDPOINT = 'https://ibe.specials.de/';
 const FLIGHT_BOX_BASE = 'https://api.specials.de/component/teaserFlights.html';
-// One offer box per route, configured by Rozhan in the specials partner tools.
-const FLIGHT_BOX_KEYS = [
-  'e8e7cf1b63e22aa4c9612b459eaa2c68', // DUS-EBL
-  'e6b2c162eeb20f923740bbcf192a16eb', // HAJ-EBL
-  '5fbbe53dd88b336b361f11b5afb131ec', // FRA-EBL
-  '8e016fc6c512a12b7723014e4ae95c5f', // MUC-EBL
-  '68247f0e6d8a5cc42969cd3542f17ff8', // STR-EBL
-  '7055812ff8fefdd0d85c5a2554d50de6', // DUS-PMI
-  'c7dedbd3150374df970ace74c2ed9a86', // DUS-AYT
-  'ecd141163ae629bd021cc0c11ed1457f', // DUS-IST
-  '8d0452e5babe17648c928a0ee04c9f98', // DUS-LON
-  'a4f5c8b17cfc9a2b3e84f05b040dbe26', // DUS-DXB
+// One offer box per route, configured by Rozhan in the specials partner tools (date setting:
+// "ohne Datum", otherwise boxes are often empty). `route` is what the box must return: a
+// misconfigured box returns unrelated routes, which are dropped (see getFlightOffers).
+const FLIGHT_BOXES = [
+  { route: 'DUS-EBL', key: 'e8e7cf1b63e22aa4c9612b459eaa2c68' },
+  { route: 'HAJ-EBL', key: 'e6b2c162eeb20f923740bbcf192a16eb' },
+  { route: 'FRA-EBL', key: '5fbbe53dd88b336b361f11b5afb131ec' },
+  { route: 'MUC-EBL', key: '37fc4ef27d12c7d59ba8540853f91a53' },
+  { route: 'STR-EBL', key: '68247f0e6d8a5cc42969cd3542f17ff8' },
+  { route: 'DUS-PMI', key: '7055812ff8fefdd0d85c5a2554d50de6' },
+  { route: 'DUS-AYT', key: 'c7dedbd3150374df970ace74c2ed9a86' },
+  { route: 'DUS-IST', key: 'ecd141163ae629bd021cc0c11ed1457f' },
+  { route: 'DUS-LON', key: '8d0452e5babe17648c928a0ee04c9f98' },
+  { route: 'DUS-DXB', key: 'a4f5c8b17cfc9a2b3e84f05b040dbe26' },
+  { route: 'BER-BCN', key: '3062885b78edbf2980596f12b54e2e45' },
+  { route: 'CGN-ROM', key: 'c99b2cc6ce07cdaaa8dcb36198a1beb3' },
+  { route: 'HAJ-HER', key: 'd7049a28f0d4e0c60e6b2dc73bb5b475' },
+  { route: 'HAM-ISU', key: 'c6ccd5e1a2e063d9f7b747a54c7f4b61' },
+  { route: 'DUS-BGW', key: '6c6ead2d080b1c3383673b813c89741e' },
+  { route: 'HAJ-PAR', key: '36724c7bcd6112f429ecfea7ba6e993c' },
+  { route: 'BER-AMS', key: '57ee7b58cefafa420ab90dc277e7499e' },
+  { route: 'DUS-TBS', key: '25d46f19e42ebac13436b0df4feb2a07' },
+  { route: 'FRA-CAI', key: 'd84585f01f9065c153da4bfca092d2f7' },
+  { route: 'FRA-BKK', key: 'b46010baf1f53416d4c63de91d81e17b' },
+  { route: 'CGN-VIE', key: '853a4c597e0965b2bc44f04900ebcc34' },
+  { route: 'MUC-LCA', key: '3be189cef24ff4725b80b2ab6834ff5e' },
 ];
 const MAX_OFFERS = 12;
 const MAX_BYTES = 2000000;
@@ -141,9 +155,10 @@ async function fetchText(url) {
 
 /** Live flight offers: cheapest per route over all offer boxes, future departures only. */
 async function getFlightOffers() {
-  const pages = await Promise.all(FLIGHT_BOX_KEYS.map((k) => fetchText(FLIGHT_BOX_BASE + '?access=' + k)));
+  const pages = await Promise.all(FLIGHT_BOXES.map((b) => fetchText(FLIGHT_BOX_BASE + '?access=' + b.key)));
   const today = new Date().toISOString().slice(0, 10);
-  const all = pages.flatMap((html) => (html ? parseFlightOffers(html) : []));
+  const all = pages.flatMap((html, i) => (html ? parseFlightOffers(html) : [])
+    .filter((o) => o.from.code + '-' + o.to.code === FLIGHT_BOXES[i].route)); // only the box's own route
   return cheapestPerRoute(all.filter((o) => o.departureDate > today)).sort((a, b) => a.price - b.price);
 }
 
@@ -160,4 +175,4 @@ async function getPackageOffers(kind = 'package') {
   }
 }
 
-module.exports = { getFlightOffers, getPackageOffers, parseFlightOffers, parsePackageOffers, parseEuro, plainText, cheapestPerRoute };
+module.exports = { FLIGHT_BOXES, getFlightOffers, getPackageOffers, parseFlightOffers, parsePackageOffers, parseEuro, plainText, cheapestPerRoute };

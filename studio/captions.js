@@ -28,6 +28,20 @@ const CITY = {
   EBL: { de: 'Erbil', ar: 'أربيل', ckb: 'هەولێر' },
   ISU: { de: 'Sulaimaniyya', ar: 'السليمانية', ckb: 'سلێمانی' },
   BGW: { de: 'Bagdad', ar: 'بغداد', ckb: 'بەغدا' },
+  HAM: { de: 'Hamburg', ar: 'هامبورغ', ckb: 'هامبۆرگ' },
+  CGN: { de: 'Köln', ar: 'كولونيا', ckb: 'کۆڵن' },
+  BER: { de: 'Berlin', ar: 'برلين', ckb: 'بەرلین' },
+  BCN: { de: 'Barcelona', ar: 'برشلونة', ckb: 'بارسێلۆنا' },
+  ROM: { de: 'Rom', ar: 'روما', ckb: 'ڕۆما' },
+  FCO: { de: 'Rom', ar: 'روما', ckb: 'ڕۆما' },
+  HER: { de: 'Heraklion (Kreta)', ar: 'هيراكليون (كريت)', ckb: 'هێراکلیۆن (کریت)' },
+  PAR: { de: 'Paris', ar: 'باريس', ckb: 'پاریس' },
+  AMS: { de: 'Amsterdam', ar: 'أمستردام', ckb: 'ئەمستردام' },
+  TBS: { de: 'Tiflis', ar: 'تبليسي', ckb: 'تبلیسی' },
+  CAI: { de: 'Kairo', ar: 'القاهرة', ckb: 'قاهیرە' },
+  BKK: { de: 'Bangkok', ar: 'بانكوك', ckb: 'بانکۆک' },
+  VIE: { de: 'Wien', ar: 'فيينا', ckb: 'ڤیەننا' },
+  LCA: { de: 'Larnaka', ar: 'لارنكا', ckb: 'لارناکا' },
 };
 // Fixed hashtags per language (always added); the destination adds its own.
 const BASE_TAGS = {
