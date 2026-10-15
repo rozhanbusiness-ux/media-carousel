@@ -79,7 +79,7 @@ async function photoFor(offer, used, queriesFor, choosePhoto) {
     return { file: null, pexelsId: best.id, dataUri, pos: `${Number.isInteger(best.x) ? best.x : 50}% 50%` };
   }
   if (lib && !used.has(lib.file)) { used.add(lib.file); return { file: lib.file, pexelsId: null, dataUri: lib.dataUri }; }
-  const any = ranked[0];
+  const any = ranked.find((c) => c.score != null && c.score >= 6); // never an unscored or poor photo
   if (!any) return null;
   used.add(any.id);
   return { file: null, pexelsId: any.id, dataUri: await sources.download(any.url), pos: `${Number.isInteger(any.x) ? any.x : 50}% 50%` };
@@ -98,7 +98,7 @@ async function pickPhotos(draft, queriesFor, choosePhoto) {
   draft.photoPos = [];
   for (let n = 0; n < draft.offers.length; n++) {
     const p = await photoFor(draft.offers[n], used, queriesFor, choosePhoto);
-    if (!p) throw new Error(`Kein Foto für ${draft.offers[n].to.name} gefunden.`);
+    if (!p) throw new Error(`Kein Foto für ${draft.offers[n].to.name} gefunden – bitte erneut versuchen oder das Angebot weglassen.`);
     fs.writeFileSync(photoPath(draft.id, n), p.dataUri);
     sources.use(draft.offers[n], p.pexelsId != null ? p.pexelsId : (p.file ? 'lib:' + p.file : null), p.dataUri);
     draft.pexelsIds.push(p.pexelsId || p.file);

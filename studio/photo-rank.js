@@ -8,6 +8,16 @@ const config = require('../config');
 
 const MODEL = 'gemini-2.5-flash';
 
+const SCHEMA = {
+  type: 'OBJECT',
+  properties: { scores: { type: 'ARRAY', items: { type: 'OBJECT', properties: {
+    i: { type: 'INTEGER' }, score: { type: 'INTEGER' }, x: { type: 'INTEGER' },
+    shot: { type: 'STRING', enum: ['aerial', 'panorama', 'bay', 'waterfront', 'landmark', 'sunset', 'resort', 'street', 'other'] },
+    sky: { type: 'STRING', enum: ['clear', 'cloudy', 'overcast'] }, why: { type: 'STRING' },
+  }, required: ['i', 'score'] } } },
+  required: ['scores'],
+};
+
 const OFFER_TYPE = { flight: 'flights', package: 'holiday packages', cruise: 'river cruises', home: 'holiday homes' };
 const WINTER = new Set([10, 11, 0, 1, 2]); // Nov-Mar
 
@@ -82,18 +92,26 @@ async function rankPhotos(candidates, city, fetchImpl = fetch, kind = null) {
   if (!usable.length) { console.error('studio photo rank: no thumbnails loaded'); return list; }
   const parts = [{ text: criteria(city, kind) }];
   usable.forEach((x, i) => parts.push({ text: `Photo ${i}:` }, { inline_data: { mime_type: x.t.mime, data: x.t.data } }));
-  try {
-    const res = await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': config.GEMINI_API_KEY },
-      body: JSON.stringify({ contents: [{ parts }], generationConfig: { responseMimeType: 'application/json', temperature: 0.2, maxOutputTokens: 4096, thinkingConfig: { thinkingBudget: 0 } } }),
-      signal: AbortSignal.timeout(60000),
-    });
-    if (!res.ok) { console.error('studio photo rank: HTTP', res.status); return list; }
-    const json = await res.json();
-    const text = (json?.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join('');
-    const scores = JSON.parse(text.replace(/```json|```/g, '').trim()).scores;
-    if (!Array.isArray(scores)) return list;
+  // The answer is forced into a JSON schema (free JSON was sometimes invalid); one retry on failure.
+  let scores = null;
+  for (let attempt = 1; attempt <= 2 && !scores; attempt++) {
+    try {
+      const res = await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': config.GEMINI_API_KEY },
+        body: JSON.stringify({ contents: [{ parts }], generationConfig: { responseMimeType: 'application/json', responseSchema: SCHEMA, temperature: 0.2, maxOutputTokens: 8192, thinkingConfig: { thinkingBudget: 0 } } }),
+        signal: AbortSignal.timeout(90000),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      const text = (json?.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join('');
+      const parsed = JSON.parse(text.replace(/```json|```/g, '').trim()).scores;
+      if (!Array.isArray(parsed)) throw new Error('no scores');
+      scores = parsed;
+    } catch (err) { console.error(`studio photo rank (attempt ${attempt}):`, err.message); }
+  }
+  if (!scores) return list; // unscored: callers never use unscored photos automatically
+  {
     for (const s of scores) {
       if (Number.isInteger(s?.i) && s.i >= 0 && s.i < usable.length && Number.isFinite(s.score)) {
         usable[s.i].c.score = Math.max(0, Math.min(10, Math.round(s.score)));
@@ -104,7 +122,7 @@ async function rankPhotos(candidates, city, fetchImpl = fetch, kind = null) {
         if (typeof s.why === 'string') usable[s.i].c.why = s.why.replace(/[<>{}]/g, '').trim().slice(0, 40);
       }
     }
-  } catch (err) { console.error('studio photo rank:', err.message); return list; }
+  }
   return list.sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
 }
 

@@ -45,8 +45,8 @@ function shotQueries(offer) {
   if (!n) return [];
   const pkg = offer.kind && offer.kind !== 'flight';
   return pkg
-    ? [`${n} aerial drone beach`, `${n} turquoise bay from above`, `${n} coast panorama`, `${n} golden hour sea`]
-    : [`${n} aerial drone`, `${n} panorama viewpoint`, `${n} skyline blue sky`, `${n} golden hour`];
+    ? [`${n} beach aerial view`, `${n} turquoise bay from above`, `${n} coast panorama`, `${n} golden hour sea`]
+    : [`${n} aerial view`, `${n} panorama viewpoint`, `${n} skyline blue sky`, `${n} golden hour`]; // never "drone": it returns photos of drones
 }
 
 /** Search words: shot types first, then the destination's own list, else Gemini suggestions + the generic fallback. */
