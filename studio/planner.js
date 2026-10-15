@@ -12,7 +12,7 @@ const { getFlightOffers, getPackageOffers } = require('./offers');
 const { toDraftOffer, offerKey, countryName, cardFor } = require('./packages');
 const { buildCaption, formatDate, formatPrice, cityName, LANGS } = require('./captions');
 const { renderSlide, STYLE_BY_WEEKDAY, STYLES, PACKAGE_STYLES } = require('./render');
-const { generatePhoto } = require('./image');
+const { generateSet } = require('./image');
 const sources = require('./photo-sources');
 const registry = require('./photo-registry');
 const { rankPhotos } = require('./photo-rank');
@@ -30,6 +30,7 @@ const KURDISH_DAYS = new Set([1, 3, 5]);
 
 const defaultLangs = (date) => ['de', KURDISH_DAYS.has(date.getDay()) ? 'ckb' : 'ar'];
 const photoPath = (id) => path.join(CACHE, `studio-photo-${id}.txt`);
+const slidePath = (id, slide) => path.join(CACHE, `studio-photo-${id}-s${slide}.txt`); // own photo for slide 2/3 (AI sets)
 
 /** A library photo for the destination (studio/photos/<IATA>-n.jpg), least recently used first. */
 function libraryPhoto(code, used) {
@@ -94,10 +95,13 @@ function choosePhoto(offer) {
   return libraryPhoto(offer.to.code, new Set(drafts.map((d) => d.photoFile).filter(Boolean)));
 }
 
+// AI set → picture: slide 1 photo plus different photos for slides 2 and 3 (client: never one photo for all slides).
+const aiPicture = ([a, b, c]) => ({ file: null, pexelsId: null, ai: true, dataUri: a, slides: { 2: b, 3: c } });
+
 /** First photo for an offer (client decision): an AI image first, else our library, else null
  *  (then ranked real photos are shown to choose from). */
 async function firstPhoto(offer) {
-  try { return { file: null, pexelsId: null, ai: true, dataUri: await generatePhoto(offer) }; } catch (err) { console.error('studio ai photo:', err.message); }
+  try { return aiPicture(await generateSet(offer)); } catch (err) { console.error('studio ai photo:', err.message); }
   return choosePhoto(offer);
 }
 
@@ -115,13 +119,21 @@ async function findCandidates(draft) {
 async function useCandidate(draft, id) {
   const c = (draft.photoCandidates || []).find((x) => x.id === id);
   if (!c) throw new Error('unknown photo');
-  setPhoto(draft, { file: null, pexelsId: c.id, dataUri: await sources.download(c.url) });
+  // Slides 2 and 3 get the next best other photos (client: never one photo for all slides).
+  const others = draft.photoCandidates.filter((x) => x.id !== id).slice(0, 2);
+  const extra = await Promise.all(others.map((x) => sources.download(x.url).catch(() => null)));
+  setPhoto(draft, { file: null, pexelsId: c.id, dataUri: await sources.download(c.url), slides: { 2: extra[0] || null, 3: extra[1] || null } });
+  others.forEach((x, i) => { if (extra[i]) sources.use(draft.offer, x.id, extra[i]); });
   draft.photoCandidates = [];
 }
 
 function setPhoto(draft, p) {
   if (p) draft.photoCandidates = [];
   fs.writeFileSync(photoPath(draft.id), p ? p.dataUri : '');
+  for (const n of [2, 3]) {
+    const extra = p && p.slides && p.slides[n];
+    try { if (extra) fs.writeFileSync(slidePath(draft.id, n), extra); else fs.unlinkSync(slidePath(draft.id, n)); } catch { /* none */ }
+  }
   draft.photoFile = p ? p.file : null;
   draft.pexelsId = p ? p.pexelsId : null;
   draft.needsPhoto = !p;
@@ -173,6 +185,8 @@ function datesText(offer, lang) {
 /** Render all slides of a draft from its stored photo and texts. */
 async function renderDraft(draft) {
   const photo = fs.readFileSync(photoPath(draft.id), 'utf8');
+  const slidePhotos = {};
+  for (const n of [2, 3]) { try { slidePhotos[n] = fs.readFileSync(slidePath(draft.id, n), 'utf8'); } catch { /* uses slide 1 photo */ } }
   const stamp = Date.now().toString(36);
   const versions = [];
   for (const lang of draft.langs) {
@@ -191,7 +205,7 @@ async function renderDraft(draft) {
     for (const size of ['story', 'square']) { // story first: it is posted first
       for (const slide of [1, 2, 3]) {
         const name = `studio_${draft.id}_${stamp}_${lang}_${size}_${slide}.jpg`;
-        fs.writeFileSync(path.join(OUTPUT, name), await renderSlide(post, size, slide));
+        fs.writeFileSync(path.join(OUTPUT, name), await renderSlide({ ...post, photo: slidePhotos[slide] || photo }, size, slide));
         files.push({ size, slide, url: '/output/' + name });
       }
     }
@@ -318,7 +332,7 @@ async function regenerate(draft, what, value) {
     if (!draft.photoCandidates.length) throw new Error('Kein echtes Foto gefunden – bitte eigenes Foto hochladen.');
     await useCandidate(draft, draft.photoCandidates[0].id);
   }
-  if (what === 'photo-ai') setPhoto(draft, { file: null, pexelsId: null, ai: true, dataUri: await generatePhoto(draft.offer) });
+  if (what === 'photo-ai') setPhoto(draft, aiPicture(await generateSet(draft.offer)));
   if (what === 'photo-upload') setPhoto(draft, { file: null, pexelsId: null, dataUri: value });
   if (what === 'text' || what === 'all') await writeTexts(draft);
   if (what === 'all') await findCandidates(draft); // new ranked photos to choose from
@@ -343,6 +357,7 @@ function deleteDraft(draft) {
     try { fs.unlinkSync(path.join(OUTPUT, path.basename(f.url))); } catch { /* already gone */ }
   }
   try { fs.unlinkSync(photoPath(draft.id)); } catch { /* no photo */ }
+  for (const n of [2, 3]) { try { fs.unlinkSync(slidePath(draft.id, n)); } catch { /* none */ } }
   if (draft.bundle) deleteBundlePhotos(draft);
   store.removeDraft(draft.id);
 }

@@ -22,6 +22,7 @@ const VARIANTS = [
 function buildPrompt(city, variant) {
   return [
     `Ultra-realistic luxury travel photograph of ${city}. Scene: ${variant}.`,
+    'REALISM FIRST: it must be indistinguishable from an unretouched photo taken on a real camera (Sony A7 IV, RAW, natural colour grading), with natural imperfections; ONE viewpoint and ONE main subject, as a photographer standing there could really see it; do not combine several landmarks in one frame; no exaggerated turquoise water, no glossy plastic textures, no perfect symmetry, no typical AI look.',
     'STYLE: editorial cover photo for a high-end travel magazine (Condé Nast Traveler, Travel + Leisure); aspirational, elegant, calm, inviting.',
     'CAMERA: full-frame camera, 24mm or 35mm lens, f/8, tripod, perfectly level horizon, vertical lines straight, tack-sharp from foreground to background, no blur, no bokeh.',
     'LIGHT: warm golden hour or a clear bright morning, soft directional sunlight, clean blue sky with a few soft clouds, gentle natural contrast, rich but true-to-life colours, crystal-clear air, no haze, no fog.',
@@ -34,14 +35,21 @@ function buildPrompt(city, variant) {
   ].join(' ');
 }
 
-/** Returns a data URI (image) or throws. */
-async function generatePhoto(offerOrCity) {
+const toOffer = (o) => (typeof o === 'string' ? { to: { name: o } } : o);
+const shuffle = (a) => a.map((x) => [Math.random(), x]).sort((p, q) => p[0] - q[0]).map((p) => p[1]);
+
+/** `n` different scenes for the offer: its own scenes (destinations.js) first, then generic ones. */
+function scenesFor(offer, n) {
+  const own = shuffle((destinations.find(offer) || {}).ai || []);
+  return [...own, ...shuffle(VARIANTS)].slice(0, n);
+}
+
+/** Returns a data URI (image) or throws. `scene` is optional (else a random one). */
+async function generatePhoto(offerOrCity, scene) {
   if (!config.GEMINI_API_KEY) throw new Error('GEMINI_API_KEY is not set');
-  const offer = typeof offerOrCity === 'string' ? { to: { name: offerOrCity } } : offerOrCity;
+  const offer = toOffer(offerOrCity);
   const city = [offer.to.name, offer.country].filter(Boolean).join(', ');
-  // Destination-specific scenes first (destinations.js), else a generic variant.
-  const scenes = (destinations.find(offer) || {}).ai || VARIANTS;
-  const variant = scenes[Math.floor(Math.random() * scenes.length)];
+  const variant = scene || scenesFor(offer, 1)[0];
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${config.GEMINI_IMAGE_MODEL}:generateContent`;
   const res = await fetch(url, {
     method: 'POST',
@@ -60,4 +68,14 @@ async function generatePhoto(offerOrCity) {
   return `data:${inline.mimeType || inline.mime_type || 'image/png'};base64,${inline.data}`;
 }
 
-module.exports = { generatePhoto, buildPrompt };
+/** Three different AI photos (one per slide), generated in parallel. Fails when the first one fails;
+ *  a missing slide 2/3 photo is null (that slide then uses the first photo). */
+async function generateSet(offerOrCity) {
+  const offer = toOffer(offerOrCity);
+  const scenes = scenesFor(offer, 3);
+  const [a, b, c] = await Promise.allSettled(scenes.map((sc) => generatePhoto(offer, sc)));
+  if (a.status !== 'fulfilled') throw a.reason;
+  return [a.value, b.status === 'fulfilled' ? b.value : null, c.status === 'fulfilled' ? c.value : null];
+}
+
+module.exports = { generatePhoto, generateSet, buildPrompt, scenesFor };
