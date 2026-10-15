@@ -68,7 +68,7 @@ async function photoFor(offer, used, queriesFor, choosePhoto) {
   const lib = choosePhoto(offer);
   let list = [];
   try { list = await sources.candidates(offer, queriesFor, used, 8); } catch (err) { console.error('studio bundle photos:', err.message); }
-  const ranked = await rankPhotos(list, [offer.to.name, offer.country].filter(Boolean).join(', '));
+  const ranked = await rankPhotos(list, [offer.to.name, offer.country].filter(Boolean).join(', '), fetch, offer.kind || 'flight');
   // Strict: a magazine-level real photo (8+), retouched; else our library; else the best one found.
   const best = ranked.find((c) => c.score != null && c.score >= 8);
   if (best) {
@@ -187,7 +187,7 @@ async function slotCandidates(draft, n, queriesFor) {
     const o = draft.offers[n];
     let list = [];
     try { list = await sources.candidates(o, queriesFor, used, 15); } catch (err) { console.error('studio bundle photos:', err.message); }
-    ranked = await rankPhotos(list, [o.to.name, o.country].filter(Boolean).join(', '));
+    ranked = await rankPhotos(list, [o.to.name, o.country].filter(Boolean).join(', '), fetch, o.kind || 'flight');
   }
   if (!ranked.length) throw new Error('Keine weiteren Fotos gefunden – bitte eigenes Foto hochladen.');
   draft.bundlePick = { n, list: ranked.map((c) => ({ id: c.id, url: c.url || '', thumb: c.thumb, score: c.score, why: c.why || '', cover: !!c.cover })) };

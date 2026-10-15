@@ -108,11 +108,15 @@ const placeName = (o) => [o.to.name, o.country].filter(Boolean).join(', ');
  *  { picture, ranked }: picture is null when no photo is good enough (ranked are then shown). */
 async function autoPicture(offer, used = new Set()) {
   let list = [];
-  try { list = await sources.candidates(offer, queriesFor, used, 15); } catch (err) { console.error('studio photos:', err.message); }
-  const ranked = await rankPhotos(list, placeName(offer));
+  try { list = await sources.candidates(offer, queriesFor, used, 20); } catch (err) { console.error('studio photos:', err.message); }
+  const ranked = await rankPhotos(list, placeName(offer), fetch, offer.kind || 'flight');
   const top = ranked.filter((c) => c.score != null && c.score >= AUTO_MIN);
   if (!top.length) return { picture: choosePhoto(offer), ranked };
-  const picks = [...top, ...ranked.filter((c) => c.score != null && c.score >= AUTO_FILL && c.score < AUTO_MIN)].slice(0, 3);
+  // Variety (client): a different kind of shot on each slide when possible (aerial cover, then bay, sunset ...).
+  const pool = [...top, ...ranked.filter((c) => c.score != null && c.score >= AUTO_FILL && c.score < AUTO_MIN)];
+  const picks = [];
+  for (const c of pool) if (picks.length < 3 && !picks.some((p) => p.shot && p.shot === c.shot)) picks.push(c);
+  for (const c of pool) if (picks.length < 3 && !picks.includes(c)) picks.push(c);
   const imgs = await Promise.all(picks.map(async (c) => {
     try {
       const raw = await sources.download(c.url);
@@ -137,7 +141,7 @@ async function findCandidates(draft) {
   for (const c of draft.photoCandidates || []) used.add(c.id); // "more photos" shows new ones
   let list = [];
   try { list = await sources.candidates(draft.offer, queriesFor, used, 15); } catch (err) { console.error('studio photos:', err.message); }
-  const ranked = await rankPhotos(list, [draft.offer.to.name, draft.offer.country].filter(Boolean).join(', '));
+  const ranked = await rankPhotos(list, placeName(draft.offer), fetch, draft.offer.kind || 'flight');
   draft.photoCandidates = asCandidates(ranked);
 }
 

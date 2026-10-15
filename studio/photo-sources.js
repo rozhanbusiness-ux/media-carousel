@@ -39,11 +39,21 @@ async function suggestQueries(offer, fetchImpl = fetch) {
   return list;
 }
 
-/** Search words: own list for the destination, else Gemini suggestions + the generic fallback. */
+// Shot types searched first (client): aerial and elevated views with a clear sky, then the offer's mood.
+function shotQueries(offer) {
+  const n = String((offer.to && offer.to.name) || '').trim();
+  if (!n) return [];
+  const pkg = offer.kind && offer.kind !== 'flight';
+  return pkg
+    ? [`${n} aerial drone beach`, `${n} turquoise bay from above`, `${n} coast panorama`, `${n} golden hour sea`]
+    : [`${n} aerial drone`, `${n} panorama viewpoint`, `${n} skyline blue sky`, `${n} golden hour`];
+}
+
+/** Search words: shot types first, then the destination's own list, else Gemini suggestions + the generic fallback. */
 async function queriesFor(offer, fallback) {
   const e = destinations.find(offer);
-  if (e) return e.q;
-  return [...(await suggestQueries(offer)), ...fallback(offer)];
+  const own = e ? e.q : [...(await suggestQueries(offer)), ...fallback(offer)];
+  return [...new Set([...shotQueries(offer), ...own])];
 }
 
 /** Unused candidates (Pexels first, then Pixabay), registry rule applied. */
@@ -65,4 +75,4 @@ const download = (url) => (/^https:\/\/(cdn\.)?pixabay\.com\//.test(url) ? pixab
 /** Record that a photo is now used for this offer's destination. */
 const use = (offer, id, dataUri) => registry.record(id, destOf(offer), dataUri);
 
-module.exports = { candidates, download, use, destOf, queriesFor, suggestQueries };
+module.exports = { candidates, download, use, destOf, queriesFor, suggestQueries, shotQueries };

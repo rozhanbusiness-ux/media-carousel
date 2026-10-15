@@ -62,16 +62,22 @@ async function findPhoto(queries, used, fetchImpl = fetch) {
   return null;
 }
 
-/** Up to `max` unused candidates over all queries (deduplicated), in search order. */
-async function candidates(queries, used, max = 15, fetchImpl = fetch) {
+/** Up to `max` unused candidates (deduplicated), spread over the queries: at most `per` from each
+ *  query first (so every shot type is represented), then filled up in search order. */
+async function candidates(queries, used, max = 15, fetchImpl = fetch, per = 4) {
   if (!key()) return [];
-  const out = new Map();
-  for (const q of queries.filter(Boolean)) {
-    for (const p of await search(q, fetchImpl)) {
-      if (!used.has(p.id) && !out.has(p.id) && /^https:\/\/images\.pexels\.com\//.test(p.thumb)) out.set(p.id, p);
-      if (out.size >= max) return [...out.values()];
-    }
+  const qs = queries.filter(Boolean).slice(0, 8);
+  const results = [];
+  for (const q of qs) {
+    try { results.push(await search(q, fetchImpl)); } catch (err) { console.error('studio pexels:', err.message); results.push([]); }
   }
+  const ok = (p) => !used.has(p.id) && /^https:\/\/images\.pexels\.com\//.test(p.thumb);
+  const out = new Map();
+  for (const list of results) {
+    let n = 0;
+    for (const p of list) if (n < per && out.size < max && ok(p) && !out.has(p.id)) { out.set(p.id, p); n++; }
+  }
+  for (const list of results) for (const p of list) if (out.size < max && ok(p) && !out.has(p.id)) out.set(p.id, p);
   return [...out.values()];
 }
 

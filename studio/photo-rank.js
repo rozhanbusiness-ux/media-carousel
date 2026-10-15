@@ -1,6 +1,6 @@
 // ============================================================
 //  studio/photo-rank.js — Gemini scores candidate photos 0-10
-//  Only small thumbnails and the criteria are sent. The model returns
+//  Only preview images and the criteria are sent. The model returns
 //  numbers only; they are validated here before use.
 // ============================================================
 
@@ -8,18 +8,51 @@ const config = require('../config');
 
 const MODEL = 'gemini-2.5-flash';
 
-function criteria(city) {
+const OFFER_TYPE = { flight: 'flights', package: 'holiday packages', cruise: 'river cruises', home: 'holiday homes' };
+const WINTER = new Set([10, 11, 0, 1, 2]); // Nov-Mar
+
+function criteria(city, kind, month = new Date().getMonth()) {
+  if (!kind) return coverCriteria(city); // type covers (airplane / resort), no destination
+  const match = kind === 'flight'
+    ? '- Flight offer: the city\'s or coast\'s most iconic, recognisable view.'
+    : '- Holiday offer: sea, beach, resort coastline, pools, relaxation.';
   return [
-    `You are the strict photo editor of a luxury travel magazine. Score each photo (0-10) as the background of a vertical Instagram ad for a trip to ${city}.`,
-    'Be demanding: 8-10 only for a photo you would really print on a magazine cover: clearly THIS destination (its best-known landmark, coast or view), beautiful light,',
-    'strong composition, sharp, clean and tidy, elegant and aspirational. Ordinary snapshots, average views, cluttered or flat-light photos get 6 or less.',
-    'The photo is shown cropped to a vertical 9:16 frame: the main subject must fit in a vertical strip; calm sky at the top (logo), calm lower third (a price card covers it).',
-    'Also give "x": the horizontal centre of the main subject in percent of the photo width (0 = left edge, 50 = centre, 100 = right edge).',
-    'Score 0 only if a mosque, church, cathedral, temple or religious symbol is CLEARLY recognisable. Towers, palaces, schools or other buildings that merely look similar only lower the score a little.',
-    'Low scores: dark, grey or gloomy; night; close-up faces; crowds; text, signs or logos; food or interiors; generic places that could be anywhere; blurry.',
+    `You are the senior photo editor of a luxury travel magazine choosing images for a premium Instagram campaign selling ${OFFER_TYPE[kind] || 'trips'} to ${city}.`,
+    'MUST HAVE (otherwise score 4 or less):',
+    '- Clear, deep-blue sky (or a warm, clean golden-hour sky). No overcast, grey, white, hazy or stormy sky.',
+    `- Unmistakably ${city}: its signature coastline, skyline or landmark.`,
+    '- Bright, sunny, inviting; crisp and in focus.',
+    'WHAT MAKES 9-10 (a cover image):',
+    '- Aerial / drone or elevated panoramic viewpoint with depth and a sense of space.',
+    '- Vivid but natural colours: turquoise water, white sand, lush green, warm stone.',
+    '- Strong composition: clear subject, leading lines, clean horizon.',
+    '- Calm areas top and bottom (logo / price card) and the subject fitting a vertical 9:16 crop.',
+    '- Feels like a dream holiday you want to book NOW: luxury, freedom, escape.',
+    ...(WINTER.has(month) ? ['- It is winter in Germany: warm, sunny, summery scenes score higher.'] : []),
+    'MATCH THE OFFER:',
+    match,
+    'ALWAYS LOW (3 or less):',
+    '- Any religious building or symbol, including famous ones (Sagrada Familia, Hagia Sophia, Notre-Dame, Blue Mosque, Sheikh Zayed Mosque, St. Peter\'s, Cologne Cathedral ...), even partly visible.',
+    '- Night, dark, rain, fog; crowds; traffic; construction; litter.',
+    '- Close-up people, selfies; text, signs, logos, watermarks.',
+    '- Generic places that could be anywhere; interiors; food.',
+    '- Heavy filters, HDR, oversaturated or fake-looking images.',
     'Photos are numbered from 0 in the order given.',
-    'Give each photo a very short German reason (max 4 words), e.g. "Bosporus, hell, elegant" or "Moschee sichtbar" or "zu dunkel".',
-    'Return ONLY JSON: {"scores":[{"i":0,"score":7,"x":50,"why":"Bosporus, hell, elegant"}, ...]} with one entry per photo.',
+    'For each photo return: "score" (0-10), "x" (horizontal centre of the main subject in percent of the width, 0 = left, 100 = right),',
+    '"shot" (one of: aerial, panorama, bay, waterfront, landmark, sunset, resort, street, other), "sky" (clear, cloudy or overcast)',
+    'and "why" (very short German reason, max 4 words, e.g. "Drohne, Bucht, strahlend").',
+    'Return ONLY JSON: {"scores":[{"i":0,"score":9,"x":50,"shot":"aerial","sky":"clear","why":"Drohne, Bucht, strahlend"}, ...]} with one entry per photo.',
+  ].join('\n');
+}
+
+function coverCriteria(subject) {
+  return [
+    `You are the photo editor of a luxury travel agency. Score each photo (0-10) as the cover background of an Instagram post about ${subject}.`,
+    'High scores: bright, clear blue sky, elegant, luxurious, sharp, professional; calm area at the top (logo) and bottom (text).',
+    'Low scores: dark, grey, cluttered, text or logos, close-up faces, any religious building or symbol.',
+    'Photos are numbered from 0 in the order given. Also give "x" (horizontal centre of the main subject in percent).',
+    'Give each photo a very short German reason (max 4 words).',
+    'Return ONLY JSON: {"scores":[{"i":0,"score":7,"x":50,"why":"hell, elegant"}, ...]} with one entry per photo.',
   ].join('\n');
 }
 
@@ -41,13 +74,13 @@ async function fetchThumb(url, fetchImpl) {
  * Adds `score` (0-10, or null when scoring is unavailable) to each candidate
  * ({ id, thumb, ... }) and returns them sorted best first.
  */
-async function rankPhotos(candidates, city, fetchImpl = fetch) {
+async function rankPhotos(candidates, city, fetchImpl = fetch, kind = null) {
   const list = candidates.map((c) => ({ ...c, score: null, why: '' }));
   if (!config.GEMINI_API_KEY || !list.length) return list;
   const thumbs = await Promise.all(list.map((c) => fetchThumb(c.preview || c.thumb, fetchImpl))); // larger preview: composition is judged better
   const usable = list.map((c, i) => ({ c, t: thumbs[i] })).filter((x) => x.t);
   if (!usable.length) { console.error('studio photo rank: no thumbnails loaded'); return list; }
-  const parts = [{ text: criteria(city) }];
+  const parts = [{ text: criteria(city, kind) }];
   usable.forEach((x, i) => parts.push({ text: `Photo ${i}:` }, { inline_data: { mime_type: x.t.mime, data: x.t.data } }));
   try {
     const res = await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
@@ -64,6 +97,9 @@ async function rankPhotos(candidates, city, fetchImpl = fetch) {
     for (const s of scores) {
       if (Number.isInteger(s?.i) && s.i >= 0 && s.i < usable.length && Number.isFinite(s.score)) {
         usable[s.i].c.score = Math.max(0, Math.min(10, Math.round(s.score)));
+        const SHOTS = ['aerial', 'panorama', 'bay', 'waterfront', 'landmark', 'sunset', 'resort', 'street', 'other'];
+        if (SHOTS.includes(s.shot)) usable[s.i].c.shot = s.shot;
+        if (['cloudy', 'overcast'].includes(s.sky)) usable[s.i].c.score = Math.min(usable[s.i].c.score, 4); // clear sky is a must (client)
         if (Number.isFinite(s.x)) usable[s.i].c.x = Math.max(0, Math.min(100, Math.round(s.x)));
         if (typeof s.why === 'string') usable[s.i].c.why = s.why.replace(/[<>{}]/g, '').trim().slice(0, 40);
       }
@@ -72,4 +108,4 @@ async function rankPhotos(candidates, city, fetchImpl = fetch) {
   return list.sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
 }
 
-module.exports = { rankPhotos };
+module.exports = { rankPhotos, criteria };
