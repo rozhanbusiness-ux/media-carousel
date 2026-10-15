@@ -164,6 +164,7 @@
     </div>
     <div id="tracks"></div>
   </details>
+  <p id="aiWarn" class="warn" hidden></p>
   <div id="msg"></div>
   <div id="list"></div>
 </main>
@@ -444,7 +445,10 @@ $('#covers').onclick = async (e) => {
 };
 loadCovers();
 
-async function load() { drafts = await api('/api/studio/drafts'); render(drafts); }
+async function load() {
+  drafts = await api('/api/studio/drafts'); render(drafts);
+  try { const s = await api('/api/studio/ai-status'); $('#aiWarn').hidden = !s; if (s) $('#aiWarn').textContent = '⚠ KI nicht verfügbar: ' + s.text + ' Fotos sind dann ungeprüft und Texte Standardtexte.'; } catch { /* no status */ }
+}
 
 $('#xKind').onchange = () => document.querySelectorAll('[data-x]').forEach((el) => { el.hidden = el.dataset.x !== $('#xKind').value; });
 $('#xGo').onclick = async () => {

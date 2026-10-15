@@ -43,7 +43,7 @@ function criteria(city, kind, month = new Date().getMonth()) {
     match,
     'ALWAYS LOW (3 or less):',
     '- Any religious building or symbol, including famous ones (Sagrada Familia, Hagia Sophia, Notre-Dame, Blue Mosque, Sheikh Zayed Mosque, St. Peter\'s, Cologne Cathedral ...), even partly visible.',
-    '- Night, dark, rain, fog; crowds; traffic; construction; litter.',
+    '- Black-and-white, sepia, desaturated, washed-out or grey-toned photos; night, dark, rain, fog; crowds; traffic; construction; litter; power lines.',
     '- Close-up people, selfies; text, signs, logos, watermarks.',
     '- Generic places that could be anywhere; interiors; food.',
     '- Heavy filters, HDR, oversaturated or fake-looking images.',
@@ -102,6 +102,7 @@ async function rankPhotos(candidates, city, fetchImpl = fetch, kind = null) {
         body: JSON.stringify({ contents: [{ parts }], generationConfig: { responseMimeType: 'application/json', responseSchema: SCHEMA, temperature: 0.2, maxOutputTokens: 8192, thinkingConfig: { thinkingBudget: 0 } } }),
         signal: AbortSignal.timeout(90000),
       });
+      require('./ai-status').report(res.status);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
       const text = (json?.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join('');

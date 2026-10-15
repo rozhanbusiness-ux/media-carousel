@@ -147,6 +147,7 @@ async function askModel(offer, lang, fetchImpl) {
     }),
     signal: AbortSignal.timeout(30000),
   });
+  require('./ai-status').report(res.status);
   if (!res.ok) { console.error('studio caption: HTTP', res.status); return null; }
   const json = await res.json();
   const text = (json?.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join('');

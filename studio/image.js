@@ -60,6 +60,7 @@ async function generatePhoto(offerOrCity, scene) {
     }),
     signal: AbortSignal.timeout(120000),
   });
+  require('./ai-status').report(res.status);
   if (!res.ok) throw new Error(`Gemini image error ${res.status}`);
   const json = await res.json();
   const part = (json?.candidates?.[0]?.content?.parts || []).find((p) => p.inlineData || p.inline_data);
@@ -99,6 +100,7 @@ async function enhancePhoto(dataUri) {
     }),
     signal: AbortSignal.timeout(120000),
   });
+  require('./ai-status').report(res.status);
   if (!res.ok) throw new Error(`Gemini enhance error ${res.status}`);
   const json = await res.json();
   const part = (json?.candidates?.[0]?.content?.parts || []).find((p) => p.inlineData || p.inline_data);

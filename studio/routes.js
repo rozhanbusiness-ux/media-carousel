@@ -25,6 +25,7 @@ module.exports = function mountStudio(app) {
   const router = express.Router();
 
   router.get('/drafts', (req, res) => res.json(store.listDrafts().slice(0, 30)));
+  router.get('/ai-status', (req, res) => res.json(require('./ai-status').get()));
 
   router.get('/offers', async (req, res) => {
     try { res.json(await getFlightOffers()); } catch { res.status(502).json({ error: 'offers unavailable' }); }

@@ -53,9 +53,11 @@
 
   /* Slide 2: editorial feature panel */
   .s2 .shade { background: radial-gradient(45% 12% at 50% 7%, rgba(4,10,28,.45), rgba(4,10,28,0)); }
-  .s2 .panel { position: absolute; left: 110px; right: 110px; top: 54%; transform: translateY(-50%); text-align: center;
+  .s2 .panel { position: absolute; left: 110px; right: 110px; bottom: calc(96 * var(--u)); text-align: center; /* lower part: the landmark stays visible (client) */
     padding: calc(54 * var(--u)) calc(46 * var(--u)); background: rgba(10,24,56,.42); backdrop-filter: blur(18px) saturate(140%); -webkit-backdrop-filter: blur(18px) saturate(140%); border: 1px solid rgba(246,227,161,.6);
     outline: 1px solid rgba(246,227,161,.3); outline-offset: 10px; box-shadow: 0 30px 80px rgba(0,0,0,.5); }
+  .story .s2 .panel { bottom: 230px; }
+  .square .s2 .panel { bottom: 64px; transform: scale(.78); transform-origin: 50% 100%; }
   .s2 .kicker { font-size: calc(19 * var(--u)); display: flex; align-items: center; justify-content: center; gap: 18px; }
   .s2 .kicker::before, .s2 .kicker::after { content: ""; width: 70px; height: 1px; background: var(--gold); }
   .s2 .route { display: flex; align-items: center; justify-content: center; gap: 30px; margin: calc(28 * var(--u)) 0 calc(18 * var(--u)); }
