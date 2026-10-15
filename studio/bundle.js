@@ -13,7 +13,7 @@ const { cardFor, countryName, offerKey } = require('./packages');
 const { formatDate, formatPrice, cityName, BASE_TAGS, FIXED } = require('./captions');
 const { renderSlide, PACKAGE_STYLES } = require('./render');
 const sources = require('./photo-sources');
-const { generatePhoto } = require('./image');
+const { generatePhoto, enhancePhoto } = require('./image');
 const { rankPhotos } = require('./photo-rank');
 const store = require('./store');
 const covers = require('./covers');
@@ -63,18 +63,26 @@ function bundleCaption(offers, lang, title = '') {
   return [...(title ? [title.replace(/\s*…$/, ''), ''] : []), CAPTION_HEAD[lang], '', ...offers.map((o) => offerLine(o, lang)), '', f.cta, '', f.notice, '', tags.join(' ')].join('\n');
 }
 
-/** Photo for one offer: an AI image first (client decision), else library, else the top-ranked real photo. */
+/** Photo for one offer: a strictly ranked real photo (8+, retouched), else library, else the best real photo. */
 async function photoFor(offer, used, queriesFor, choosePhoto) {
-  try { return { file: null, pexelsId: null, dataUri: await generatePhoto(offer) }; } catch (err) { console.error('studio bundle ai photo:', err.message); }
   const lib = choosePhoto(offer);
-  if (lib && !used.has(lib.file)) { used.add(lib.file); return { file: lib.file, pexelsId: null, dataUri: lib.dataUri }; }
   let list = [];
   try { list = await sources.candidates(offer, queriesFor, used, 8); } catch (err) { console.error('studio bundle photos:', err.message); }
   const ranked = await rankPhotos(list, [offer.to.name, offer.country].filter(Boolean).join(', '));
-  const best = ranked.find((c) => c.score == null || c.score >= 5) || ranked[0];
-  if (!best) return null;
-  used.add(best.id);
-  return { file: null, pexelsId: best.id, dataUri: await sources.download(best.url) };
+  // Strict: a magazine-level real photo (8+), retouched; else our library; else the best one found.
+  const best = ranked.find((c) => c.score != null && c.score >= 8);
+  if (best) {
+    used.add(best.id);
+    const raw = await sources.download(best.url);
+    let dataUri = raw;
+    try { dataUri = await enhancePhoto(raw); } catch (err) { console.error('studio enhance:', err.message); }
+    return { file: null, pexelsId: best.id, dataUri, pos: `${Number.isInteger(best.x) ? best.x : 50}% 50%` };
+  }
+  if (lib && !used.has(lib.file)) { used.add(lib.file); return { file: lib.file, pexelsId: null, dataUri: lib.dataUri }; }
+  const any = ranked[0];
+  if (!any) return null;
+  used.add(any.id);
+  return { file: null, pexelsId: any.id, dataUri: await sources.download(any.url), pos: `${Number.isInteger(any.x) ? any.x : 50}% 50%` };
 }
 
 // Cover photo: about the offer TYPE, never a destination (client decision). The client's saved
@@ -87,12 +95,14 @@ async function pickPhotos(draft, queriesFor, choosePhoto) {
   const used = new Set(store.listDrafts().flatMap((d) => [d.pexelsId, ...(d.pexelsIds || []), d.photoFile]).filter(Boolean));
   for (const id of draft.pexelsIds || []) used.add(id); // "new photos" shows other ones
   draft.pexelsIds = [];
+  draft.photoPos = [];
   for (let n = 0; n < draft.offers.length; n++) {
     const p = await photoFor(draft.offers[n], used, queriesFor, choosePhoto);
     if (!p) throw new Error(`Kein Foto für ${draft.offers[n].to.name} gefunden.`);
     fs.writeFileSync(photoPath(draft.id, n), p.dataUri);
     sources.use(draft.offers[n], p.pexelsId != null ? p.pexelsId : (p.file ? 'lib:' + p.file : null), p.dataUri);
     draft.pexelsIds.push(p.pexelsId || p.file);
+    draft.photoPos[n] = p.pos || null; // horizontal crop around the subject (landscape photos)
   }
   const cover = await coverPhoto(draft.bundleKind || 'flight', used);
   if (!cover) throw new Error('Kein Cover-Foto gefunden – bitte unter „📸 Cover-Fotos“ eines speichern.');
@@ -118,12 +128,12 @@ async function renderBundle(draft) {
   const stamp = Date.now().toString(36);
   const versions = [];
   for (const lang of draft.langs) {
-    const posts = draft.offers.map((o, n) => postFor(o, lang, photos[n], PACKAGE_STYLES.includes(draft.style) ? draft.style : 'flight'));
+    const posts = draft.offers.map((o, n) => ({ ...postFor(o, lang, photos[n], PACKAGE_STYLES.includes(draft.style) ? draft.style : 'flight'), photoPosition: (draft.photoPos || [])[n] || '' }));
     const title = titleOf(draft, lang);
     // Never a destination photo on the cover (client rule).
-    const cover = { ...posts[0], photo: coverImg, kind: 'flight', card: null, country: '', destination: title,
+    const cover = { ...posts[0], photo: coverImg, photoPosition: '', kind: 'flight', card: null, country: '', destination: title,
       hook: draft.offers.map((o) => local(o.to, lang)).join(' · '), labels: { kicker: COVER[lang].kicker, swipe: COVER[lang].swipe } };
-    const slides = [[cover, 1], ...posts.map((p) => [p, 2]), [{ ...posts[0], photo: coverImg || posts[0].photo }, 3]]; // last slide: cover photo, not a repeat of slide 2
+    const slides = [[cover, 1], ...posts.map((p) => [p, 2]), [{ ...posts[0], photo: coverImg || posts[0].photo, photoPosition: coverImg ? '' : posts[0].photoPosition }, 3]]; // last slide: cover photo, not a repeat of slide 2
     const files = [];
     for (const size of ['story', 'square']) {
       for (let i = 0; i < slides.length; i++) {
@@ -209,6 +219,7 @@ async function regenerateBundle(draft, what, value, queriesFor, choosePhoto, LAN
     }
     if (n >= 0) sources.use(draft.offers[n], what === 'bundle-photo-pick' ? value.id : null, dataUri);
     fs.writeFileSync(slotPath(draft, n), dataUri);
+    if (n >= 0 && draft.photoPos) draft.photoPos[n] = null; // new photo: centred
     draft.bundlePick = null;
   } else if (what === 'style') {
     if (!PACKAGE_STYLES.includes(value)) throw new Error('Für Sammel-Beiträge: Glas oder Magazin.');

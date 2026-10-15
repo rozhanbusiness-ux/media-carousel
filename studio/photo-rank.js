@@ -10,14 +10,16 @@ const MODEL = 'gemini-2.5-flash';
 
 function criteria(city) {
   return [
-    `You are the photo editor of a luxury travel agency. Score each photo (0-10) as the background of an Instagram ad for a trip to ${city}.`,
-    'High scores: bright, sunny, airy, light colours; clearly recognisable, attractive view or landmark of THIS destination; clean, elegant, luxurious travel feeling;',
-    'calm area at the top (for a logo) and at the bottom (for text); sharp, professional, natural photo.',
+    `You are the strict photo editor of a luxury travel magazine. Score each photo (0-10) as the background of a vertical Instagram ad for a trip to ${city}.`,
+    'Be demanding: 8-10 only for a photo you would really print on a magazine cover: clearly THIS destination (its best-known landmark, coast or view), beautiful light,',
+    'strong composition, sharp, clean and tidy, elegant and aspirational. Ordinary snapshots, average views, cluttered or flat-light photos get 6 or less.',
+    'The photo is shown cropped to a vertical 9:16 frame: the main subject must fit in a vertical strip; calm sky at the top (logo), calm lower third (a price card covers it).',
+    'Also give "x": the horizontal centre of the main subject in percent of the photo width (0 = left edge, 50 = centre, 100 = right edge).',
     'Score 0 only if a mosque, church, cathedral, temple or religious symbol is CLEARLY recognisable. Towers, palaces, schools or other buildings that merely look similar only lower the score a little.',
     'Low scores: dark, grey or gloomy; night; close-up faces; crowds; text, signs or logos; food or interiors; generic places that could be anywhere; blurry.',
     'Photos are numbered from 0 in the order given.',
     'Give each photo a very short German reason (max 4 words), e.g. "Bosporus, hell, elegant" or "Moschee sichtbar" or "zu dunkel".',
-    'Return ONLY JSON: {"scores":[{"i":0,"score":7,"why":"Bosporus, hell, elegant"}, ...]} with one entry per photo.',
+    'Return ONLY JSON: {"scores":[{"i":0,"score":7,"x":50,"why":"Bosporus, hell, elegant"}, ...]} with one entry per photo.',
   ].join('\n');
 }
 
@@ -42,7 +44,7 @@ async function fetchThumb(url, fetchImpl) {
 async function rankPhotos(candidates, city, fetchImpl = fetch) {
   const list = candidates.map((c) => ({ ...c, score: null, why: '' }));
   if (!config.GEMINI_API_KEY || !list.length) return list;
-  const thumbs = await Promise.all(list.map((c) => fetchThumb(c.thumb, fetchImpl)));
+  const thumbs = await Promise.all(list.map((c) => fetchThumb(c.preview || c.thumb, fetchImpl))); // larger preview: composition is judged better
   const usable = list.map((c, i) => ({ c, t: thumbs[i] })).filter((x) => x.t);
   if (!usable.length) { console.error('studio photo rank: no thumbnails loaded'); return list; }
   const parts = [{ text: criteria(city) }];
@@ -62,6 +64,7 @@ async function rankPhotos(candidates, city, fetchImpl = fetch) {
     for (const s of scores) {
       if (Number.isInteger(s?.i) && s.i >= 0 && s.i < usable.length && Number.isFinite(s.score)) {
         usable[s.i].c.score = Math.max(0, Math.min(10, Math.round(s.score)));
+        if (Number.isFinite(s.x)) usable[s.i].c.x = Math.max(0, Math.min(100, Math.round(s.x)));
         if (typeof s.why === 'string') usable[s.i].c.why = s.why.replace(/[<>{}]/g, '').trim().slice(0, 40);
       }
     }

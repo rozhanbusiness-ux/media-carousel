@@ -11,9 +11,9 @@ function fakeFetch(photos) {
   };
 }
 
-test('findPhoto skips religious, landscape, small and used photos', async () => {
+test('findPhoto skips religious, low-resolution and used photos (landscape needs 2000 px height)', async () => {
   process.env.PEXELS_API_KEY = 'test';
-  const list = [photo(1, 'Blue Mosque at sunset'), photo(2, 'Old town street', 4000, 3000), photo(3, 'Harbour', 800, 1200), photo(4, 'Beach promenade'), photo(5, 'Sea view')];
+  const list = [photo(1, 'Blue Mosque at sunset'), photo(2, 'Old town street', 4000, 1500), photo(3, 'Harbour', 800, 1200), photo(4, 'Beach promenade'), photo(5, 'Sea view')];
   const p = await findPhoto(['Palma'], new Set([4]), fakeFetch(list));
   assert.strictEqual(p.id, 5);
   assert.match(p.dataUri, /^data:image\/jpeg;base64,/);

@@ -12,7 +12,7 @@ const { getFlightOffers, getPackageOffers } = require('./offers');
 const { toDraftOffer, offerKey, countryName, cardFor } = require('./packages');
 const { buildCaption, formatDate, formatPrice, cityName, LANGS } = require('./captions');
 const { renderSlide, STYLE_BY_WEEKDAY, STYLES, PACKAGE_STYLES } = require('./render');
-const { generateSet } = require('./image');
+const { generateSet, enhancePhoto } = require('./image');
 const sources = require('./photo-sources');
 const registry = require('./photo-registry');
 const { rankPhotos } = require('./photo-rank');
@@ -96,14 +96,40 @@ function choosePhoto(offer) {
 }
 
 // AI set → picture: slide 1 photo plus different photos for slides 2 and 3 (client: never one photo for all slides).
-const aiPicture = ([a, b, c]) => ({ file: null, pexelsId: null, ai: true, dataUri: a, slides: { 2: b, 3: c } });
+const aiPicture = ([a, b, c]) => ({ file: null, pexelsId: null, ai: true, dataUri: a, slides: { 2: b, 3: c } }); // only via the 🤖 KI button
 
-/** First photo for an offer (client decision): an AI image first, else our library, else null
- *  (then ranked real photos are shown to choose from). */
-async function firstPhoto(offer) {
-  try { return aiPicture(await generateSet(offer)); } catch (err) { console.error('studio ai photo:', err.message); }
-  return choosePhoto(offer);
+const AUTO_MIN = 8; // strict: only magazine-level real photos are used automatically
+const AUTO_FILL = 7; // slides 2/3 may use a slightly lower score rather than repeating slide 1
+const pos = (c) => `${Number.isInteger(c.x) ? c.x : 50}% 50%`;
+const placeName = (o) => [o.to.name, o.country].filter(Boolean).join(', ');
+
+/** Fully automatic photos (client decision): real photos, strictly ranked by Gemini, three different
+ *  ones for the three slides, each retouched (light/colour/sky, place unchanged). Returns
+ *  { picture, ranked }: picture is null when no photo is good enough (ranked are then shown). */
+async function autoPicture(offer, used = new Set()) {
+  let list = [];
+  try { list = await sources.candidates(offer, queriesFor, used, 15); } catch (err) { console.error('studio photos:', err.message); }
+  const ranked = await rankPhotos(list, placeName(offer));
+  const top = ranked.filter((c) => c.score != null && c.score >= AUTO_MIN);
+  if (!top.length) return { picture: choosePhoto(offer), ranked };
+  const picks = [...top, ...ranked.filter((c) => c.score != null && c.score >= AUTO_FILL && c.score < AUTO_MIN)].slice(0, 3);
+  const imgs = await Promise.all(picks.map(async (c) => {
+    try {
+      const raw = await sources.download(c.url);
+      try { return await enhancePhoto(raw); } catch (err) { console.error('studio enhance:', err.message); return raw; }
+    } catch { return null; }
+  }));
+  if (!imgs[0]) return { picture: choosePhoto(offer), ranked };
+  picks.slice(1).forEach((c, i) => { if (imgs[i + 1]) sources.use(offer, c.id, imgs[i + 1]); });
+  return {
+    ranked,
+    picture: { file: null, pexelsId: picks[0].id, dataUri: imgs[0], slides: { 2: imgs[1] || null, 3: imgs[2] || null },
+      pos: { 1: pos(picks[0]), 2: picks[1] ? pos(picks[1]) : null, 3: picks[2] ? pos(picks[2]) : null } },
+  };
 }
+
+const usedIds = () => new Set(store.listDrafts().flatMap((d) => [d.pexelsId, ...(d.pexelsIds || [])]).filter(Boolean));
+const asCandidates = (ranked) => ranked.map((c) => ({ id: c.id, url: c.url, thumb: c.thumb, score: c.score, why: c.why || '', x: c.x }));
 
 /** Real photo candidates for a draft, ranked best first by Gemini (score 0-10). */
 async function findCandidates(draft) {
@@ -112,7 +138,7 @@ async function findCandidates(draft) {
   let list = [];
   try { list = await sources.candidates(draft.offer, queriesFor, used, 15); } catch (err) { console.error('studio photos:', err.message); }
   const ranked = await rankPhotos(list, [draft.offer.to.name, draft.offer.country].filter(Boolean).join(', '));
-  draft.photoCandidates = ranked.map((c) => ({ id: c.id, url: c.url, thumb: c.thumb, score: c.score, why: c.why || '' }));
+  draft.photoCandidates = asCandidates(ranked);
 }
 
 /** Use one candidate (by Pexels id) as the draft photo. */
@@ -122,7 +148,8 @@ async function useCandidate(draft, id) {
   // Slides 2 and 3 get the next best other photos (client: never one photo for all slides).
   const others = draft.photoCandidates.filter((x) => x.id !== id).slice(0, 2);
   const extra = await Promise.all(others.map((x) => sources.download(x.url).catch(() => null)));
-  setPhoto(draft, { file: null, pexelsId: c.id, dataUri: await sources.download(c.url), slides: { 2: extra[0] || null, 3: extra[1] || null } });
+  setPhoto(draft, { file: null, pexelsId: c.id, dataUri: await sources.download(c.url), slides: { 2: extra[0] || null, 3: extra[1] || null },
+    pos: { 1: pos(c), 2: others[0] ? pos(others[0]) : null, 3: others[1] ? pos(others[1]) : null } });
   others.forEach((x, i) => { if (extra[i]) sources.use(draft.offer, x.id, extra[i]); });
   draft.photoCandidates = [];
 }
@@ -138,6 +165,7 @@ function setPhoto(draft, p) {
   draft.pexelsId = p ? p.pexelsId : null;
   draft.needsPhoto = !p;
   draft.aiPhoto = !!(p && p.ai);
+  draft.photoPos = (p && p.pos) || null;
   if (p) sources.use(draft.offer, p.pexelsId != null ? p.pexelsId : (p.file ? 'lib:' + p.file : null), p.dataUri);
 }
 
@@ -205,7 +233,9 @@ async function renderDraft(draft) {
     for (const size of ['story', 'square']) { // story first: it is posted first
       for (const slide of [1, 2, 3]) {
         const name = `studio_${draft.id}_${stamp}_${lang}_${size}_${slide}.jpg`;
-        fs.writeFileSync(path.join(OUTPUT, name), await renderSlide({ ...post, photo: slidePhotos[slide] || photo }, size, slide));
+        const own = !!slidePhotos[slide];
+        const at = draft.photoPos && (own ? draft.photoPos[slide] : draft.photoPos[1]);
+        fs.writeFileSync(path.join(OUTPUT, name), await renderSlide({ ...post, photo: own ? slidePhotos[slide] : photo, photoPosition: at || '' }, size, slide));
         files.push({ size, slide, url: '/output/' + name });
       }
     }
@@ -231,15 +261,16 @@ async function writeTexts(draft, langs = draft.langs) {
 
 async function buildDraft({ offer, style, date, source, photo = null, langs = null, warning = '' }) {
   const id = crypto.randomBytes(6).toString('hex');
-  const picture = photo ? { file: null, pexelsId: null, dataUri: photo } : await firstPhoto(offer);
+  const auto = photo ? { picture: { file: null, pexelsId: null, dataUri: photo }, ranked: [] } : await autoPicture(offer, usedIds());
+  const picture = auto.picture;
   const draft = {
     id, createdAt: new Date().toISOString(), forDate: date.toISOString().slice(0, 10),
     status: 'pending', style, source, offer, langs: langs || defaultLangs(date), versions: [], warning,
   };
   setPhoto(draft, picture);
   await writeTexts(draft);
-  if (!picture) { // no AI image and no library photo: show ranked real photos; the client picks one (or "auto")
-    await findCandidates(draft);
+  if (!picture) { // no good-enough photo and no library photo: show the ranked photos; the client picks one
+    draft.photoCandidates = asCandidates(auto.ranked);
     return store.upsertDraft(draft);
   }
   return renderDraft(draft);
@@ -298,9 +329,9 @@ async function changeOffer(draft, key) {
   draft.warning = picked.warning || '';
   draft.texts = {};
   await writeTexts(draft);
-  const pic = await firstPhoto(offer);
-  setPhoto(draft, pic);
-  if (!pic) await findCandidates(draft);
+  const auto = await autoPicture(offer, usedIds());
+  setPhoto(draft, auto.picture);
+  if (!auto.picture) draft.photoCandidates = asCandidates(auto.ranked);
 }
 
 /** Today's offers of the draft's kind, for the "choose offer" list. */
@@ -335,7 +366,13 @@ async function regenerate(draft, what, value) {
   if (what === 'photo-ai') setPhoto(draft, aiPicture(await generateSet(draft.offer)));
   if (what === 'photo-upload') setPhoto(draft, { file: null, pexelsId: null, dataUri: value });
   if (what === 'text' || what === 'all') await writeTexts(draft);
-  if (what === 'all') await findCandidates(draft); // new ranked photos to choose from
+  if (what === 'all') { // new automatic photos (other ones than now)
+    const used = usedIds();
+    for (const c of draft.photoCandidates || []) used.add(c.id);
+    const auto = await autoPicture(draft.offer, used);
+    if (auto.picture) setPhoto(draft, auto.picture);
+    else draft.photoCandidates = asCandidates(auto.ranked);
+  }
   if (what === 'style') {
     if (!STYLES.includes(value)) throw new Error('unknown style');
     if (draft.offer.kind && draft.offer.kind !== 'flight' && !PACKAGE_STYLES.includes(value)) throw new Error('Für dieses Angebot: Glas oder Magazin.');

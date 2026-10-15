@@ -21,15 +21,15 @@ const key = () => process.env.PEXELS_API_KEY || '';
 
 /** Pexels search → list of { id, url } for portrait photos that pass the content filter. */
 async function search(query, fetchImpl = fetch) {
-  const url = `${API}?query=${encodeURIComponent(query)}&orientation=portrait&size=large&per_page=40`;
+  const url = `${API}?query=${encodeURIComponent(query)}&size=large&per_page=60`; // portrait and landscape (landscape is cropped around the subject)
   const res = await fetchImpl(url, { headers: { Authorization: key() }, signal: AbortSignal.timeout(20000) });
   if (!res.ok) throw new Error(`pexels search ${res.status}`);
   const data = await res.json();
   return (Array.isArray(data.photos) ? data.photos : [])
-    .filter((p) => Number.isInteger(p.id) && typeof p.src?.original === 'string' && p.height > p.width && p.height >= 2000)
+    .filter((p) => Number.isInteger(p.id) && typeof p.src?.original === 'string' && p.height >= 2000)
     .filter((p) => !RELIGIOUS.test(`${p.alt || ''} ${p.url || ''}`))
     .filter((p) => brightness(p.avg_color) >= MIN_BRIGHTNESS) // the template adds a dark filter, so start bright
-    .map((p) => ({ id: p.id, url: p.src.original, thumb: p.src.medium || p.src.small || '' }));
+    .map((p) => ({ id: p.id, url: p.src.original, thumb: p.src.medium || p.src.small || '', preview: p.src.large || p.src.medium || '', landscape: p.width > p.height }));
 }
 
 /** Download one photo (Pexels CDN only), resized by the CDN to ~2200 px wide. Returns a data URI. */

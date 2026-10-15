@@ -78,4 +78,33 @@ async function generateSet(offerOrCity) {
   return [a.value, b.status === 'fulfilled' ? b.value : null, c.status === 'fulfilled' ? c.value : null];
 }
 
-module.exports = { generatePhoto, generateSet, buildPrompt, scenesFor };
+const ENHANCE_PROMPT = [
+  'Retouch this real travel photograph like a top magazine photo editor. Keep it the SAME photo: same place, same buildings, same landscape, same viewpoint and framing; do not add, move or invent anything.',
+  'Improve only: exposure and white balance, warm natural golden light, clean clear blue sky, clearer water, gentle contrast, crisp detail, slight lens-shadow correction.',
+  'Remove small distractions only (litter, wires, cranes, stray signs, cars, random people) where it is easy and natural.',
+  'Colours rich but true-to-life, no oversaturation, no HDR or glow, no painted or AI look. No text, logos or watermarks.',
+].join(' ');
+
+/** Magazine-style retouch of a real photo (data URI in, data URI out). Keeps the place real. */
+async function enhancePhoto(dataUri) {
+  if (!config.GEMINI_API_KEY) throw new Error('GEMINI_API_KEY is not set');
+  const m = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(dataUri || '');
+  if (!m) throw new Error('bad photo');
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${config.GEMINI_IMAGE_MODEL}:generateContent`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': config.GEMINI_API_KEY },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: ENHANCE_PROMPT }, { inline_data: { mime_type: m[1], data: m[2] } }] }],
+      generationConfig: { responseModalities: ['Image'], imageConfig: { imageSize: config.GEMINI_IMAGE_SIZE || '2K' } },
+    }),
+    signal: AbortSignal.timeout(120000),
+  });
+  if (!res.ok) throw new Error(`Gemini enhance error ${res.status}`);
+  const json = await res.json();
+  const part = (json?.candidates?.[0]?.content?.parts || []).find((p) => p.inlineData || p.inline_data);
+  if (!part) throw new Error('Gemini returned no image');
+  const inline = part.inlineData || part.inline_data;
+  return `data:${inline.mimeType || inline.mime_type || 'image/png'};base64,${inline.data}`;
+}
+
+module.exports = { generatePhoto, generateSet, enhancePhoto, buildPrompt, scenesFor };
