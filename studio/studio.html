@@ -191,9 +191,10 @@ function render(drafts) {
         <span>${esc(d.forDate)}</span>${d.bundle ? `<span>🗂 ${d.offers.length} Angebote: ${d.offers.map((o) => esc(o.to.name)).join(' · ')}</span>` : `<span>${d.offer.kind && d.offer.kind !== 'flight' ? ({ package: '🏨 ', cruise: '🚢 ', home: '🏡 ' })[d.offer.kind] + esc(d.offer.to.name) + (d.offer.country ? ', ' + esc(d.offer.country) : '') + ' – ' + esc(d.offer.hotel || d.offer.ship || d.offer.home) : esc(d.offer.from.name) + ' → ' + esc(d.offer.to.name)}</span>
         <span>${esc(d.offer.price)} €</span>`}</div>
       ${d.warning ? `<p class="warn">⚠ ${esc(d.warning)}</p>` : ''}
+      ${d.aiPhoto ? '<p class="warn">🤖 KI-Foto – bitte genau prüfen (Ort, Details), sonst 🤖 KI neu oder 🖼 Fotos zeigen.</p>' : ''}
       ${d.bundle ? `<div class="row"><span>🖼 Foto ändern:</span>
         <button class="ghost" data-act="bundle-photos" data-n="-1">Cover</button>
-        ${d.offers.map((o, n) => `<button class="ghost" data-act="bundle-photos" data-n="${n}">${n + 1}. ${esc(o.to.name)}</button>`).join('')}</div>` : ''}
+        ${d.offers.map((o, n) => `<button class="ghost" data-act="bundle-photos" data-n="${n}">${n + 1}. ${esc(o.to.name)}</button><button class="ghost" data-act="bundle-photo-ai" data-n="${n}" title="KI-Foto für ${esc(o.to.name)} – bitte genau prüfen">🤖 KI</button>`).join('')}</div>` : ''}
       ${d.bundle && d.bundlePick ? `
         <div class="photo-pick"><h3>Foto für ${d.bundlePick.n === -1 ? 'Cover' : esc(d.offers[d.bundlePick.n].to.name)} wählen <small>(beste zuerst)</small></h3>
           <div class="row"><button class="ghost" data-act="bundle-photos" data-n="${d.bundlePick.n}">Mehr Fotos</button>

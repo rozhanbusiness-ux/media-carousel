@@ -94,6 +94,13 @@ function choosePhoto(offer) {
   return libraryPhoto(offer.to.code, new Set(drafts.map((d) => d.photoFile).filter(Boolean)));
 }
 
+/** First photo for an offer (client decision): an AI image first, else our library, else null
+ *  (then ranked real photos are shown to choose from). */
+async function firstPhoto(offer) {
+  try { return { file: null, pexelsId: null, ai: true, dataUri: await generatePhoto(offer) }; } catch (err) { console.error('studio ai photo:', err.message); }
+  return choosePhoto(offer);
+}
+
 /** Real photo candidates for a draft, ranked best first by Gemini (score 0-10). */
 async function findCandidates(draft) {
   const used = new Set(store.listDrafts().map((d) => d.pexelsId).filter(Boolean));
@@ -118,6 +125,7 @@ function setPhoto(draft, p) {
   draft.photoFile = p ? p.file : null;
   draft.pexelsId = p ? p.pexelsId : null;
   draft.needsPhoto = !p;
+  draft.aiPhoto = !!(p && p.ai);
   if (p) sources.use(draft.offer, p.pexelsId != null ? p.pexelsId : (p.file ? 'lib:' + p.file : null), p.dataUri);
 }
 
@@ -209,14 +217,14 @@ async function writeTexts(draft, langs = draft.langs) {
 
 async function buildDraft({ offer, style, date, source, photo = null, langs = null, warning = '' }) {
   const id = crypto.randomBytes(6).toString('hex');
-  const picture = photo ? { file: null, pexelsId: null, dataUri: photo } : choosePhoto(offer);
+  const picture = photo ? { file: null, pexelsId: null, dataUri: photo } : await firstPhoto(offer);
   const draft = {
     id, createdAt: new Date().toISOString(), forDate: date.toISOString().slice(0, 10),
     status: 'pending', style, source, offer, langs: langs || defaultLangs(date), versions: [], warning,
   };
   setPhoto(draft, picture);
   await writeTexts(draft);
-  if (!picture) { // no library photo: show ranked real photos; the client picks one (or "auto")
+  if (!picture) { // no AI image and no library photo: show ranked real photos; the client picks one (or "auto")
     await findCandidates(draft);
     return store.upsertDraft(draft);
   }
@@ -276,9 +284,9 @@ async function changeOffer(draft, key) {
   draft.warning = picked.warning || '';
   draft.texts = {};
   await writeTexts(draft);
-  const lib = choosePhoto(offer);
-  setPhoto(draft, lib);
-  if (!lib) await findCandidates(draft);
+  const pic = await firstPhoto(offer);
+  setPhoto(draft, pic);
+  if (!pic) await findCandidates(draft);
 }
 
 /** Today's offers of the draft's kind, for the "choose offer" list. */
@@ -310,7 +318,7 @@ async function regenerate(draft, what, value) {
     if (!draft.photoCandidates.length) throw new Error('Kein echtes Foto gefunden – bitte eigenes Foto hochladen.');
     await useCandidate(draft, draft.photoCandidates[0].id);
   }
-  if (what === 'photo-ai') setPhoto(draft, { file: null, pexelsId: null, dataUri: await generatePhoto(draft.offer) });
+  if (what === 'photo-ai') setPhoto(draft, { file: null, pexelsId: null, ai: true, dataUri: await generatePhoto(draft.offer) });
   if (what === 'photo-upload') setPhoto(draft, { file: null, pexelsId: null, dataUri: value });
   if (what === 'text' || what === 'all') await writeTexts(draft);
   if (what === 'all') await findCandidates(draft); // new ranked photos to choose from

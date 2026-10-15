@@ -16,16 +16,21 @@ const VARIANTS = [
   'a local market or harbour scene with soft natural light',
 ];
 
+// Detailed prompt (client decision: AI images first). Layout matches the templates: logo at the top,
+// the landmark in the upper-middle, a calm lower third where the glass price card sits; the square
+// version is a centre crop, so the subject stays centred horizontally.
 function buildPrompt(city, variant) {
   return [
-    `A real, unedited travel photograph of ${city}: ${variant}.`,
-    'Luxury travel-magazine style (Condé Nast Traveler), shot by a professional travel photographer on a full-frame camera,',
-    '24-35mm lens at f/8, tripod, golden-hour or clear morning daylight, the landmark recognisable and accurate to reality,',
-    'true-to-life colours, gentle contrast, crisp sharp detail from foreground to background, realistic textures.',
-    'It must look like an authentic photo, not a rendering: no HDR look, no oversaturation, no glow, no fantasy sky.',
-    'Absolutely NO mosques, minarets, domes, churches, cathedrals, temples, crosses, crescents or any religious building or symbol anywhere in the frame.',
-    'No people in close-up, no text, no logos, no watermarks. Keep the upper 12% of the frame calm (sky) for a logo.',
-    'Vertical 9:16 composition, main subject in the middle band.',
+    `Ultra-realistic luxury travel photograph of ${city}. Scene: ${variant}.`,
+    'STYLE: editorial cover photo for a high-end travel magazine (Condé Nast Traveler, Travel + Leisure); aspirational, elegant, calm, inviting.',
+    'CAMERA: full-frame camera, 24mm or 35mm lens, f/8, tripod, perfectly level horizon, vertical lines straight, tack-sharp from foreground to background, no blur, no bokeh.',
+    'LIGHT: warm golden hour or a clear bright morning, soft directional sunlight, clean blue sky with a few soft clouds, gentle natural contrast, rich but true-to-life colours, crystal-clear air, no haze, no fog.',
+    'ACCURACY: the place must be instantly recognisable and architecturally accurate to reality; real materials, real proportions, real surroundings; no invented buildings.',
+    'COMPOSITION (vertical 9:16): the main subject stands in the upper-middle of the frame (between 15% and 60% from the top) and horizontally centred, so a centre square crop still shows it whole;',
+    'the top 12% is calm sky (space for a logo); the lower third is calm and simple (water, sand, lawn, a plaza or a promenade) with no important detail, because a price card covers it.',
+    'Clean, uncluttered, tidy and well-kept scene; no traffic, no cranes, no rubbish, no construction, no wires; at most a few small distant people, none facing the camera.',
+    'FORBIDDEN: any mosque, minaret, dome, church, cathedral, chapel, temple, shrine, cross, crescent or other religious building or symbol anywhere in the frame;',
+    'no text, letters, signs with words, logos, watermarks, borders or frames; no HDR look, no oversaturation, no glow, no fantasy or painted look, no CGI or illustration style.',
   ].join(' ');
 }
 

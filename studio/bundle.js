@@ -63,8 +63,9 @@ function bundleCaption(offers, lang, title = '') {
   return [...(title ? [title.replace(/\s*…$/, ''), ''] : []), CAPTION_HEAD[lang], '', ...offers.map((o) => offerLine(o, lang)), '', f.cta, '', f.notice, '', tags.join(' ')].join('\n');
 }
 
-/** Best real photo for one offer: library first (passed in), else the top-ranked Pexels photo. */
+/** Photo for one offer: an AI image first (client decision), else library, else the top-ranked real photo. */
 async function photoFor(offer, used, queriesFor, choosePhoto) {
+  try { return { file: null, pexelsId: null, dataUri: await generatePhoto(offer) }; } catch (err) { console.error('studio bundle ai photo:', err.message); }
   const lib = choosePhoto(offer);
   if (lib && !used.has(lib.file)) { used.add(lib.file); return { file: lib.file, pexelsId: null, dataUri: lib.dataUri }; }
   let list = [];
@@ -90,7 +91,7 @@ async function pickPhotos(draft, queriesFor, choosePhoto) {
     const p = await photoFor(draft.offers[n], used, queriesFor, choosePhoto);
     if (!p) throw new Error(`Kein Foto für ${draft.offers[n].to.name} gefunden.`);
     fs.writeFileSync(photoPath(draft.id, n), p.dataUri);
-    sources.use(draft.offers[n], p.pexelsId != null ? p.pexelsId : 'lib:' + p.file, p.dataUri);
+    sources.use(draft.offers[n], p.pexelsId != null ? p.pexelsId : (p.file ? 'lib:' + p.file : null), p.dataUri);
     draft.pexelsIds.push(p.pexelsId || p.file);
   }
   const cover = await coverPhoto(draft.bundleKind || 'flight', used);
@@ -122,7 +123,7 @@ async function renderBundle(draft) {
     // Never a destination photo on the cover (client rule).
     const cover = { ...posts[0], photo: coverImg, kind: 'flight', card: null, country: '', destination: title,
       hook: draft.offers.map((o) => local(o.to, lang)).join(' · '), labels: { kicker: COVER[lang].kicker, swipe: COVER[lang].swipe } };
-    const slides = [[cover, 1], ...posts.map((p) => [p, 2]), [posts[0], 3]];
+    const slides = [[cover, 1], ...posts.map((p) => [p, 2]), [{ ...posts[0], photo: coverImg || posts[0].photo }, 3]]; // last slide: cover photo, not a repeat of slide 2
     const files = [];
     for (const size of ['story', 'square']) {
       for (let i = 0; i < slides.length; i++) {

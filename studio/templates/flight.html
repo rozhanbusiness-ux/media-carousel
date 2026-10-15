@@ -47,8 +47,10 @@
   /* Slide 2: details */
   /* Slide 2: the photo stays sharp (client); only the card is glass. */
   .s2 .shade { background: radial-gradient(45% 12% at 50% 6%, rgba(4,10,28,.4), rgba(4,10,28,0)); }
-  .s2 .card { position: absolute; left: 80px; right: 80px; top: 50%; transform: translateY(-46%);
+  .s2 .card { position: absolute; left: 80px; right: 80px; bottom: calc(96 * var(--u)); /* lower part: the landmark above stays visible (client) */
     padding: calc(56 * var(--u)) calc(56 * var(--u)); text-align: center; }
+  .story .s2 .card { bottom: 230px; }
+  .square .s2 .card { bottom: 64px; transform: scale(.78); transform-origin: 50% 100%; }
   .s2 .kicker { font-size: calc(20 * var(--u)); }
   .s2 .route { margin: calc(26 * var(--u)) 0; display: flex; align-items: center; justify-content: center; gap: 28px; }
   .s2 .city b { display: block; font-size: calc(54 * var(--u)); font-weight: 800; line-height: 1.1; }
