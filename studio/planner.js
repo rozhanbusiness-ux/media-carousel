@@ -13,7 +13,8 @@ const { toDraftOffer, offerKey, countryName, cardFor } = require('./packages');
 const { buildCaption, formatDate, formatPrice, cityName, LANGS } = require('./captions');
 const { renderSlide, STYLE_BY_WEEKDAY, STYLES, PACKAGE_STYLES } = require('./render');
 const { generatePhoto } = require('./image');
-const { candidates: pexelsCandidates, download: pexelsDownload } = require('./pexels');
+const sources = require('./photo-sources');
+const registry = require('./photo-registry');
 const { rankPhotos } = require('./photo-rank');
 const store = require('./store');
 const ownOffers = require('./own-offers');
@@ -32,20 +33,21 @@ const photoPath = (id) => path.join(CACHE, `studio-photo-${id}.txt`);
 
 /** A library photo for the destination (studio/photos/<IATA>-n.jpg), least recently used first. */
 function libraryPhoto(code, used) {
+  const block = registry.blocked(code);
   const files = [];
   for (const dir of [PHOTOS, LIBRARY]) {
     try {
       for (const f of fs.readdirSync(dir)) if (code && f.startsWith(code + '-') && /\.(jpe?g|png|webp)$/i.test(f)) files.push([dir, f]);
     } catch { /* none */ }
   }
-  const fresh = files.filter(([, f]) => !used.has(f));
+  const fresh = files.filter(([, f]) => !used.has(f) && !block.has('lib:' + f));
   if (!fresh.length) return null;
   const [dir, file] = fresh[0];
   const ext = file.split('.').pop().toLowerCase().replace('jpg', 'jpeg');
   return { file, pexelsId: null, dataUri: `data:image/${ext};base64,` + fs.readFileSync(path.join(dir, file)).toString('base64') };
 }
 
-// Better search words for frequent destinations (bright, iconic, non-religious views).
+// Fallback search words (destinations.js and Gemini suggestions come first, see photo-sources.js).
 const QUERIES = {
   IST: ['Istanbul Bosphorus sunny', 'Galata tower daytime', 'Istanbul waterfront'],
   AYT: ['Antalya beach', 'Antalya coast turquoise', 'Kaleici harbour'],
@@ -97,7 +99,7 @@ async function findCandidates(draft) {
   const used = new Set(store.listDrafts().map((d) => d.pexelsId).filter(Boolean));
   for (const c of draft.photoCandidates || []) used.add(c.id); // "more photos" shows new ones
   let list = [];
-  try { list = await pexelsCandidates(queriesFor(draft.offer), used, 15); } catch (err) { console.error('studio pexels:', err.message); }
+  try { list = await sources.candidates(draft.offer, queriesFor, used, 15); } catch (err) { console.error('studio photos:', err.message); }
   const ranked = await rankPhotos(list, [draft.offer.to.name, draft.offer.country].filter(Boolean).join(', '));
   draft.photoCandidates = ranked.map((c) => ({ id: c.id, url: c.url, thumb: c.thumb, score: c.score, why: c.why || '' }));
 }
@@ -106,7 +108,7 @@ async function findCandidates(draft) {
 async function useCandidate(draft, id) {
   const c = (draft.photoCandidates || []).find((x) => x.id === id);
   if (!c) throw new Error('unknown photo');
-  setPhoto(draft, { file: null, pexelsId: c.id, dataUri: await pexelsDownload(c.url) });
+  setPhoto(draft, { file: null, pexelsId: c.id, dataUri: await sources.download(c.url) });
   draft.photoCandidates = [];
 }
 
@@ -116,6 +118,7 @@ function setPhoto(draft, p) {
   draft.photoFile = p ? p.file : null;
   draft.pexelsId = p ? p.pexelsId : null;
   draft.needsPhoto = !p;
+  if (p) sources.use(draft.offer, p.pexelsId != null ? p.pexelsId : (p.file ? 'lib:' + p.file : null), p.dataUri);
 }
 
 /** Keep the photo of an approved draft in the library (once per draft). */
@@ -307,7 +310,7 @@ async function regenerate(draft, what, value) {
     if (!draft.photoCandidates.length) throw new Error('Kein echtes Foto gefunden – bitte eigenes Foto hochladen.');
     await useCandidate(draft, draft.photoCandidates[0].id);
   }
-  if (what === 'photo-ai') setPhoto(draft, { file: null, pexelsId: null, dataUri: await generatePhoto(draft.offer.to.name) });
+  if (what === 'photo-ai') setPhoto(draft, { file: null, pexelsId: null, dataUri: await generatePhoto(draft.offer) });
   if (what === 'photo-upload') setPhoto(draft, { file: null, pexelsId: null, dataUri: value });
   if (what === 'text' || what === 'all') await writeTexts(draft);
   if (what === 'all') await findCandidates(draft); // new ranked photos to choose from

@@ -149,15 +149,17 @@ module.exports = function mountStudio(app) {
     const draft = store.getDraft(req.params.id);
     if (!draft) return res.status(404).json({ error: 'not found' });
     const { what, value } = req.body || {};
-    if (!['offer-next', 'offer-pick', 'photo', 'photo-pick', 'photo-auto', 'photo-ai', 'text', 'all', 'style', 'langs', 'photo-upload', 'bundle-photos', 'bundle-photo-pick', 'bundle-photo-upload'].includes(what)) return res.status(400).json({ error: 'bad request' });
+    if (!['offer-next', 'offer-pick', 'photo', 'photo-pick', 'photo-auto', 'photo-ai', 'text', 'all', 'style', 'langs', 'photo-upload', 'bundle-photos', 'bundle-photo-pick', 'bundle-photo-upload', 'bundle-photo-ai'].includes(what)) return res.status(400).json({ error: 'bad request' });
     if (what === 'photo-upload' && !(typeof value === 'string' && value.length < 12000000 && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(value))) {
       return res.status(400).json({ error: 'bad image' });
     }
     if (what === 'offer-pick' && !(typeof value === 'string' && /^[A-Za-z0-9-]{3,40}$/.test(value))) return res.status(400).json({ error: 'bad offer' });
-    if (what === 'photo-pick' && !(Number.isInteger(value) && value > 0)) return res.status(400).json({ error: 'bad photo' });
+    const pid = (id) => (Number.isInteger(id) && id > 0 && id < 1e12) || (typeof id === 'string' && /^pb:\d{1,12}$/.test(id));
+    if (what === 'photo-pick' && !pid(value)) return res.status(400).json({ error: 'bad photo' });
     const slot = (n) => Number.isInteger(n) && n >= -1 && n < 6;
     if (what === 'bundle-photos' && !slot(value)) return res.status(400).json({ error: 'bad slide' });
-    if (what === 'bundle-photo-pick' && !(value && slot(value.n) && Number.isInteger(value.id) && value.id > 0)) return res.status(400).json({ error: 'bad photo' });
+    if (what === 'bundle-photo-ai' && !(slot(value) && value >= 0)) return res.status(400).json({ error: 'bad slide' });
+    if (what === 'bundle-photo-pick' && !(value && slot(value.n) && pid(value.id))) return res.status(400).json({ error: 'bad photo' });
     if (what === 'bundle-photo-upload' && !(value && slot(value.n) && typeof value.data === 'string' && value.data.length < 12000000
       && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(value.data))) return res.status(400).json({ error: 'bad image' });
     if (generating) return res.status(429).json({ error: 'already generating' });

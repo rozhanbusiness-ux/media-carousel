@@ -12,7 +12,8 @@ const crypto = require('crypto');
 const { cardFor, countryName, offerKey } = require('./packages');
 const { formatDate, formatPrice, cityName, BASE_TAGS, FIXED } = require('./captions');
 const { renderSlide, PACKAGE_STYLES } = require('./render');
-const { candidates: pexelsCandidates, download: pexelsDownload } = require('./pexels');
+const sources = require('./photo-sources');
+const { generatePhoto } = require('./image');
 const { rankPhotos } = require('./photo-rank');
 const store = require('./store');
 const covers = require('./covers');
@@ -67,12 +68,12 @@ async function photoFor(offer, used, queriesFor, choosePhoto) {
   const lib = choosePhoto(offer);
   if (lib && !used.has(lib.file)) { used.add(lib.file); return { file: lib.file, pexelsId: null, dataUri: lib.dataUri }; }
   let list = [];
-  try { list = await pexelsCandidates(queriesFor(offer), used, 8); } catch (err) { console.error('studio bundle pexels:', err.message); }
+  try { list = await sources.candidates(offer, queriesFor, used, 8); } catch (err) { console.error('studio bundle photos:', err.message); }
   const ranked = await rankPhotos(list, [offer.to.name, offer.country].filter(Boolean).join(', '));
   const best = ranked.find((c) => c.score == null || c.score >= 5) || ranked[0];
   if (!best) return null;
   used.add(best.id);
-  return { file: null, pexelsId: best.id, dataUri: await pexelsDownload(best.url) };
+  return { file: null, pexelsId: best.id, dataUri: await sources.download(best.url) };
 }
 
 // Cover photo: about the offer TYPE, never a destination (client decision). The client's saved
@@ -89,6 +90,7 @@ async function pickPhotos(draft, queriesFor, choosePhoto) {
     const p = await photoFor(draft.offers[n], used, queriesFor, choosePhoto);
     if (!p) throw new Error(`Kein Foto für ${draft.offers[n].to.name} gefunden.`);
     fs.writeFileSync(photoPath(draft.id, n), p.dataUri);
+    sources.use(draft.offers[n], p.pexelsId != null ? p.pexelsId : 'lib:' + p.file, p.dataUri);
     draft.pexelsIds.push(p.pexelsId || p.file);
   }
   const cover = await coverPhoto(draft.bundleKind || 'flight', used);
@@ -173,7 +175,7 @@ async function slotCandidates(draft, n, queriesFor) {
   else {
     const o = draft.offers[n];
     let list = [];
-    try { list = await pexelsCandidates(queriesFor(o), used, 15); } catch (err) { console.error('studio bundle pexels:', err.message); }
+    try { list = await sources.candidates(o, queriesFor, used, 15); } catch (err) { console.error('studio bundle photos:', err.message); }
     ranked = await rankPhotos(list, [o.to.name, o.country].filter(Boolean).join(', '));
   }
   if (!ranked.length) throw new Error('Keine weiteren Fotos gefunden – bitte eigenes Foto hochladen.');
@@ -181,26 +183,30 @@ async function slotCandidates(draft, n, queriesFor) {
 }
 
 /** Bundle actions: 'langs', 'all' (new photos), 'style', 'bundle-photos' (show suggestions for a slide),
- *  'bundle-photo-pick' ({ n, id }), 'bundle-photo-upload' ({ n, data }). */
+ *  'bundle-photo-pick' ({ n, id }), 'bundle-photo-upload' ({ n, data }), 'bundle-photo-ai' (n, offer slides only). */
 async function regenerateBundle(draft, what, value, queriesFor, choosePhoto, LANGS) {
   if (what === 'bundle-photos') {
     if (!validSlot(draft, value)) throw new Error('bad slide');
     await slotCandidates(draft, value, queriesFor);
     return store.upsertDraft(draft); // nothing to render until a photo is picked
   }
-  if (what === 'bundle-photo-pick' || what === 'bundle-photo-upload') {
-    const n = value && value.n;
+  if (what === 'bundle-photo-pick' || what === 'bundle-photo-upload' || what === 'bundle-photo-ai') {
+    const n = what === 'bundle-photo-ai' ? value : value && value.n;
     if (!validSlot(draft, n)) throw new Error('bad slide');
     let dataUri;
-    if (what === 'bundle-photo-upload') dataUri = value.data;
+    if (what === 'bundle-photo-ai') {
+      if (n === -1) throw new Error('Cover: nur gespeicherte Cover-Fotos (kein KI-Bild).');
+      dataUri = await generatePhoto(draft.offers[n]);
+    } else if (what === 'bundle-photo-upload') dataUri = value.data;
     else {
       const c = draft.bundlePick && draft.bundlePick.n === n && draft.bundlePick.list.find((x) => x.id === value.id);
       if (!c) throw new Error('Foto nicht mehr verfügbar – bitte Vorschläge neu laden.');
       const url = c.cover ? covers.urlOf(draft.bundleKind || 'flight', c.id) : c.url;
       if (!url) throw new Error('Foto nicht mehr verfügbar – bitte Vorschläge neu laden.');
-      dataUri = await pexelsDownload(url);
+      dataUri = await sources.download(url);
       draft.pexelsIds = [...(draft.pexelsIds || []), c.id];
     }
+    if (n >= 0) sources.use(draft.offers[n], what === 'bundle-photo-pick' ? value.id : null, dataUri);
     fs.writeFileSync(slotPath(draft, n), dataUri);
     draft.bundlePick = null;
   } else if (what === 'style') {

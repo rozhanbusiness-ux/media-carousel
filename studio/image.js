@@ -6,6 +6,7 @@
 // ============================================================
 
 const config = require('../config');
+const destinations = require('./destinations');
 
 const VARIANTS = [
   'a quiet seaside or riverside promenade in the late afternoon',
@@ -18,8 +19,9 @@ const VARIANTS = [
 function buildPrompt(city, variant) {
   return [
     `A real, unedited travel photograph of ${city}: ${variant}.`,
-    'Shot by a professional travel photographer on a full-frame camera with a 35mm lens, natural daylight,',
-    'true-to-life colours, gentle contrast, realistic textures and slight natural imperfections.',
+    'Luxury travel-magazine style (Condé Nast Traveler), shot by a professional travel photographer on a full-frame camera,',
+    '24-35mm lens at f/8, tripod, golden-hour or clear morning daylight, the landmark recognisable and accurate to reality,',
+    'true-to-life colours, gentle contrast, crisp sharp detail from foreground to background, realistic textures.',
     'It must look like an authentic photo, not a rendering: no HDR look, no oversaturation, no glow, no fantasy sky.',
     'Absolutely NO mosques, minarets, domes, churches, cathedrals, temples, crosses, crescents or any religious building or symbol anywhere in the frame.',
     'No people in close-up, no text, no logos, no watermarks. Keep the upper 12% of the frame calm (sky) for a logo.',
@@ -28,9 +30,13 @@ function buildPrompt(city, variant) {
 }
 
 /** Returns a data URI (image) or throws. */
-async function generatePhoto(city) {
+async function generatePhoto(offerOrCity) {
   if (!config.GEMINI_API_KEY) throw new Error('GEMINI_API_KEY is not set');
-  const variant = VARIANTS[Math.floor(Math.random() * VARIANTS.length)];
+  const offer = typeof offerOrCity === 'string' ? { to: { name: offerOrCity } } : offerOrCity;
+  const city = [offer.to.name, offer.country].filter(Boolean).join(', ');
+  // Destination-specific scenes first (destinations.js), else a generic variant.
+  const scenes = (destinations.find(offer) || {}).ai || VARIANTS;
+  const variant = scenes[Math.floor(Math.random() * scenes.length)];
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${config.GEMINI_IMAGE_MODEL}:generateContent`;
   const res = await fetch(url, {
     method: 'POST',
