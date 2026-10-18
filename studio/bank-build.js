@@ -29,9 +29,16 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(
   const keys = process.argv.slice(2).filter((k) => PLACES[k]);
   if (!keys.length) { console.log('usage: node studio/bank-build.js ' + Object.keys(PLACES).join(' ')); process.exitCode = 1; return; }
   const results = [];
-  for (const k of keys) {
-    const [name, country] = PLACES[k];
-    results.push(await bank.build(bank.target(k, SEARCH_NAME[k] || name, 'flight', country)));
+  const run = (k) => { const [name, country] = PLACES[k]; return bank.build(bank.target(k, SEARCH_NAME[k] || name, 'flight', country)); };
+  for (const k of keys) results.push(await run(k));
+  // Unsplash hourly limit: wait until it is open again, then top up the destinations that missed it.
+  for (let round = 0; round < 6; round++) {
+    const missed = results.filter((r) => r.unsplashMissed).map((r) => r.key);
+    if (!missed.length) break;
+    const wait = Math.max(0, bank.unsplashPausedUntil() - Date.now());
+    console.log(`unsplash: waiting ${Math.round(wait / 60000)} min, then topping up ${missed.join(' ')}`);
+    await new Promise((res) => setTimeout(res, wait));
+    for (const k of missed) results[results.findIndex((r) => r.key === k)] = await run(k);
   }
   const rows = results.map((r) => {
     const kept = new Set(bank.readIndex(r.key).photos.map((p) => p.id));
