@@ -70,8 +70,9 @@ function coverCriteria(subject) {
 async function fetchThumb(url, fetchImpl) {
   try {
     const u = new URL(url);
-    if (u.protocol !== 'https:' || u.hostname !== 'images.pexels.com') return null;
-    const res = await fetchImpl(u.toString(), { signal: AbortSignal.timeout(15000) });
+    if (u.protocol !== 'https:' || !['images.pexels.com', 'images.unsplash.com', 'upload.wikimedia.org'].includes(u.hostname)) return null;
+    const headers = u.hostname === 'upload.wikimedia.org' ? { 'User-Agent': 'MediaTravelStudio/1.0 (https://media-travels.com)' } : {};
+    const res = await fetchImpl(u.toString(), { headers, signal: AbortSignal.timeout(15000) });
     if (!res.ok) return null;
     const mime = (res.headers.get('content-type') || '').split(';')[0];
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(mime)) return null;

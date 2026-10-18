@@ -29,7 +29,8 @@ async function search(query, fetchImpl = fetch) {
     .filter((p) => Number.isInteger(p.id) && typeof p.src?.original === 'string' && p.height >= 2000)
     .filter((p) => !RELIGIOUS.test(`${p.alt || ''} ${p.url || ''}`))
     .filter((p) => brightness(p.avg_color) >= MIN_BRIGHTNESS) // the template adds a dark filter, so start bright
-    .map((p) => ({ id: p.id, url: p.src.original, thumb: p.src.medium || p.src.small || '', preview: p.src.large || p.src.medium || '', landscape: p.width > p.height }));
+    .map((p) => ({ id: p.id, url: p.src.original, thumb: p.src.medium || p.src.small || '', preview: p.src.large || p.src.medium || '', landscape: p.width > p.height,
+      credit: { source: 'Pexels', author: String(p.photographer || '').slice(0, 80), license: 'Pexels License' } }));
 }
 
 /** Download one photo (Pexels CDN only), resized by the CDN to ~2200 px wide. Returns a data URI. */
