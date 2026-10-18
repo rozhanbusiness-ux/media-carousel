@@ -8,7 +8,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const { getFlightOffers, getPackageOffers } = require('./offers');
+const { getFlightOffers, getPackageOffers, getPackageBoxOffers } = require('./offers');
 const { toDraftOffer, offerKey, countryName, cardFor } = require('./packages');
 const { buildCaption, formatDate, formatPrice, cityName, LANGS } = require('./captions');
 const { renderSlide, STYLE_BY_WEEKDAY, STYLES, PACKAGE_STYLES } = require('./render');
@@ -196,9 +196,9 @@ const pickOffer = (offers, recent, skip = new Set()) => offers.find((o) => !rece
 // The client's own offers ("Eigene Angebote") are always added to their kind's list.
 async function liveOffers(kind) {
   if (kind !== 'package') return [...ownOffers.list('flight'), ...(await getFlightOffers())].sort((a, b) => a.price - b.price);
-  const [top, last] = await Promise.all([getPackageOffers('package'), getPackageOffers('lastminute')]);
+  const [top, last, boxes] = await Promise.all([getPackageOffers('package'), getPackageOffers('lastminute'), getPackageBoxOffers()]);
   const best = new Map();
-  for (const o of [...top, ...last].map(toDraftOffer).filter((x) => x.to.name)) {
+  for (const o of [...top, ...last, ...boxes].map(toDraftOffer).filter((x) => x.to.name)) {
     const k = o.country || destKey(o);
     if (!best.has(k) || o.price < best.get(k).price) best.set(k, o);
   }

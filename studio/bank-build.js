@@ -27,7 +27,7 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(
 
 (async () => {
   const keys = process.argv.slice(2).filter((k) => PLACES[k]);
-  if (!keys.length) { console.log('usage: node studio/bank-build.js ' + Object.keys(PLACES).join(' ')); process.exit(1); }
+  if (!keys.length) { console.log('usage: node studio/bank-build.js ' + Object.keys(PLACES).join(' ')); process.exitCode = 1; return; }
   const results = [];
   for (const k of keys) {
     const [name, country] = PLACES[k];
@@ -47,5 +47,5 @@ img{width:100%;height:220px;object-fit:cover;display:block}figcaption{padding:8p
   const name = `bank-report-${crypto.randomBytes(6).toString('hex')}.html`;
   fs.writeFileSync(path.join(__dirname, '..', 'output', name), html);
   console.log('REPORT: /output/' + name);
-  process.exit(0);
-})().catch((err) => { console.error(err); process.exit(1); });
+  // No process.exit(): it can cut off output still on its way through a pipe (ssh | tail).
+})().catch((err) => { console.error(err); process.exitCode = 1; });

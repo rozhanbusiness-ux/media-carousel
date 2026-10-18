@@ -36,6 +36,28 @@ const FLIGHT_BOXES = [
   { route: 'CGN-VIE', key: '853a4c597e0965b2bc44f04900ebcc34' },
   { route: 'MUC-LCA', key: '3be189cef24ff4725b80b2ab6834ff5e' },
 ];
+// Package offer boxes, one per destination (specials partner tools, product Pauschalreise).
+const PACKAGE_BOX_BASE = 'https://api.specials.de/component/teaserPackages.html';
+const PACKAGE_BOXES = [
+  { name: 'Mallorca', key: '62913817537b0f1151e87c45d826dad9' },
+  { name: 'Hurghada', key: 'f200028aa4d93f1b7f84e6c9e27d09a9' },
+  { name: 'Sharm el Sheikh', key: 'eda2f7a19e98902c6d4c32cda79cdb4b' },
+  { name: 'Griechenland', key: '6c284942bfbe66bd6f28ef7781941eac' },
+  { name: 'Kreta', key: '42c1567b4df2401b4edc5172579fdb88' },
+  { name: 'Zypern', key: '4ed6f55e968b6d65d9adbc954490355d' },
+  { name: 'Spanien', key: 'c956bf92d133af55f7313df7053c711c' },
+  { name: 'Türkei', key: '01f0bcb46648dc9e3270677c5d176e08' },
+  { name: 'Emirate', key: '12e0e2fe03cd683c5b0f8d68c570a1de' },
+  { name: 'Portugal', key: '892b5dd5c29ce52fde62bb03c939e056' },
+  { name: 'Kroatien', key: '772b24d0da5f81f02485a87aced19e46' },
+  { name: 'Bulgarien', key: '23a4167018165766e643675763ec1a1f' },
+  { name: 'Italien', key: '42271de45605f01fcfdc32de42482444' },
+  { name: 'Rumänien', key: 'bacfe10e1e79ed445de64ccd066009d3' },
+  { name: 'Albanien', key: '72ec531414bec30c3de3e2722fa3983e' },
+  { name: 'Österreich', key: '10f3bada0c23d892986ca88f91ad4ef5' },
+  { name: 'Schweiz', key: 'c46d88ba532ef1bfcba23e56a18ce2da' },
+  { name: 'Frankreich', key: '1692036b541560dfb4e112826dcce21e' },
+];
 const MAX_OFFERS = 12;
 const MAX_BYTES = 2000000;
 const IMAGE_PREFIX = 'https://media.traffics-switch.de/service/imgdata?';
@@ -101,6 +123,43 @@ function parsePackageOffers(html) {
     if (ok) offers.push(offer);
   }
   return offers;
+}
+
+/** Parse the HTML of api.specials.de/component/teaserPackages.html?access=... (same offer shape as top offers). */
+function parsePackageBox(html) {
+  const offers = [];
+  for (const chunk of String(html).split('<a class="teaser-small').slice(1, MAX_OFFERS + 1)) {
+    const href = ((/href="\?([^"]*)"/.exec(chunk) || [])[1] || '').replace(/&amp;/g, '&');
+    const q = new URLSearchParams(href);
+    const lines = (/<p[^>]*>([\s\S]*?)<\/p>/.exec(chunk) || [])[1] || '';
+    const parts = lines.split(/<br\s*\/?>/i).map(plainText).filter(Boolean);
+    const location = (parts[0] || '').split(' - ').map((s) => s.trim()).filter(Boolean).reverse(); // country, region, city
+    const details = parts.slice(1).join(', ');
+    const category = (/class="category">([\s\S]*?)<\/div>/.exec(chunk) || [])[1] || '';
+    const stars = (category.split('opacity')[0].match(/fa-star"/g) || []).length;
+    const nights = (/(\d{1,2})\s*Nächte?/.exec(details) || [])[1];
+    const imageRaw = (/background-image:\s*url\('([^']+)'\)/.exec(chunk) || [])[1];
+    const image = imageRaw ? imageRaw.replace(/&amp;/g, '&') : null;
+    const offer = {
+      kind: 'package', location,
+      hotel: plainText((/class="hotel-title">([\s\S]*?)<\/div>/.exec(chunk) || [])[1]),
+      stars, details, nights: nights ? Number(nights) : null,
+      price: parseEuro(plainText((/class="price">([\s\S]*?)<\/div>/.exec(chunk) || [])[1])) || 0,
+      cityId: '', regionId: q.get('regionId') || '', giataId: q.get('giataId') || '',
+      image: image && image.startsWith(IMAGE_PREFIX) && image.length <= 600 ? image : null,
+    };
+    const ok = location.length >= 1 && location.length <= 5 && location.every((l) => isText(l, 80))
+      && isText(offer.hotel, 120) && stars <= 6 && details.length <= 200
+      && offer.price > 0 && isId(offer.regionId) && isId(offer.giataId);
+    if (ok) offers.push(offer);
+  }
+  return offers;
+}
+
+/** Live offers of all package boxes (cheapest first). */
+async function getPackageBoxOffers() {
+  const pages = await Promise.all(PACKAGE_BOXES.map((b) => fetchText(PACKAGE_BOX_BASE + '?access=' + b.key)));
+  return pages.flatMap((html) => (html ? parsePackageBox(html) : [])).sort((a, b) => a.price - b.price);
 }
 
 /** Parse the HTML of api.specials.de/component/teaserFlights.html?access=... */
@@ -175,4 +234,4 @@ async function getPackageOffers(kind = 'package') {
   }
 }
 
-module.exports = { FLIGHT_BOXES, getFlightOffers, getPackageOffers, parseFlightOffers, parsePackageOffers, parseEuro, plainText, cheapestPerRoute };
+module.exports = { FLIGHT_BOXES, PACKAGE_BOXES, getFlightOffers, getPackageOffers, getPackageBoxOffers, parsePackageBox, parseFlightOffers, parsePackageOffers, parseEuro, plainText, cheapestPerRoute };

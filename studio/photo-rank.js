@@ -13,10 +13,19 @@ const SCHEMA = {
   properties: { scores: { type: 'ARRAY', items: { type: 'OBJECT', properties: {
     i: { type: 'INTEGER' }, score: { type: 'INTEGER' }, x: { type: 'INTEGER' },
     shot: { type: 'STRING', enum: ['aerial', 'panorama', 'bay', 'waterfront', 'landmark', 'sunset', 'resort', 'street', 'other'] },
-    sky: { type: 'STRING', enum: ['clear', 'cloudy', 'overcast'] }, why: { type: 'STRING' },
+    sky: { type: 'STRING', enum: ['clear', 'cloudy', 'overcast'] }, why: { type: 'STRING', maxLength: 40 },
   }, required: ['i', 'score'] } } },
   required: ['scores'],
 };
+
+/** Scores from the answer; a cut-off answer still yields its complete entries (seen: runaway "why" texts). */
+function parseScores(text) {
+  const clean = String(text || '').replace(/```json|```/g, '').trim();
+  try { return JSON.parse(clean).scores; } catch { /* salvage below */ }
+  const out = [];
+  for (const m of clean.matchAll(/\{[^{}]*\}/g)) { try { const o = JSON.parse(m[0]); if (Number.isInteger(o.i)) out.push(o); } catch { /* skip */ } }
+  return out.length ? out : null;
+}
 
 const OFFER_TYPE = { flight: 'flights', package: 'holiday packages', cruise: 'river cruises', home: 'holiday homes' };
 const WINTER = new Set([10, 11, 0, 1, 2]); // Nov-Mar
@@ -50,8 +59,8 @@ function criteria(city, kind, month = new Date().getMonth()) {
     'Photos are numbered from 0 in the order given.',
     'For each photo return: "score" (0-10), "x" (horizontal centre of the main subject in percent of the width, 0 = left, 100 = right),',
     '"shot" (one of: aerial, panorama, bay, waterfront, landmark, sunset, resort, street, other), "sky" (clear, cloudy or overcast)',
-    'and "why" (very short German reason, max 4 words, e.g. "Drohne, Bucht, strahlend").',
-    'Return ONLY JSON: {"scores":[{"i":0,"score":9,"x":50,"shot":"aerial","sky":"clear","why":"Drohne, Bucht, strahlend"}, ...]} with one entry per photo.',
+    'and "why" (very short German reason, max 4 words, e.g. "Luftbild, Bucht, strahlend").',
+    'Return ONLY JSON: {"scores":[{"i":0,"score":9,"x":50,"shot":"aerial","sky":"clear","why":"Luftbild, Bucht, strahlend"}, ...]} with one entry per photo.',
   ].join('\n');
 }
 
@@ -100,14 +109,14 @@ async function rankPhotos(candidates, city, fetchImpl = fetch, kind = null) {
       const res = await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': config.GEMINI_API_KEY },
-        body: JSON.stringify({ contents: [{ parts }], generationConfig: { responseMimeType: 'application/json', responseSchema: SCHEMA, temperature: 0.2, maxOutputTokens: 8192, thinkingConfig: { thinkingBudget: 0 } } }),
+        body: JSON.stringify({ contents: [{ parts }], generationConfig: { responseMimeType: 'application/json', responseSchema: SCHEMA, temperature: 0.2, maxOutputTokens: 2048, thinkingConfig: { thinkingBudget: 0 } } }),
         signal: AbortSignal.timeout(90000),
       });
       require('./ai-status').report(res.status);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
       const text = (json?.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join('');
-      const parsed = JSON.parse(text.replace(/```json|```/g, '').trim()).scores;
+      const parsed = parseScores(text);
       if (!Array.isArray(parsed)) throw new Error('no scores');
       scores = parsed;
     } catch (err) { console.error(`studio photo rank (attempt ${attempt}):`, err.message); }
@@ -128,4 +137,4 @@ async function rankPhotos(candidates, city, fetchImpl = fetch, kind = null) {
   return list.sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
 }
 
-module.exports = { rankPhotos, criteria };
+module.exports = { rankPhotos, criteria, parseScores };

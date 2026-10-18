@@ -47,3 +47,9 @@ test('a cloudy sky caps the score at 4', async () => {
   config.GEMINI_API_KEY = old;
   assert.deepStrictEqual(out.map((c) => [c.id, c.score, c.shot]), [[2, 8, 'bay'], [1, 4, 'aerial']]);
 });
+
+test('a cut-off ranking answer still yields its complete entries', () => {
+  const { parseScores } = require('./photo-rank');
+  const cut = '{"scores":[{"i":0,"score":9,"sky":"clear"},{"i":1,"score":3,"why":"zu dunkel"},{"i":2,"score":8,"why":"Bosporus Bosporus Bosporus Bos';
+  assert.deepStrictEqual(parseScores(cut).map((s) => [s.i, s.score]), [[0, 9], [1, 3]]);
+});

@@ -39,3 +39,19 @@ test('parseEuro', () => {
   assert.equal(parseEuro('1.234,56 €'), 1234.56);
   assert.equal(parseEuro('nothing'), null);
 });
+
+test('parsePackageBox reads specials package offer boxes', () => {
+  const { parsePackageBox } = require('./offers');
+  const a = (giata, stars, price) => `<a class="teaser-small preload" href="?action=dates&amp;agent=993036&amp;product=package&amp;regionId=133&amp;giataId=${giata}" target="_top">
+<div class="img" style="position:relative; background-image: url('https://media.traffics-switch.de/service/imgdata?uid=602&amp;iid=1')"></div> <div class="content">
+<div class="header"><div class="hotel-title">THB Felip</div><div class="category">${'<i class="fa fa-star"></i>'.repeat(stars)}<span style="opacity: .6;"><i class="fa fa-star-o"></i></span></div></div>
+<p style="line-height: 160%;"><strong>Porto Cristo</strong> - Mallorca - Spanien<br/>Doppelzimmer, Halbpension<br />8 Tage (7 Nächte), inkl. Flug</p> <div class="price">p.P. ab <span>${price} €</span></div></div></a>`;
+  const out = parsePackageBox(`<body>${a(3506, 4, 362)}${a('x', 4, 1)}</body>`);
+  assert.strictEqual(out.length, 1);
+  assert.deepStrictEqual(out[0].location, ['Spanien', 'Mallorca', 'Porto Cristo']);
+  assert.strictEqual(out[0].stars, 4);
+  assert.strictEqual(out[0].nights, 7);
+  assert.strictEqual(out[0].price, 362);
+  assert.strictEqual(out[0].giataId, '3506');
+  assert.match(out[0].image, /^https:\/\/media\.traffics-switch\.de\//);
+});
