@@ -8,6 +8,8 @@ const config = require('../config');
 
 const MODEL = 'gemini-2.5-flash';
 
+// Kept for diagnosis only: with this schema Gemini 2.5 Flash wrote endless digits for "x" (seen 2026-10-18),
+// so the ranking uses plain JSON mode plus parseScores() salvage instead.
 const SCHEMA = {
   type: 'OBJECT',
   properties: { scores: { type: 'ARRAY', items: { type: 'OBJECT', properties: {
@@ -102,14 +104,14 @@ async function rankPhotos(candidates, city, fetchImpl = fetch, kind = null) {
   if (!usable.length) { console.error('studio photo rank: no thumbnails loaded'); return list; }
   const parts = [{ text: criteria(city, kind) }];
   usable.forEach((x, i) => parts.push({ text: `Photo ${i}:` }, { inline_data: { mime_type: x.t.mime, data: x.t.data } }));
-  // The answer is forced into a JSON schema (free JSON was sometimes invalid); one retry on failure.
+  // Plain JSON mode (a response schema caused runaway digits); cut-off answers are salvaged; one retry.
   let scores = null;
   for (let attempt = 1; attempt <= 2 && !scores; attempt++) {
     try {
       const res = await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': config.GEMINI_API_KEY },
-        body: JSON.stringify({ contents: [{ parts }], generationConfig: { responseMimeType: 'application/json', responseSchema: SCHEMA, temperature: 0.2, maxOutputTokens: 2048, thinkingConfig: { thinkingBudget: 0 } } }),
+        body: JSON.stringify({ contents: [{ parts }], generationConfig: { responseMimeType: 'application/json', temperature: 0.2, maxOutputTokens: 2048, thinkingConfig: { thinkingBudget: 0 } } }),
         signal: AbortSignal.timeout(90000),
       });
       require('./ai-status').report(res.status);
