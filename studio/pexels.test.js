@@ -21,7 +21,7 @@ test('findPhoto skips religious, low-resolution and used photos (landscape needs
 
 test('findPhoto returns null without key or results', async () => {
   process.env.PEXELS_API_KEY = 'test';
-  assert.strictEqual(await findPhoto(['X'], new Set(), fakeFetch([photo(1, 'cathedral')])), null);
+  assert.strictEqual(await findPhoto(['X'], new Set(), fakeFetch([photo(1, 'mosque')])), null);
   delete process.env.PEXELS_API_KEY;
   assert.strictEqual(await findPhoto(['X'], new Set(), fakeFetch([photo(9, 'sea')])), null);
 });

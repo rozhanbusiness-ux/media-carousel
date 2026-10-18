@@ -1,12 +1,13 @@
 // ============================================================
 //  studio/pexels.js — real destination photos from Pexels
 //  Pexels licence: free commercial use, no attribution required.
-//  Photos whose description mentions a religious building or symbol
+//  Photos whose description mentions a mosque or minaret (client rule; churches,
+//  cathedrals and ancient temples are allowed)
 //  are skipped (client rule); the client still reviews every draft.
 // ============================================================
 
 const API = 'https://api.pexels.com/v1/search';
-const RELIGIOUS = /mosque|minaret|church|cathedral|chapel|temple|shrine|synagogue|monastery|basilica|religio|prayer|cross\b|crucifix|crescent|islam|christian|buddh|hindu|jewish|dome|moschee|kirche|kathedrale|tempel/i;
+const RELIGIOUS = /mosque|minaret|moschee|minarett|masjid|\bcamii?\b|\bjami\b|islamic|prayer|ramadan/i; // client rule: no mosques or minarets
 // Perceived brightness (0-255) of the Pexels average colour, e.g. "#A3B8CC".
 const MIN_BRIGHTNESS = 120;
 function brightness(hex) {

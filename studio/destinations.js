@@ -1,6 +1,6 @@
 // ============================================================
 //  studio/destinations.js — what a good photo of each destination
-//  shows: specific search phrases (iconic, bright, non-religious views)
+//  shows: specific search phrases (iconic, bright views; no mosques or minarets)
 //  and scene descriptions for AI images. Each destination has its own
 //  phrases; no generic phrase is shared between destinations (shared
 //  phrases returned the same photo for different places).
@@ -31,6 +31,8 @@ const D = {
   VIE: { q: ['Vienna Schonbrunn palace', 'Vienna Belvedere palace', 'Vienna Ringstrasse', 'Vienna Prater wheel'], ai: ['Schönbrunn Palace and its gardens in Vienna on a sunny day', 'the Upper Belvedere palace in Vienna reflected in its pond'] },
   LCA: { q: ['Larnaca Finikoudes promenade', 'Cyprus Ayia Napa beach', 'Larnaca salt lake flamingos', 'Cyprus turquoise sea'], ai: ['the palm-lined Finikoudes promenade in Larnaca by the sea', 'a turquoise bay with white sand in Cyprus on a sunny day'] },
   HRG: { q: ['Hurghada red sea beach', 'Hurghada coral reef', 'Hurghada marina'], ai: ['a Red Sea beach in Hurghada with crystal clear turquoise water'] },
+  ATH: { q: ['Athens Acropolis Parthenon', 'Athens Plaka old town', 'Athens Lycabettus hill view', 'Athens Riviera Vouliagmeni', 'Athens city panorama'], ai: ['a panoramic view over Athens from Lycabettus hill at golden hour'] },
+  SOF: { q: ['Sofia Alexander Nevsky Cathedral', 'Sofia Vitosha mountain', 'Sofia Vitosha boulevard', 'Sofia city panorama', 'Sofia National Palace of Culture'], ai: ['Sofia city with Vitosha mountain behind on a clear day'] },
   LIS: { q: ['Lisbon tram 28', 'Lisbon Belem tower', 'Lisbon viewpoint Alfama'], ai: ['a yellow tram climbing a narrow street in Lisbon on a sunny day'] },
   side: { q: ['Side Turkey Apollo temple ruins sea', 'Side Turkey beach', 'Side harbour Turkey'], ai: ['a long sandy beach at Side on the Turkish Riviera with calm turquoise water'] },
   alanya: { q: ['Alanya castle peninsula', 'Alanya Cleopatra beach', 'Alanya red tower'], ai: ['the Alanya peninsula with its castle walls above Cleopatra beach'] },

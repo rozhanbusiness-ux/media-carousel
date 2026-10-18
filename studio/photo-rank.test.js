@@ -26,11 +26,12 @@ test('keeps order with null scores when the model fails or no key', async () => 
   assert.deepStrictEqual((await rankPhotos([cand(5)], 'X', fake('{}'))).map((c) => c.score), [null]);
 });
 
-test('destination criteria demand a clear sky and name famous religious landmarks', () => {
+test('destination criteria demand a clear sky and exclude mosques only', () => {
   const { criteria } = require('./photo-rank');
   const c = criteria('Barcelona, Spanien', 'flight', 5);
   assert.match(c, /Clear, deep-blue sky/);
-  assert.match(c, /Sagrada Familia/);
+  assert.match(c, /Blue Mosque/);
+  assert.match(c, /cathedrals and ancient temples are fine/);
   assert.match(c, /Flight offer/);
   assert.match(criteria('Antalya', 'package', 11), /winter/);
 });

@@ -18,10 +18,10 @@ const PLACES = {
   PMI: ['Mallorca', 'Spanien'], CAI: ['Kairo', 'Ägypten'], HRG: ['Hurghada', 'Ägypten'], LON: ['London', 'Großbritannien'],
   PAR: ['Paris', 'Frankreich'], ROM: ['Rom', 'Italien'], AMS: ['Amsterdam', 'Niederlande'], VIE: ['Wien', 'Österreich'],
   TBS: ['Tiflis', 'Georgien'], LCA: ['Larnaka', 'Zypern'], HER: ['Kreta', 'Griechenland'], BKK: ['Bangkok', 'Thailand'],
-  LIS: ['Lissabon', 'Portugal'], BGW: ['Bagdad', 'Irak'], duhok: ['Duhok', 'Kurdistan, Irak'], zakho: ['Zakho', 'Kurdistan, Irak'],
+  LIS: ['Lissabon', 'Portugal'], ATH: ['Athen', 'Griechenland'], SOF: ['Sofia', 'Bulgarien'], BGW: ['Bagdad', 'Irak'], duhok: ['Duhok', 'Kurdistan, Irak'], zakho: ['Zakho', 'Kurdistan, Irak'],
 };
 // English names for the search (stock sites index English words).
-const SEARCH_NAME = { CAI: 'Cairo', LON: 'London', ROM: 'Rome', VIE: 'Vienna', TBS: 'Tbilisi', LCA: 'Larnaca', HER: 'Crete', LIS: 'Lisbon', BGW: 'Baghdad', PMI: 'Mallorca' };
+const SEARCH_NAME = { ATH: 'Athens', CAI: 'Cairo', LON: 'London', ROM: 'Rome', VIE: 'Vienna', TBS: 'Tbilisi', LCA: 'Larnaca', HER: 'Crete', LIS: 'Lisbon', BGW: 'Baghdad', PMI: 'Mallorca' };
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 

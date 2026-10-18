@@ -42,7 +42,7 @@ function criteria(city, kind, month = new Date().getMonth()) {
     'MATCH THE OFFER:',
     match,
     'ALWAYS LOW (3 or less):',
-    '- Any religious building or symbol, including famous ones (Sagrada Familia, Hagia Sophia, Notre-Dame, Blue Mosque, Sheikh Zayed Mosque, St. Peter\'s, Cologne Cathedral ...), even partly visible.',
+    '- Any mosque or minaret, including famous ones (Blue Mosque, Hagia Sophia with its minarets, Sheikh Zayed Mosque, Jalil Khayat Mosque, Muhammad Ali Mosque ...), even partly visible. Churches, cathedrals and ancient temples are fine.',
     '- Black-and-white, sepia, desaturated, washed-out or grey-toned photos; night, dark, rain, fog; crowds; traffic; construction; litter; power lines.',
     '- Close-up people, selfies; text, signs, logos, watermarks.',
     '- Generic places that could be anywhere; interiors; food.',
@@ -59,7 +59,7 @@ function coverCriteria(subject) {
   return [
     `You are the photo editor of a luxury travel agency. Score each photo (0-10) as the cover background of an Instagram post about ${subject}.`,
     'High scores: bright, clear blue sky, elegant, luxurious, sharp, professional; calm area at the top (logo) and bottom (text).',
-    'Low scores: dark, grey, cluttered, text or logos, close-up faces, any religious building or symbol.',
+    'Low scores: dark, grey, cluttered, text or logos, close-up faces, any mosque or minaret.',
     'Photos are numbered from 0 in the order given. Also give "x" (horizontal centre of the main subject in percent).',
     'Give each photo a very short German reason (max 4 words).',
     'Return ONLY JSON: {"scores":[{"i":0,"score":7,"x":50,"why":"hell, elegant"}, ...]} with one entry per photo.',

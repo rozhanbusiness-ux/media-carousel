@@ -21,8 +21,8 @@ async function suggestQueries(offer, fetchImpl = fetch) {
   if (suggested.has(place)) return suggested.get(place);
   let list = [];
   try {
-    const prompt = `Give 4 short stock-photo search phrases (2-5 English words each) for iconic, bright, non-religious travel photos of ${place}. `
-      + 'Each phrase must name the place or a specific landmark, beach or view of it. No mosques, churches or temples. Answer as a JSON array of strings only.';
+    const prompt = `Give 4 short stock-photo search phrases (2-5 English words each) for iconic, bright travel photos of ${place}. `
+      + 'Each phrase must name the place or a specific landmark, beach or view of it. No mosques or minarets. Answer as a JSON array of strings only.';
     const res = await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${config.GEMINI_MODEL || 'gemini-2.5-flash'}:generateContent`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': config.GEMINI_API_KEY },
