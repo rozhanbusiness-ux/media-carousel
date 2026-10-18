@@ -29,11 +29,13 @@ test('keeps order with null scores when the model fails or no key', async () => 
 test('destination criteria demand a clear sky and exclude mosques only', () => {
   const { criteria } = require('./photo-rank');
   const c = criteria('Barcelona, Spanien', 'flight', 5);
-  assert.match(c, /Clear, deep-blue sky/);
-  assert.match(c, /Blue Mosque/);
+  assert.match(c, /CLEAR BLUE SKY/);
+  assert.match(c, /any mosque or minaret/);
   assert.match(c, /cathedrals and ancient temples are fine/);
-  assert.match(c, /Flight offer/);
+  assert.match(c, /Offer type: flight/);
   assert.match(criteria('Antalya', 'package', 11), /winter/);
+  assert.match(c, /FEW ELEMENTS, CENTRED/);
+  assert.match(c, /STRONG COLOUR CONTRAST/);
 });
 
 test('a cloudy sky caps the score at 4', async () => {

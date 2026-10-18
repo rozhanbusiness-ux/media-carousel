@@ -28,7 +28,7 @@ async function search(query, fetchImpl = fetch, quality = false) {
     const lic = strip(m.LicenseShortName && m.LicenseShortName.value);
     return { p, ii, m, lic };
   })
-    .filter(({ p, ii, lic }) => Number.isInteger(p.pageid) && ii.mime === 'image/jpeg' && OK_LICENSE.test(lic) && Math.min(ii.width, ii.height) >= 1600)
+    .filter(({ p, ii, lic }) => Number.isInteger(p.pageid) && ii.mime === 'image/jpeg' && OK_LICENSE.test(lic) && Math.min(ii.width, ii.height) >= 2000 && Math.max(ii.width, ii.height) >= 3000)
     .filter(({ p, m }) => !RELIGIOUS.test(`${p.title} ${strip(m.ImageDescription && m.ImageDescription.value)} ${strip(m.Categories && m.Categories.value)}`))
     .map(({ p, ii, m, lic }) => ({
       id: `wm:${p.pageid}`, w: ii.width, h: ii.height, landscape: ii.width > ii.height,

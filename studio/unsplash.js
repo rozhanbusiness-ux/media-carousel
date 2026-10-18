@@ -20,7 +20,7 @@ async function search(query, fetchImpl = fetch) {
   const data = await res.json();
   return (Array.isArray(data.results) ? data.results : [])
     .filter((p) => typeof p.id === 'string' && /^[\w-]{4,40}$/.test(p.id) && p.urls && typeof p.urls.raw === 'string')
-    .filter((p) => Math.min(p.width, p.height) >= 1600)
+    .filter((p) => Math.min(p.width, p.height) >= 2000 && Math.max(p.width, p.height) >= 3000) // highest resolution only (client)
     .filter((p) => !RELIGIOUS.test(`${p.alt_description || ''} ${p.description || ''} ${(p.tags || []).map((t) => t.title).join(' ')}`))
     .map((p) => ({
       id: `us:${p.id}`, w: p.width, h: p.height, landscape: p.width > p.height,

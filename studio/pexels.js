@@ -27,7 +27,7 @@ async function search(query, fetchImpl = fetch) {
   if (!res.ok) throw new Error(`pexels search ${res.status}`);
   const data = await res.json();
   return (Array.isArray(data.photos) ? data.photos : [])
-    .filter((p) => Number.isInteger(p.id) && typeof p.src?.original === 'string' && p.height >= 2000)
+    .filter((p) => Number.isInteger(p.id) && typeof p.src?.original === 'string' && p.height >= 2000 && Math.max(p.width, p.height) >= 3000) // highest resolution only (client)
     .filter((p) => !RELIGIOUS.test(`${p.alt || ''} ${p.url || ''}`))
     .filter((p) => brightness(p.avg_color) >= MIN_BRIGHTNESS) // the template adds a dark filter, so start bright
     .map((p) => ({ id: p.id, url: p.src.original, thumb: p.src.medium || p.src.small || '', preview: p.src.large || p.src.medium || '', landscape: p.width > p.height,
