@@ -26,19 +26,17 @@ test('keeps order with null scores when the model fails or no key', async () => 
   assert.deepStrictEqual((await rankPhotos([cand(5)], 'X', fake('{}'))).map((c) => c.score), [null]);
 });
 
-test('destination criteria demand a clear sky and exclude mosques only', () => {
+test('destination criteria are the client\'s four short rules and exclude mosques', () => {
   const { criteria } = require('./photo-rank');
-  const c = criteria('Barcelona, Spanien', 'flight', 5);
-  assert.match(c, /CLEAR BLUE SKY/);
-  assert.match(c, /any mosque or minaret/);
-  assert.match(c, /cathedrals and ancient temples are fine/);
-  assert.match(c, /Offer type: flight/);
-  assert.match(criteria('Antalya', 'package', 11), /winter/);
-  assert.match(c, /FEW ELEMENTS, CENTRED/);
-  assert.match(c, /STRONG COLOUR CONTRAST/);
+  const c = criteria('Istanbul', 'flight');
+  assert.match(c, /High resolution/);
+  assert.match(c, /landmark in the centre/);
+  assert.match(c, /Clean, without clutter/);
+  assert.match(c, /Day or night, with high contrast/);
+  assert.match(c, /mosque or minaret/);
 });
 
-test('a cloudy sky caps the score at 4', async () => {
+test('scores are taken as given (no sky cap any more) and sorted best first', async () => {
   const fake = async (url) => (String(url).includes('generativelanguage')
     ? { ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: '{"scores":[{"i":0,"score":9,"sky":"overcast","shot":"aerial"},{"i":1,"score":8,"sky":"clear","shot":"bay"}]}' }] } }] }) }
     : { ok: true, headers: { get: () => 'image/jpeg' }, arrayBuffer: async () => new ArrayBuffer(8) });
@@ -47,7 +45,7 @@ test('a cloudy sky caps the score at 4', async () => {
   const { rankPhotos } = require('./photo-rank');
   const out = await rankPhotos([{ id: 1, thumb: 'https://images.pexels.com/a.jpg' }, { id: 2, thumb: 'https://images.pexels.com/b.jpg' }], 'X', fake, 'flight');
   config.GEMINI_API_KEY = old;
-  assert.deepStrictEqual(out.map((c) => [c.id, c.score, c.shot]), [[2, 8, 'bay'], [1, 4, 'aerial']]);
+  assert.deepStrictEqual(out.map((c) => [c.id, c.score, c.shot]), [[1, 9, 'aerial'], [2, 8, 'bay']]);
 });
 
 test('a cut-off ranking answer still yields its complete entries', () => {

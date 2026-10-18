@@ -97,4 +97,4 @@ async function build(t, log = console.log) {
   return { key: t.key, candidates: ranked.length, scored, added: good.length, total: index.photos.length, top: ranked.slice(0, 24) };
 }
 
-module.exports = { build, target, readIndex, entryDir, DIR, MIN_SCORE, KEEP };
+module.exports = { build, target, readIndex, writeIndex, entryDir, DIR, MIN_SCORE, KEEP };

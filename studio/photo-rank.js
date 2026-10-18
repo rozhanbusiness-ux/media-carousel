@@ -34,22 +34,14 @@ const WINTER = new Set([10, 11, 0, 1, 2]); // Nov-Mar
 
 function criteria(city, kind, month = new Date().getMonth()) {
   if (!kind) return coverCriteria(city); // type covers (airplane / resort), no destination
-  const match = kind === 'flight'
-    ? '- Flight offer: the city\'s or coast\'s most iconic, recognisable view.'
-    : '- Holiday offer: sea, beach, resort coastline, pools, relaxation.';
-  // Client's six rules (2026-10-18), checked one by one; a photo needs all six for 8+.
+  // Client's four rules (2026-10-18, kept short on purpose: longer rule lists made the model too strict).
   return [
-    `You select background photos for a premium Instagram ad selling ${OFFER_TYPE[kind] || 'trips'} to ${city}. Judge each photo by SIX rules:`,
-    '1. FEW ELEMENTS, CENTRED: one clear main subject (or very few) in the centre of the photo; simple, uncluttered scene.',
-    '2. CLEAR BLUE SKY: deep, clean blue sky without grey, white haze or heavy clouds.',
-    '3. BRILLIANT BLUE SEA (where sea or water is in the photo): bright, shining blue or turquoise water.',
-    '4. HIGHEST SHARPNESS: crisp, detailed, professional photo; nothing blurry or noisy.',
-    '5. STRONG COLOUR CONTRAST: rich, vivid colours that pop (blue vs. white, green, warm stone); never flat, grey or washed out.',
-    '6. CLEAN: tidy scene; no crowds, traffic, cars, wires, construction, litter, text, signs or watermarks.',
-    `Score: 9-10 = all six rules fully met AND clearly ${city}; 7-8 = one rule slightly weak; 5-6 = two rules weak; 0-4 = a rule clearly broken.`,
-    `Also 0-3: not recognisable as ${city}; any mosque or minaret (churches, cathedrals and ancient temples are fine); black-and-white; night; interiors; food.`,
-    ...(WINTER.has(month) ? ['It is winter in Germany: warm, sunny scenes are preferred.'] : []),
-    kind === 'flight' ? 'Offer type: flight – the place\'s best-known view.' : 'Offer type: holiday – sea, beach, coast, resort.',
+    `You select background photos for an Instagram ad for trips to ${city}. A great photo has:`,
+    '1. High resolution: sharp and professional.',
+    '2. A landmark in the centre.',
+    '3. Clean, without clutter.',
+    '4. Day or night, with high contrast.',
+    `Score 0-10 for how well a photo meets these four points and shows ${city}. Score 0-3 if it shows any mosque or minaret.`,
     'Photos are numbered from 0 in the order given.',
     'For each photo return: "score" (0-10), "x" (horizontal centre of the main subject in percent of the width, 0 = left, 100 = right),',
     '"shot" (one of: aerial, panorama, bay, waterfront, landmark, sunset, resort, street, other), "sky" (clear, cloudy or overcast)',
@@ -127,7 +119,6 @@ async function rankPhotos(candidates, city, fetchImpl = fetch, kind = null) {
         usable[s.i].c.score = Math.max(0, Math.min(10, Math.round(s.score)));
         const SHOTS = ['aerial', 'panorama', 'bay', 'waterfront', 'landmark', 'sunset', 'resort', 'street', 'other'];
         if (SHOTS.includes(s.shot)) usable[s.i].c.shot = s.shot;
-        if (['cloudy', 'overcast'].includes(s.sky)) usable[s.i].c.score = Math.min(usable[s.i].c.score, 4); // clear sky is a must (client)
         if (Number.isFinite(s.x)) usable[s.i].c.x = Math.max(0, Math.min(100, Math.round(s.x)));
         if (typeof s.why === 'string') usable[s.i].c.why = s.why.replace(/[<>{}]/g, '').trim().slice(0, 40);
       }
