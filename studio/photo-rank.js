@@ -117,7 +117,12 @@ async function rankPhotos(candidates, city, fetchImpl = fetch, kind = null) {
       const json = await res.json();
       const text = (json?.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join('');
       const parsed = parseScores(text);
-      if (!Array.isArray(parsed)) throw new Error('no scores');
+      if (!Array.isArray(parsed)) {
+        // Diagnosis: what Gemini actually answered (no key or image data in it).
+        const c = json?.candidates?.[0] || {};
+        const t = String(text).replace(/\s+/g, ' ');
+        throw new Error(`no scores (finish: ${c.finishReason || '-'}, block: ${json?.promptFeedback?.blockReason || '-'}, ${t.length} chars) start: ${t.slice(0, 400)} … end: ${t.slice(-200)}`);
+      }
       scores = parsed;
     } catch (err) { console.error(`studio photo rank (attempt ${attempt}):`, err.message); }
   }
@@ -137,4 +142,4 @@ async function rankPhotos(candidates, city, fetchImpl = fetch, kind = null) {
   return list.sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
 }
 
-module.exports = { rankPhotos, criteria, parseScores };
+module.exports = { rankPhotos, criteria, parseScores, SCHEMA };
