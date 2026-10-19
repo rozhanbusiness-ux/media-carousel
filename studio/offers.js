@@ -35,6 +35,20 @@ const FLIGHT_BOXES = [
   { route: 'FRA-BKK', key: 'b46010baf1f53416d4c63de91d81e17b' },
   { route: 'CGN-VIE', key: '853a4c597e0965b2bc44f04900ebcc34' },
   { route: 'MUC-LCA', key: '3be189cef24ff4725b80b2ab6834ff5e' },
+  { route: 'FRA-ISU', key: '6ccb188fabd4d301fc5fcdcb39987295' },
+  { route: 'BER-ISU', key: 'f8afc2ddbedeae3e3146c8a6bb56a84e' },
+  { route: 'MUC-ISU', key: '775a781041511dd36a062b668b2c9e06' },
+  { route: 'HAM-EBL', key: '0d537126b4a00477f2b5ddbcca852275' },
+  { route: 'BER-BGW', key: '788df881d9d82d951a1ee1163f76f90b' },
+  { route: 'STR-MAD', key: 'b1aa3971ad4e7e8a37b97b6116e9fda9' },
+  { route: 'MUC-STO', key: 'b511e3f025662c39ff21904abe00cc34' }, // Stockholm (all airports)
+  { route: 'FRA-OSL', key: 'a1e2aa05297b9f57c69bec500ce94da8' },
+  { route: 'DUS-WAW', key: 'e912b5c64ec452dc9191cb81478e37e2' },
+  { route: 'MUC-BGW', key: '3772d712efbe3bf035f2b4828a8e38c3' },
+  { route: 'CGN-ATH', key: 'e6d88c2fbc92c8571dbd530ad3c301fc' },
+  { route: 'FRA-BEY', key: '2d77d453241e806565108588b638eb4d' },
+  { route: 'FRA-AMM', key: 'ca90e2d6363cfbd671846a59ac1214bb' },
+  { route: 'DUS-AGA', key: 'f0661eaa41f4c8acb4f1316618994b65' },
 ];
 // Package offer boxes, one per destination (specials partner tools, product Pauschalreise).
 const PACKAGE_BOX_BASE = 'https://api.specials.de/component/teaserPackages.html';

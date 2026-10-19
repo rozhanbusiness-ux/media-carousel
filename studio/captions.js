@@ -15,6 +15,15 @@ const LANGS = ['de', 'ar', 'ckb'];
 
 // City names per airport code; unknown codes keep the provider's (German) name.
 const CITY = {
+  ATH: { de: 'Athen', ar: 'أثينا', ckb: 'ئەسینا' },
+  BEY: { de: 'Beirut', ar: 'بيروت', ckb: 'بەیروت' },
+  AMM: { de: 'Amman', ar: 'عمّان', ckb: 'عەممان' },
+  AGA: { de: 'Agadir', ar: 'أغادير', ckb: 'ئەگادیر' },
+  MAD: { de: 'Madrid', ar: 'مدريد', ckb: 'مادرید' },
+  STO: { de: 'Stockholm', ar: 'ستوكهولم', ckb: 'ستۆکهۆڵم' },
+  ARN: { de: 'Stockholm', ar: 'ستوكهولم', ckb: 'ستۆکهۆڵم' },
+  OSL: { de: 'Oslo', ar: 'أوسلو', ckb: 'ئۆسلۆ' },
+  WAW: { de: 'Warschau', ar: 'وارسو', ckb: 'وارشۆ' },
   DUS: { de: 'Düsseldorf', ar: 'دوسلدورف', ckb: 'دۆسێڵدۆرف' },
   FRA: { de: 'Frankfurt', ar: 'فرانكفورت', ckb: 'فرانکفۆرت' },
   MUC: { de: 'München', ar: 'ميونخ', ckb: 'میونخ' },
