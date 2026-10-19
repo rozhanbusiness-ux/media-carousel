@@ -111,4 +111,49 @@ async function build(t, log = console.log) {
   return { key: t.key, unsplashMissed: !!t.unsplashMissed, candidates: ranked.length, scored, added: good.length, total: index.photos.length, top: ranked.slice(0, 24) };
 }
 
-module.exports = { unsplashPausedUntil: () => unsplashPausedUntil, build, target, readIndex, writeIndex, entryDir, DIR, MIN_SCORE, KEEP };
+// ---- Use in posts -------------------------------------------------------------------------
+
+/** Bank key of an offer's destination: airport code, else the place name (lower case). */
+const keyOf = (offer) => safeKey((offer.to && (offer.to.code || offer.to.name)) || '');
+
+/** Up to `n` different bank photos for the offer (best score first, a different kind of shot per slide),
+ *  skipping photos used for this destination within 60 days and ids in `exclude`. Each item:
+ *  { id, dataUri, pos, credit }. Empty when the destination has no bank entry. */
+function pick(offer, n = 3, exclude = new Set()) {
+  const key = keyOf(offer);
+  if (!key) return [];
+  const index = readIndex(key);
+  const registry = require('./photo-registry');
+  const blocked = registry.blocked(key.length === 3 ? key.toUpperCase() : (offer.to.code || offer.to.name));
+  const fresh = index.photos.filter((p) => !exclude.has(p.id) && !blocked.has(p.id));
+  const pool = (fresh.length >= n ? fresh : index.photos.filter((p) => !exclude.has(p.id)))
+    .map((p) => ({ p, r: (p.score || 0) + Math.random() * 2 })) // best first, with some variety between posts
+    .sort((a, b) => b.r - a.r).map((x) => x.p);
+  const picks = [];
+  for (const p of pool) if (picks.length < n && !picks.some((q) => q.shot === p.shot)) picks.push(p);
+  for (const p of pool) if (picks.length < n && !picks.includes(p)) picks.push(p);
+  const out = [];
+  for (const p of picks) {
+    try {
+      const buf = fs.readFileSync(path.join(entryDir(key), p.file));
+      const mime = /\.png$/.test(p.file) ? 'image/png' : /\.webp$/.test(p.file) ? 'image/webp' : 'image/jpeg';
+      out.push({ id: p.id, dataUri: `data:${mime};base64,` + buf.toString('base64'), pos: `${Number.isInteger(p.x) ? p.x : 50}% 50%`, credit: p.credit || {} });
+    } catch { /* file missing: skip */ }
+  }
+  return out;
+}
+
+/** Report a bank photo as used (registry; Unsplash requires a download ping). */
+function markUsed(offer, item) {
+  require('./photo-registry').record(item.id, (offer.to && (offer.to.code || offer.to.name)) || '', null);
+  if (item.credit && item.credit.downloadLocation) unsplash.trackUse(item.credit.downloadLocation);
+}
+
+/** Caption line crediting the photographers where the licence asks for it (Unsplash, Wikimedia). */
+function creditLine(credits) {
+  const parts = [...new Set((credits || []).filter((c) => c && c.author && /Unsplash|Wikimedia/.test(c.source || ''))
+    .map((c) => `${c.author} / ${c.source}${/Wikimedia/.test(c.source) && c.license ? ` (${c.license})` : ''}`))];
+  return parts.length ? `📷 ${parts.join(' · ')}` : '';
+}
+
+module.exports = { pick, markUsed, creditLine, keyOf, unsplashPausedUntil: () => unsplashPausedUntil, build, target, readIndex, writeIndex, entryDir, DIR, MIN_SCORE, KEEP };

@@ -14,6 +14,7 @@ const { buildCaption, formatDate, formatPrice, cityName, LANGS } = require('./ca
 const { renderSlide, STYLE_BY_WEEKDAY, STYLES, PACKAGE_STYLES } = require('./render');
 const { generateSet, enhancePhoto } = require('./image');
 const sources = require('./photo-sources');
+const bank = require('./bank');
 const registry = require('./photo-registry');
 const { rankPhotos } = require('./photo-rank');
 const store = require('./store');
@@ -107,6 +108,15 @@ const placeName = (o) => [o.to.name, o.country].filter(Boolean).join(', ');
  *  ones for the three slides, each retouched (light/colour/sky, place unchanged). Returns
  *  { picture, ranked }: picture is null when no photo is good enough (ranked are then shown). */
 async function autoPicture(offer, used = new Set()) {
+  // Photo bank first (client-approved, ranked in advance): instant, three different photos.
+  const fromBank = bank.pick(offer, 3, used);
+  if (fromBank.length) {
+    fromBank.forEach((b) => bank.markUsed(offer, b));
+    return { ranked: [], picture: { file: null, pexelsId: fromBank[0].id, dataUri: fromBank[0].dataUri,
+      slides: { 2: (fromBank[1] || {}).dataUri || null, 3: (fromBank[2] || {}).dataUri || null },
+      pos: { 1: fromBank[0].pos, 2: (fromBank[1] || {}).pos || null, 3: (fromBank[2] || {}).pos || null },
+      credits: fromBank.map((b) => b.credit) } };
+  }
   let list = [];
   try { list = await sources.candidates(offer, queriesFor, used, 20); } catch (err) { console.error('studio photos:', err.message); }
   const ranked = await rankPhotos(list, placeName(offer), fetch, offer.kind || 'flight');
@@ -170,6 +180,7 @@ function setPhoto(draft, p) {
   draft.needsPhoto = !p;
   draft.aiPhoto = !!(p && p.ai);
   draft.photoPos = (p && p.pos) || null;
+  draft.photoCredits = (p && p.credits) || [];
   if (p) sources.use(draft.offer, p.pexelsId != null ? p.pexelsId : (p.file ? 'lib:' + p.file : null), p.dataUri);
 }
 
@@ -243,7 +254,8 @@ async function renderDraft(draft) {
         files.push({ size, slide, url: '/output/' + name });
       }
     }
-    versions.push({ lang, caption: t.caption, aiWritten: t.aiWritten, files });
+    const credit = bank.creditLine(draft.photoCredits);
+    versions.push({ lang, caption: credit && !t.caption.includes(credit) ? `${t.caption}\n\n${credit}` : t.caption, aiWritten: t.aiWritten, files });
   }
   // Remove the previous renders of this draft.
   for (const v of draft.versions || []) for (const f of v.files) {

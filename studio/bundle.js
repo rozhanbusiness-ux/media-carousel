@@ -13,6 +13,7 @@ const { cardFor, countryName, offerKey } = require('./packages');
 const { formatDate, formatPrice, cityName, BASE_TAGS, FIXED } = require('./captions');
 const { renderSlide, PACKAGE_STYLES } = require('./render');
 const sources = require('./photo-sources');
+const bank = require('./bank');
 const { generatePhoto, enhancePhoto } = require('./image');
 const { rankPhotos } = require('./photo-rank');
 const store = require('./store');
@@ -65,6 +66,8 @@ function bundleCaption(offers, lang, title = '') {
 
 /** Photo for one offer: a strictly ranked real photo (8+, retouched), else library, else the best real photo. */
 async function photoFor(offer, used, queriesFor, choosePhoto) {
+  const [fromBank] = bank.pick(offer, 1, used); // photo bank first (client-approved photos)
+  if (fromBank) { used.add(fromBank.id); bank.markUsed(offer, fromBank); return { file: null, pexelsId: fromBank.id, dataUri: fromBank.dataUri, pos: fromBank.pos, credit: fromBank.credit }; }
   const lib = choosePhoto(offer);
   let list = [];
   try { list = await sources.candidates(offer, queriesFor, used, 8); } catch (err) { console.error('studio bundle photos:', err.message); }
@@ -79,7 +82,8 @@ async function photoFor(offer, used, queriesFor, choosePhoto) {
     return { file: null, pexelsId: best.id, dataUri, pos: `${Number.isInteger(best.x) ? best.x : 50}% 50%` };
   }
   if (lib && !used.has(lib.file)) { used.add(lib.file); return { file: lib.file, pexelsId: null, dataUri: lib.dataUri }; }
-  const any = ranked.find((c) => c.score != null && c.score >= 6); // never an unscored or poor photo
+  // Last resort: the best scored photo (an error here blocked whole multi-offer posts).
+  const any = ranked.find((c) => c.score != null && c.score >= 6) || ranked.find((c) => c.score != null);
   if (!any) return null;
   used.add(any.id);
   return { file: null, pexelsId: any.id, dataUri: await sources.download(any.url), pos: `${Number.isInteger(any.x) ? any.x : 50}% 50%` };
@@ -96,6 +100,7 @@ async function pickPhotos(draft, queriesFor, choosePhoto) {
   for (const id of draft.pexelsIds || []) used.add(id); // "new photos" shows other ones
   draft.pexelsIds = [];
   draft.photoPos = [];
+  draft.photoCredits = [];
   for (let n = 0; n < draft.offers.length; n++) {
     const p = await photoFor(draft.offers[n], used, queriesFor, choosePhoto);
     if (!p) throw new Error(`Kein Foto für ${draft.offers[n].to.name} gefunden – bitte erneut versuchen oder das Angebot weglassen.`);
@@ -103,6 +108,7 @@ async function pickPhotos(draft, queriesFor, choosePhoto) {
     sources.use(draft.offers[n], p.pexelsId != null ? p.pexelsId : (p.file ? 'lib:' + p.file : null), p.dataUri);
     draft.pexelsIds.push(p.pexelsId || p.file);
     draft.photoPos[n] = p.pos || null; // horizontal crop around the subject (landscape photos)
+    draft.photoCredits = [...(draft.photoCredits || []).slice(0, n), p.credit || null];
   }
   const cover = await coverPhoto(draft.bundleKind || 'flight', used);
   if (!cover) throw new Error('Kein Cover-Foto gefunden – bitte unter „📸 Cover-Fotos“ eines speichern.');
@@ -142,7 +148,9 @@ async function renderBundle(draft) {
         files.push({ size, slide: i + 1, url: '/output/' + name });
       }
     }
-    versions.push({ lang, caption: (draft.texts[lang] || {}).caption || bundleCaption(draft.offers, lang, titleOf(draft, lang)), aiWritten: false, files });
+    const base = (draft.texts[lang] || {}).caption || bundleCaption(draft.offers, lang, titleOf(draft, lang));
+    const credit = bank.creditLine(draft.photoCredits);
+    versions.push({ lang, caption: credit && !base.includes(credit) ? `${base}\n\n${credit}` : base, aiWritten: false, files });
   }
   for (const v of draft.versions || []) for (const f of v.files) {
     try { fs.unlinkSync(path.join(OUTPUT, path.basename(f.url))); } catch { /* already gone */ }
