@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const config = require('../config');
-const { plan, research, writeStory, jsonIn, okText } = require('./editorial');
+const { plan, research, writeStory, jsonIn, okText, trustOf, trustedSources } = require('./editorial');
 
 test('plan: different themes, about 60 % core areas', () => {
   const p = plan(6, () => 0.3);
@@ -28,15 +28,42 @@ test('research keeps verified facts and takes sources from the grounding data', 
   config.GEMINI_API_KEY = 'test';
   const r = await research({ theme: 'nature', area: 'Europe' }, [], grounded(
     { topic: 'Plitvice Lakes', place: 'Plitvice', country: 'Croatia', facts: ['16 terraced lakes', 'UNESCO since 1979', 'colours change'], photo_query: 'Plitvice lakes waterfalls' },
-    [{ web: { uri: 'https://en.wikipedia.org/wiki/Plitvice', title: 'wikipedia.org' } }, { web: { uri: 'javascript:x', title: 'bad' } }]));
+    [{ web: { uri: 'https://en.wikipedia.org/wiki/Plitvice', title: 'wikipedia.org' } }, { web: { uri: 'javascript:x', title: 'bad' } },
+      { web: { uri: 'https://some-blog.example/plitvice', title: 'some-blog.example' } }, { web: { uri: 'https://croatia.hr/en/plitvice', title: 'croatia.hr' } }]));
   assert.strictEqual(r.place, 'Plitvice');
-  assert.deepStrictEqual(r.sources, [{ title: 'wikipedia.org', url: 'https://en.wikipedia.org/wiki/Plitvice' }]);
+  assert.deepStrictEqual(r.sources.map((x) => x.title), ['wikipedia.org', 'croatia.hr']);
+});
+
+test('research rejects topics without enough trusted sources (client rule)', async () => {
+  config.GEMINI_API_KEY = 'test';
+  const r = await research({ theme: 'nature', area: 'Europe' }, [], grounded(
+    { topic: 'Some lake', place: 'Somewhere', country: 'X', facts: ['a', 'b', 'c'] },
+    [{ web: { uri: 'https://blog-one.example/a', title: 'blog-one.example' } }, { web: { uri: 'https://en.wikipedia.org/wiki/X', title: 'wikipedia.org' } }]));
+  assert.strictEqual(r, null);
+});
+
+test('trusted sources: encyclopedias, official boards, governments, the event site; not blogs or portals', () => {
+  assert.strictEqual(trustOf('en.wikipedia.org'), 'strong');
+  assert.strictEqual(trustOf('bot.gov.krd'), 'strong');
+  assert.strictEqual(trustOf('www.salzburg.gv.at'.replace(/^www\./, '')), 'strong');
+  assert.strictEqual(trustOf('duhokiff.com', 'Duhok'), 'strong');
+  assert.strictEqual(trustOf('bbc.com'), 'media');
+  for (const h of ['kurdish.events', 'festagent.com', 'tripadvisor.com', 'myblog.wordpress.com']) assert.strictEqual(trustOf(h, 'Duhok'), null, h);
+  // The Duhok film festival example from the first preview passes: official site + Wikipedia.
+  const t = trustedSources([{ web: { uri: 'https://x', title: 'kurdish.events' } }, { web: { uri: 'https://y', title: 'duhokiff.com' } },
+    { web: { uri: 'https://z', title: 'wikipedia.org' } }, { web: { uri: 'https://w', title: 'festagent.com' } }], 'Duhok');
+  assert.ok(t.ok);
+  assert.deepStrictEqual(t.list.map((x) => x.host), ['duhokiff.com', 'wikipedia.org']);
 });
 
 test('research drops sad or food topics', async () => {
   config.GEMINI_API_KEY = 'test';
   assert.strictEqual(await research({ theme: 'unusual', area: 'Europe' }, [], grounded({ topic: 'Best restaurants of Rome', place: 'Rome', country: 'Italy', facts: ['a', 'b', 'c'] })), null);
   assert.strictEqual(await research({ theme: 'unusual', area: 'Europe' }, [], grounded({ topic: 'Ship rescue', place: 'Sea', country: 'Italy', facts: ['passenger rescued', 'b', 'c'] })), null);
+  // a single food fact is dropped, not the whole topic
+  const r = await research({ theme: 'festival', area: 'Europe' }, [], grounded({ topic: 'Lantern festival', place: 'Valletta', country: 'Malta', facts: ['lanterns on the water', 'street food stalls', 'music', 'fireworks'] },
+    [{ web: { uri: 'https://en.wikipedia.org/wiki/V', title: 'wikipedia.org' } }, { web: { uri: 'https://visitmalta.com/v', title: 'visitmalta.com' } }]));
+  assert.deepStrictEqual(r.facts, ['lanterns on the water', 'music', 'fireworks']);
 });
 
 const story = (de) => async () => ({ ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify({ de,

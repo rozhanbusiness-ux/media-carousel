@@ -35,6 +35,55 @@ const WORLD_AREAS = ['East Asia', 'South-East Asia', 'Central Asia or the Caucas
 const SALES = /jetzt buchen|buchen sie|mit uns|bei uns|unser angebot|book now|with us|اكتشف عروض|احجز|معنا|لدينا عروض|دگەل مە|ئۆفەر/i;
 const LINKS = /https?:|www\.|\.com\b|\.de\b|@|€|\$|kostenlos|gratis|rabatt|مجان|خصم/i;
 
+// Trusted sources (client rule): a topic is used only when at least two of its grounding sources are
+// on this list and at least one is encyclopedic or official. Other sources are never shown or used.
+const STRONG = ['wikipedia.org', 'wikivoyage.org', 'britannica.com', 'unesco.org',
+  // official tourism boards
+  'germany.travel', 'visitgreece.gr', 'spain.info', 'croatia.hr', 'visitdubai.com', 'visitabudhabi.ae', 'visitportugal.com', 'italia.it',
+  'france.fr', 'austria.info', 'myswitzerland.com', 'visitnorway.com', 'visitcyprus.com', 'goturkiye.com', 'egypt.travel', 'visitmalta.com',
+  'visitbritain.com', 'tourismthailand.org', 'japan.travel', 'visitkorea.or.kr', 'vietnam.travel', 'visitsingapore.com', 'malaysia.travel',
+  'indonesia.travel', 'visitjordan.com', 'georgia.travel', 'visitbulgaria.com', 'romania.travel', 'visitalbania.org', 'holland.com',
+  'visitdenmark.com', 'visitsweden.com', 'visitfinland.com', 'visiticeland.com', 'visitczechia.com', 'poland.travel', 'visitmorocco.com', 'visitqatar.com'];
+const GOV = /(^|\.)(gov(\.[a-z]{2,3})?|gv\.at|gouv\.fr|gob\.es|gov\.krd|bund\.de|europa\.eu|admin\.ch|gov\.uk)$/;
+const MEDIA = ['nationalgeographic.com', 'bbc.com', 'bbc.co.uk', 'dw.com', 'lonelyplanet.com', 'atlasobscura.com', 'cntraveler.com', 'geo.de',
+  'smithsonianmag.com', 'theguardian.com', 'zeit.de', 'spiegel.de', 'sueddeutsche.de', 'faz.net', 'tagesschau.de', 'rudaw.net', 'kurdistan24.net'];
+const onList = (host, list) => list.some((d) => host === d || host.endsWith('.' + d));
+const hostOf = (s) => { try { return new URL(/^https?:/.test(s) ? s : 'https://' + s).hostname.replace(/^www\./, '').toLowerCase(); } catch { return ''; } };
+const norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[^a-z]/g, '');
+
+/** Rate a source host: 'strong' (encyclopedic/official/event's own site), 'media', or null (not trusted). */
+function trustOf(host, place = '') {
+  if (!host) return null;
+  if (onList(host, STRONG) || GOV.test(host)) return 'strong';
+  if (onList(host, MEDIA)) return 'media';
+  const p = norm(place);
+  if (p.length >= 4 && norm(host.split('.').slice(0, -1).join('')).includes(p)) return 'strong'; // official site of the place/event (e.g. duhokiff.com)
+  return null;
+}
+
+/** Trusted sources only; true when the client's rule (>= 2 trusted, >= 1 strong) is met. */
+function trustedSources(chunks, place) {
+  const list = [];
+  for (const c of chunks || []) {
+    const w = c && c.web;
+    if (!w || !/^https:\/\//.test(w.uri || '')) continue;
+    const host = hostOf(w.title) || hostOf(w.uri);
+    const trust = trustOf(host, place);
+    if (trust && !list.some((x) => x.host === host)) list.push({ host, trust, title: host, url: w.uri });
+  }
+  return { list: list.slice(0, 4), ok: list.length >= 2 && list.some((x) => x.trust === 'strong') };
+}
+
+/** Grounding links are Google redirects: resolve to the real page (only that redirect host is called). */
+async function resolveUrl(url, fetchImpl) {
+  try {
+    if (new URL(url).hostname !== 'vertexaisearch.cloud.google.com') return url;
+    const res = await fetchImpl(url, { redirect: 'manual', signal: AbortSignal.timeout(10000) });
+    const loc = res.headers && res.headers.get && res.headers.get('location');
+    return loc && /^https:\/\//.test(loc) ? loc : url;
+  } catch { return url; }
+}
+
 const pick = (list, rnd) => list[Math.floor(rnd() * list.length)];
 
 /** Plan for n ideas: themes without repeats, about 60 % core areas. */
@@ -69,12 +118,13 @@ function jsonIn(text) {
 }
 
 /** Step 1: one concrete topic with verified facts and sources (Google Search grounding). */
-async function research({ theme, area }, avoid = [], fetchImpl = fetch, today = new Date()) {
+async function research({ theme, area }, avoid = [], fetchImpl = fetch, today = new Date(), log = () => {}) {
   const prompt = [
     `Today is ${today.toISOString().slice(0, 10)}. You are the research editor of a travel magazine for people living in Germany.`,
     `Find ONE specific topic: ${THEMES[theme]}, in ${area}. Use Google Search to verify every fact.`,
     'It must be joyful and make people want to travel. Not about food, restaurants or drinks. Not about mosques, minarets or religious buildings. Not about politics, accidents, danger or anything sad.',
     avoid.length ? `Do not choose any of these recent topics: ${avoid.slice(-40).join('; ')}.` : '',
+    'Use only reliable sources: Wikipedia, UNESCO, official tourism boards, government or city websites, the official website of the event, and well-known media (National Geographic, BBC, Lonely Planet, Atlas Obscura). Ignore blogs, forums and booking portals. For events, take the dates from the official event or city website.',
     'Collect 4 to 6 surprising, concrete, verified facts (what makes it special, a story or legend, the best moment to see it, dates for events). No prices.',
     'Return ONLY JSON: {"topic":"short title in English","place":"place name","country":"country in English","facts":["…"],"photo_query":"3-6 English words to find a real photo of exactly this place"}',
   ].filter(Boolean).join('\n');
@@ -82,12 +132,16 @@ async function research({ theme, area }, avoid = [], fetchImpl = fetch, today = 
     generationConfig: { temperature: 1, maxOutputTokens: 2048 } }, fetchImpl);
   const cand = json?.candidates?.[0];
   const t = jsonIn((cand?.content?.parts || []).map((p) => p.text || '').join(''));
-  if (!t || typeof t.topic !== 'string' || !Array.isArray(t.facts) || t.facts.length < 3) return null;
-  const facts = t.facts.filter((f) => typeof f === 'string' && f.length < 400).slice(0, 6);
-  const all = `${t.topic} ${t.place} ${facts.join(' ')}`;
-  if (EXCLUDE.test(all) || SAD.test(all)) return null;
-  const sources = (cand?.groundingMetadata?.groundingChunks || []).map((c) => c.web).filter((w) => w && /^https:\/\//.test(w.uri))
-    .slice(0, 4).map((w) => ({ title: String(w.title || '').slice(0, 80), url: w.uri }));
+  if (!t || typeof t.topic !== 'string' || !Array.isArray(t.facts)) { log('research: no usable JSON'); return null; }
+  const head = `${t.topic} ${t.place}`;
+  if (EXCLUDE.test(head) || SAD.test(head)) { log(`research: topic rejected by filter (${t.topic})`); return null; }
+  // Single facts that touch food, sad news etc. are dropped; the topic itself stays.
+  const facts = t.facts.filter((f) => typeof f === 'string' && f.length < 400 && !EXCLUDE.test(f) && !SAD.test(f)).slice(0, 6);
+  if (facts.length < 3) { log(`research: too few clean facts (${t.topic})`); return null; }
+  const trusted = trustedSources(cand?.groundingMetadata?.groundingChunks, t.place);
+  if (!trusted.ok) { log(`research: not enough trusted sources for ${t.topic} (${trusted.list.map((x) => x.host).join(', ') || 'none'})`); return null; }
+  const sources = [];
+  for (const x of trusted.list) sources.push({ title: x.host, url: await resolveUrl(x.url, fetchImpl) });
   return { topic: t.topic.slice(0, 120), place: String(t.place || '').slice(0, 80), country: String(t.country || '').slice(0, 60),
     facts, photoQuery: String(t.photo_query || t.place || '').replace(/[^\p{L}\p{N} '-]/gu, '').slice(0, 60), sources };
 }
@@ -99,7 +153,7 @@ function storyPrompt(r) {
     'Style (client rule): an engaging travel-magazine STORY, like National Geographic or Atlas Obscura. Open with curiosity or a striking image, give one or two surprising facts, a sensory detail (light, sound, colour), and close with a line that stays in the mind.',
     'It is information and storytelling, NOT advertising: no calls to book or travel, no "with us", no prices, no links, no clichés ("hidden gem", "paradise", "unforgettable", "breathtaking", "Entdecke", "اكتشف"), no exclamation marks.',
     'Native, natural phrasing in each language (not a translation of the German). At most one emoji per text.',
-    `For each language (${LANGS.map((l) => `${l} = ${LANG_NAME[l]}`).join('; ')}): hook = headline that makes people stop scrolling (max 60 characters); body = 3 to 5 sentences (max 600 characters); hashtags = 4 to 6 about the place and topic (letters only, no brand tags).`,
+    `For each language (${LANGS.map((l) => `${l} = ${LANG_NAME[l]}`).join('; ')}): hook = headline that makes people stop scrolling (max 60 characters); body = 3 to 5 sentences (max 650 characters); hashtags = 4 to 6 about the place and topic (letters only, no brand tags).`,
     'Return ONLY JSON: {"de":{"hook":"","body":"","hashtags":["#…"]},"ar":{…},"ckb":{…}}',
   ].join('\n');
 }
@@ -109,15 +163,15 @@ const okText = (s, max) => typeof s === 'string' && s.trim().length > 0 && s.len
 const okTags = (t) => Array.isArray(t) && t.length >= 2 && t.length <= 8 && t.every((x) => typeof x === 'string' && /^#[\p{L}\p{N}_]{2,30}$/u.test(x));
 
 /** Step 2: the story in de / ar / ckb from the researched facts. */
-async function writeStory(r, fetchImpl = fetch) {
+async function writeStory(r, fetchImpl = fetch, log = () => {}) {
   const json = await gemini({ contents: [{ parts: [{ text: storyPrompt(r) }] }],
     generationConfig: { responseMimeType: 'application/json', temperature: 0.9, maxOutputTokens: 4096, thinkingConfig: { thinkingBudget: 0 } } }, fetchImpl);
   const ai = jsonIn(json?.candidates?.[0]?.content?.parts?.[0]?.text);
-  if (!ai) return null;
+  if (!ai) { log('story: no usable JSON'); return null; }
   const texts = {};
   for (const l of LANGS) {
     const t = ai[l] || {};
-    if (!okText(t.hook, 70) || !okText(t.body, 700) || !okTags(t.hashtags)) return null;
+    if (!okText(t.hook, 90) || !okText(t.body, 900) || !okTags(t.hashtags)) { log(`story ${l} rejected: ${JSON.stringify(t).slice(0, 300)}`); return null; }
     texts[l] = { hook: t.hook.trim(), body: t.body.trim(), hashtags: [...new Set(t.hashtags)] };
   }
   return texts;
@@ -132,12 +186,12 @@ async function makeIdeas(n = 3, { avoid = [], fetchImpl = fetch, log = console.l
   const out = [];
   const slots = plan(n, rnd);
   for (let i = 0; i < slots.length; i++) {
-    for (let attempt = 0; attempt < 2; attempt++) {
+    for (let attempt = 0; attempt < 3; attempt++) {
       const slot = attempt ? { ...slots[i], theme: pick(Object.keys(THEMES), rnd) } : slots[i];
       try {
-        const r = await research(slot, [...avoid, ...out.map((o) => o.topic)], fetchImpl);
+        const r = await research(slot, [...avoid, ...out.map((o) => o.topic)], fetchImpl, new Date(), log);
         if (!r) continue;
-        const texts = await writeStory(r, fetchImpl);
+        const texts = await writeStory(r, fetchImpl, log);
         if (!texts) continue;
         out.push({ theme: slot.theme, region: slot.core ? 'core' : 'world', ...r, texts });
         break;
@@ -147,4 +201,4 @@ async function makeIdeas(n = 3, { avoid = [], fetchImpl = fetch, log = console.l
   return out;
 }
 
-module.exports = { THEMES, plan, research, writeStory, storyPrompt, makeIdeas, jsonIn, okText };
+module.exports = { trustOf, trustedSources, THEMES, plan, research, writeStory, storyPrompt, makeIdeas, jsonIn, okText };
