@@ -48,7 +48,7 @@ const STATES = { NW: 'Nordrhein-Westfalen', NI: 'Niedersachsen', HE: 'Hessen', B
 
 // Client rules: no mosques/minarets; posts stay positive (no disasters or politics); no food,
 // restaurant or recipe topics (destinations, unusual places, activities and festivals only).
-const EXCLUDE = /moschee|minarett|mosque|minaret|مسجد|جامع|مئذنة|مزگەوت|krieg|\bwar\b|anschlag|terror|attack|killed|absturz|crash|shooting|erdbeben|earthquake|\bwahl\b|wahlen\b|election|trump|putin|restaurant|rezept|recipe|kochen|cooking|küche|cuisine|\bchef\b|koch\b|\bessen\b|\beat\b|eating|food|\bdish(es)?\b|gericht|menü|menu|michelin|bakery|bäckerei|café|coffee|kaffee|\bwein\b|\bwine|cocktail|bar\b|مطعم|مطاعم|طبخ|أكل|مأكولات|وصفة|خواردن|چێشت/i;
+const EXCLUDE = /moschee|minarett|mosque|minaret|مسجد|جامع|مئذنة|مزگەوت|krieg|\bwar\b|anschlag|terror|attack|killed|absturz|crash|shooting|erdbeben|earthquake|\bwahl\b|wahlen\b|election|trump|putin|restaurant|rezept|recipe|kochen|cooking|küche|cuisine|\bchef\b|\bkoch\b|\bessen\b|\beat\b|eating|\bfood|\bdish(es)?\b|\bgerichte?\b|menü|menu|michelin|bakery|bäckerei|café|coffee|kaffee|\bwein\b|\bwine|cocktail|\bbars?\b|مطعم|مطاعم|طبخ|أكل|مأكولات|وصفة|خواردن|چێشت/i;
 
 // Client rule: only happy, joyful news. Anything about incidents, danger, illness, crime, delays,
 // disputes or losses is dropped before the model sees it (and checked again in the written text).

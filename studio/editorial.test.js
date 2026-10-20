@@ -32,7 +32,7 @@ const slot = { kind: 'place', type: 'german_city' };
 
 test('writePost: accepts a post whose evidence is a real sentence of the article', async () => {
   config.GEMINI_API_KEY = 'test';
-  const p = await writePost(a, slot, reply({ angle: 'town hall on an island', evidence: 'built on an artificial island in the river Regnitz because the bishop refused',
+  const p = await writePost(a, slot, reply({ angle: 'town hall on an island', score: 9, evidence: 'built on an artificial island in the river Regnitz because the bishop refused',
     ...texts('Der Bischof gab kein Land, also bauten die Bürger ihr Rathaus auf eine künstliche Insel in der Regnitz.') }));
   assert.deepStrictEqual(Object.keys(p.texts), ['de', 'ar', 'ckb']);
 });
@@ -48,9 +48,28 @@ test('writePost: rejects invented evidence (nothing that is not in the article)'
 test('writePost: rejects clichés, direct address openers and sales talk', async () => {
   config.GEMINI_API_KEY = 'test';
   for (const body of ['Stellen Sie sich vor: ein Rathaus im Fluss.', 'Ein Paradies am Wasser.', 'Jetzt buchen und hinfliegen.', 'Ein Rathaus im Fluss!']) {
-    const p = await writePost(a, slot, reply({ evidence: 'built on an artificial island in the river Regnitz because the bishop refused', ...texts(body) }));
+    const p = await writePost(a, slot, reply({ score: 9, evidence: 'built on an artificial island in the river Regnitz because the bishop refused', ...texts(body) }));
     assert.strictEqual(p, null, body);
   }
+});
+
+test('writePost: rejects weak angles (score below 7)', async () => {
+  config.GEMINI_API_KEY = 'test';
+  const p = await writePost(a, slot, reply({ score: 4, evidence: 'built on an artificial island in the river Regnitz because the bishop refused', ...texts('Ein Rathaus.') }));
+  assert.strictEqual(p, null);
+});
+
+test('evidence: word for word or lightly rephrased, never invented', () => {
+  const { evidenceFound } = require('./editorial');
+  assert.ok(evidenceFound('The Old Town Hall was built on an artificial island in the river Regnitz', ARTICLE));
+  assert.ok(evidenceFound('Old Town Hall built upon an artificial island in the Regnitz river because the bishop refused land', ARTICLE));
+  assert.ok(!evidenceFound('The town hall is made entirely of gold and glows at night every single day', ARTICLE));
+});
+
+test('food filter matches whole words only (sichtbar, kostbar stay)', () => {
+  const { EXCLUDE } = require('./news-sources');
+  for (const s of ['Die Küste ist von weitem sichtbar', 'ein kostbarer Schatz', 'der Gerichtshof von Den Haag']) assert.ok(!EXCLUDE.test(s), s);
+  assert.ok(EXCLUDE.test('Die besten Bars der Stadt'));
 });
 
 test('writePost: the editor may skip a weak article', async () => {

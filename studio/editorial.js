@@ -49,6 +49,9 @@ const TIPS = [
     ['Turkey', 'Egypt', 'United Arab Emirates', 'Iraqi Kurdistan', 'Greece', 'Spain', 'Cyprus', 'Georgia (country)', 'Jordan', 'Portugal', 'Croatia', 'Thailand', 'Italy', 'Bulgaria', 'Tunisia', 'Morocco']],
 ];
 
+// One-time topics the client asked for (used once, then never again).
+const PINNED = [{ key: 'pinned:lalish', type: 'kurdistan', titles: ['Lalish', 'Lalisch', 'Lalesh', 'Shekhan'] }];
+
 const SALES = /jetzt buchen|buchen sie|mit uns|bei uns|unser angebot|book now|with us|احجز|معنا|لدينا عروض|دگەل مە|ئۆفەر/i;
 const LINKS = /https?:|www\.|\.com\b|\.de\b|@|€|\$|kostenlos|gratis|rabatt|مجان|خصم/i;
 // Openers the client found monotonous, and direct address (the posts are narrated, not addressed).
@@ -116,6 +119,19 @@ async function candidates(slot, avoid, fetchImpl) {
   return Array.isArray(ai?.places) ? ai.places.filter((p) => typeof p === 'string' && p.length < 80 && !avoid.includes(p)) : [];
 }
 
+const MIN_SCORE = 7; // the editor's own "would a reader stop and say: I did not know that?" score, 1-10
+
+const words = (s) => String(s || '').toLowerCase().normalize('NFC').match(/[\p{L}\p{N}]{4,}/gu) || [];
+/** The quoted evidence must be in the article: word for word, or at least 85 % of its words (light rephrasing). */
+function evidenceFound(evidence, text) {
+  const ev = squash(evidence);
+  if (ev.length < 40) return false;
+  if (squash(text).includes(ev)) return true;
+  const have = new Set(words(text));
+  const w = words(evidence);
+  return w.length >= 6 && w.filter((x) => have.has(x)).length / w.length >= 0.85;
+}
+
 const squash = (s) => String(s || '').toLowerCase().replace(/\s+/g, ' ').replace(/[„“"'’]/g, '').trim();
 
 function storyPrompt(a, slot) {
@@ -128,10 +144,11 @@ function storyPrompt(a, slot) {
     `Write ${what}`,
     'Use ONLY facts from this article. Copy into "evidence" the exact sentence (or part of a sentence, at least 40 characters, word for word) of the article your post rests on.',
     'Style: short, precise and vivid, like a sharp travel-magazine note. The headline IS the angle. Narrate; do not address the reader (no "Sie", "du", "you"). No opening with "Imagine", "Stellen Sie sich vor", "تخيل", "Did you know". No sales talk, no calls to book, no prices, no links, no clichés (paradise, hidden gem, breathtaking, unforgettable), no exclamation marks. Nothing about food, restaurants or drinks; nothing about mosques or minarets; nothing sad.',
-    'Native, natural phrasing in each language (not a word-for-word translation).',
+    'Native, natural phrasing in each language (not a word-for-word translation), grammatically correct (check articles and genders, e.g. "das Silberhorn").',
+    'Rate your angle honestly: "score" 1-10 = how strongly a reader would stop and think "I did not know that". A plain name, a view or a general description is at most 4.',
     `For each language (${LANGS.map((l) => `${l} = ${LANG_NAME[l]}`).join('; ')}): hook = the headline (max 60 characters); body = ${slot.kind === 'tip' ? '2-3 short points or sentences (max 420 characters)' : '2-3 sentences (max 360 characters)'}; hashtags = 3 to 5 about this place or topic only (letters only).`,
     'If the article has nothing joyful or interesting enough, return {"skip":true}.',
-    'Return ONLY JSON: {"angle":"one line in English","evidence":"…","de":{"hook":"","body":"","hashtags":["#…"]},"ar":{…},"ckb":{…}}',
+    'Return ONLY JSON: {"angle":"one line in English","score":7,"evidence":"…","de":{"hook":"","body":"","hashtags":["#…"]},"ar":{…},"ckb":{…}}',
   ].join('\n');
 }
 
@@ -152,8 +169,9 @@ async function writePost(a, slot, fetchImpl = fetch, log = () => {}) {
   const ai = await gemini(storyPrompt(a, slot), fetchImpl);
   if (!ai) { log(`${a.title}: no usable JSON`); return null; }
   if (ai.skip) { log(`${a.title}: skipped by the editor (nothing strong enough)`); return null; }
-  const ev = squash(ai.evidence);
-  if (ev.length < 40 || !squash(a.text).includes(ev)) { log(`${a.title}: evidence not found in the article`); return null; }
+  if (!evidenceFound(ai.evidence, a.text)) { log(`${a.title}: evidence not found in the article`); return null; }
+  const score = Number(ai.score);
+  if (!(score >= MIN_SCORE)) { log(`${a.title}: angle too weak (${ai.score}/10: ${String(ai.angle || '').slice(0, 80)})`); return null; }
   const max = slot.kind === 'tip' ? 520 : 460;
   const texts = {};
   for (const l of LANGS) {
@@ -190,6 +208,20 @@ async function makeIdeas(n = 3, { avoid = [], fetchImpl = fetch, log = console.l
         }
         continue;
       }
+      const pin = PINNED.find((p) => p.type === slot.type && !used.has(p.key));
+      if (pin) {
+        used.add(pin.key); // once only, also when it fails
+        let done = false;
+        for (const t of pin.titles) {
+          const a = await article(t, fetchImpl);
+          if (!a) continue;
+          const post = await writePost(a, slot, fetchImpl, log);
+          if (post) { out.push({ kind: 'place', type: slot.type, place: a.title, topic: pin.key, ...post, sources: [{ title: `Wikivoyage: ${a.title} (CC BY-SA 4.0)`, url: a.url }], photoQuery: a.title }); done = true; }
+          break;
+        }
+        if (done) continue;
+        log(`${pin.key}: no usable Wikivoyage article (${pin.titles.join(', ')})`);
+      }
       const names = (await candidates(slot, [...used], fetchImpl)).sort(() => rnd() - 0.5);
       for (const name of names.slice(0, 4)) {
         if (used.has(name)) continue;
@@ -208,4 +240,4 @@ async function makeIdeas(n = 3, { avoid = [], fetchImpl = fetch, log = console.l
   return out;
 }
 
-module.exports = { PLACE_TYPES, TIPS, plan, article, candidates, storyPrompt, writePost, makeIdeas, textProblem };
+module.exports = { evidenceFound, PLACE_TYPES, TIPS, plan, article, candidates, storyPrompt, writePost, makeIdeas, textProblem };
