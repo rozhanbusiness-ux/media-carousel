@@ -30,7 +30,12 @@ test('plain() strips markup and shortens', () => {
 
 test('excludes mosques, minarets and bad news', () => {
   for (const s of ['Die schönste Moschee', 'minaret view', 'مسجد', 'Earthquake hits', 'Anschlag']) assert.ok(EXCLUDE.test(s), s);
-  assert.ok(!EXCLUDE.test('A new beach club in Mallorca'));
+  assert.ok(!EXCLUDE.test('The strangest salt lake in Cyprus'));
+});
+
+test('excludes food and restaurant topics (client decision)', () => {
+  for (const s of ['Best new restaurants in Dubai', 'Rezept: Baklava', 'Street food tour', 'مطاعم أربيل', 'Michelin stars']) assert.ok(EXCLUDE.test(s), s);
+  for (const s of ['Lantern festival in Chiang Mai', 'Hiking the Rawanduz canyon', 'Kurdish New Year in Hessen', 'Weinberg view']) assert.ok(!EXCLUDE.test(s), s);
 });
 
 test('fetches only listed hosts', async () => {
@@ -38,9 +43,9 @@ test('fetches only listed hosts', async () => {
 });
 
 test('one failing feed does not stop the others', async () => {
-  const fake = async (url) => (url.includes('eater') ? { ok: false, status: 500 } : { ok: true, text: async () => RSS });
+  const fake = async (url) => (url.includes('cruisehive') ? { ok: false, status: 500 } : { ok: true, text: async () => RSS });
   const facts = await feedFacts(fake, () => {});
   assert.ok(facts.length >= 5);
   assert.ok(facts.every((f) => f.id && f.source && f.link.startsWith('https://')));
-  assert.ok(!facts.some((f) => f.sourceId === 'eater'));
+  assert.ok(!facts.some((f) => f.sourceId === 'cruisehive'));
 });

@@ -1,7 +1,7 @@
 // ============================================================
 //  studio/news-ideas.js — "Ideen des Tages": three post ideas a day
 //  from the travel sources (news-sources.js). Mix agreed with the
-//  client: mostly inspiration (places, food, lakes, cruises), then
+//  client: mostly inspiration (places, unusual spots, lakes, cruises, activities, festivals; never food), then
 //  seasons/occasions, rarely practical notes. Gemini writes the text
 //  in its own words (de / ar / ckb); the source is always credited.
 //  Nothing is published from here: the client approves or rejects.
@@ -19,7 +19,7 @@ const FILE = path.join(__dirname, '..', 'cache', 'studio-news.txt');
 const LANGS = ['de', 'ar', 'ckb'];
 const LANG_NAME = { de: 'German', ar: 'Arabic (Modern Standard, warm tone)', ckb: 'Kurdish Badini (Behdînî, Northern Kurdish of Duhok, written in Arabic script)' };
 const TEXT_MODEL = 'gemini-2.5-flash';
-const INSPIRATION = ['inspiration', 'place', 'food', 'cruise'];
+const INSPIRATION = ['inspiration', 'place', 'cruise'];
 
 function load() { try { return JSON.parse(fs.readFileSync(FILE, 'utf8')); } catch { return { days: {}, seen: [] }; } }
 function save(data) {
@@ -64,6 +64,7 @@ function buildPrompt(f) {
     `Kind of post: ${f.cat}. Source: ${f.source}.`,
     `Fact (use ONLY these facts, do not invent anything): Title: ${f.title}. Text: ${f.summary}`,
     'Write in your OWN words (never copy sentences from the text). Brand voice: luxurious, warm, elegant, positive; like a high-end travel magazine; never pushy.',
+    'Topics: destinations, the most beautiful or most unusual places, unusual activities, events and festivals. Never write about food, restaurants, dishes or drinks.',
     'Rules: no prices, no links, no discounts or "free", no promises; no religious buildings; no politics; at most one emoji per text.',
     `For each language (${LANGS.map((l) => `${l} = ${LANG_NAME[l]}`).join('; ')}) write: hook (max 60 characters), body (max 320 characters, 2-3 sentences, end with a gentle invitation to travel), hashtags (5 to 8, each starting with #, letters only).`,
     'Return ONLY JSON: {"de":{"hook":"","body":"","hashtags":["#..."]},"ar":{...},"ckb":{...}}',

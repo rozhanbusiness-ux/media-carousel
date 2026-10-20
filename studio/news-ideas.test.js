@@ -9,7 +9,7 @@ const facts = [f('i1', 'inspiration'), f('i2', 'inspiration'), f('p1', 'place'),
 test('three ideas: two inspiration ideas of different kinds, then one more', () => {
   const picks = pickIdeas(facts, new Set(), () => 0.1);
   assert.strictEqual(picks.length, 3);
-  assert.ok(['inspiration', 'place', 'food', 'cruise'].includes(picks[0].cat));
+  assert.ok(['inspiration', 'place', 'cruise'].includes(picks[0].cat));
   assert.notStrictEqual(picks[0].cat, picks[1].cat);
   assert.strictEqual(picks[2].cat, 'season');
 });

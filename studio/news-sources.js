@@ -1,7 +1,7 @@
 // ============================================================
 //  studio/news-sources.js — free travel sources for the daily
 //  "Ideen des Tages" (client list, checked from the Codespace):
-//  magazines, cruises and food (RSS/Atom), Wikivoyage (CC BY-SA),
+//  magazines and cruises (RSS/Atom), Wikivoyage (CC BY-SA),
 //  UNESCO, school holidays, public holidays, weather and the German
 //  Foreign Office. Only plain text facts are taken (title, short
 //  summary, link); nothing from a source is rendered as HTML.
@@ -12,14 +12,13 @@
 const MAX_BYTES = 2 * 1024 * 1024;
 const TIMEOUT_MS = 20000;
 
-// cat: inspiration | food | cruise | practical | season
+// cat: inspiration | cruise | practical | season (no food: client decision, not a cooking site)
 const FEEDS = [
   { id: 'cntraveler', name: 'Condé Nast Traveler', url: 'https://www.cntraveler.com/feed/rss', cat: 'inspiration' },
   { id: 'cnn', name: 'CNN Travel', url: 'http://rss.cnn.com/rss/edition_travel.rss', cat: 'inspiration' },
   { id: 'reisereporter', name: 'reisereporter', url: 'https://www.reisereporter.de/arc/outboundfeeds/rss/', cat: 'inspiration' },
   { id: 'thenational', name: 'The National', url: 'https://www.thenationalnews.com/arc/outboundfeeds/rss/category/travel/?outputType=xml', cat: 'inspiration' },
   { id: 'unesco', name: 'UNESCO World Heritage', url: 'https://whc.unesco.org/en/news/rss/', cat: 'inspiration' },
-  { id: 'eater', name: 'Eater', url: 'https://www.eater.com/rss/index.xml', cat: 'food' },
   { id: 'cruisehive', name: 'CruiseHive', url: 'https://www.cruisehive.com/feed', cat: 'cruise' },
   { id: 'kreuzfahrtpiraten', name: 'Kreuzfahrtpiraten', url: 'https://www.kreuzfahrtpiraten.de/feed/', cat: 'cruise' },
   { id: 'cruisetricks', name: 'Cruisetricks', url: 'https://www.cruisetricks.de/feed/', cat: 'cruise' },
@@ -45,8 +44,9 @@ const AA_COUNTRIES = new Set(['IQ', 'TR', 'EG', 'AE', 'ES', 'GR', 'CY', 'PT', 'H
 // States with most of our customers (school holidays).
 const STATES = { NW: 'Nordrhein-Westfalen', NI: 'Niedersachsen', HE: 'Hessen', BY: 'Bayern', BW: 'Baden-Württemberg', BE: 'Berlin', HH: 'Hamburg' };
 
-// Client rules: no mosques/minarets; posts stay positive (no disasters or politics).
-const EXCLUDE = /moschee|minarett|mosque|minaret|مسجد|جامع|مئذنة|مزگەوت|krieg|\bwar\b|anschlag|terror|attack|killed|tote|absturz|crash|shooting|erdbeben|earthquake|wahl|election|trump|putin/i;
+// Client rules: no mosques/minarets; posts stay positive (no disasters or politics); no food,
+// restaurant or recipe topics (destinations, unusual places, activities and festivals only).
+const EXCLUDE = /moschee|minarett|mosque|minaret|مسجد|جامع|مئذنة|مزگەوت|krieg|\bwar\b|anschlag|terror|attack|killed|tote|absturz|crash|shooting|erdbeben|earthquake|wahl|election|trump|putin|restaurant|rezept|recipe|kochen|cooking|küche|cuisine|\bchef\b|koch\b|\bessen\b|\beat\b|eating|food|\bdish(es)?\b|gericht|menü|menu|michelin|bakery|bäckerei|café|coffee|kaffee|\bwein\b|\bwine|cocktail|bar\b|مطعم|مطاعم|طبخ|أكل|مأكولات|وصفة|خواردن|چێشت/i;
 
 const ALLOWED_HOSTS = new Set([...FEEDS.map((f) => new URL(f.url).host), 'en.wikivoyage.org', 'de.wikivoyage.org',
   'ferien-api.de', 'date.nager.at', 'api.open-meteo.com', 'www.auswaertiges-amt.de']);
@@ -108,7 +108,7 @@ async function feedFacts(fetchImpl, log) {
   return out;
 }
 
-/** One random Wikivoyage place: a paragraph about sights, nature or food (CC BY-SA 4.0). */
+/** One random Wikivoyage place: a paragraph about sights, nature or activities (CC BY-SA 4.0). */
 async function placeFacts(fetchImpl, log, rnd = Math.random) {
   const out = [];
   const pool = [...PLACES].sort(() => rnd() - 0.5).slice(0, 3);

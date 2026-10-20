@@ -165,7 +165,7 @@
     <div id="tracks"></div>
   </details>
   <details class="manual" id="news">
-    <summary>📰 Ideen des Tages (Reise-News, Orte, Essen, Kreuzfahrten)</summary>
+    <summary>📰 Ideen des Tages (Orte, besondere Erlebnisse, Festivals, Kreuzfahrten)</summary>
     <p style="font-size:13px;color:#cfd6e6">Drei Ideen pro Tag aus freien Reisequellen, von der KI in eigenen Worten geschrieben. Quelle immer angeben. Nichts wird automatisch veröffentlicht.</p>
     <div class="row"><button class="ghost" id="newsRefresh">🔄 Neue Ideen</button></div>
     <div id="newsList"></div>
@@ -754,7 +754,7 @@ $('#manualGo').onclick = async () => {
 };
 
 // ---- Ideen des Tages (news-ideas.js) -------------------------------------------------------
-const NEWS_CAT = { inspiration: '🌍 Inspiration', place: '🏞 Ort', food: '🍽 Essen', cruise: '🚢 Kreuzfahrt', season: '📅 Saison', practical: 'ℹ️ Praktisch' };
+const NEWS_CAT = { inspiration: '🌍 Inspiration', place: '🏞 Ort', cruise: '🚢 Kreuzfahrt', season: '📅 Saison', practical: 'ℹ️ Praktisch' };
 const newsText = (i, l) => {
   const t = i.texts[l];
   const credit = i.photo && i.photo.credit && i.photo.credit.author && /Unsplash|Wikimedia/.test(i.photo.credit.source || '') ? `\n📷 ${i.photo.credit.author} / ${i.photo.credit.source}` : '';
