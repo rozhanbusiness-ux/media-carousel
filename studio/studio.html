@@ -164,6 +164,12 @@
     </div>
     <div id="tracks"></div>
   </details>
+  <details class="manual" id="news">
+    <summary>📰 Ideen des Tages (Reise-News, Orte, Essen, Kreuzfahrten)</summary>
+    <p style="font-size:13px;color:#cfd6e6">Drei Ideen pro Tag aus freien Reisequellen, von der KI in eigenen Worten geschrieben. Quelle immer angeben. Nichts wird automatisch veröffentlicht.</p>
+    <div class="row"><button class="ghost" id="newsRefresh">🔄 Neue Ideen</button></div>
+    <div id="newsList"></div>
+  </details>
   <p id="aiWarn" class="warn" hidden></p>
   <div id="msg"></div>
   <div id="list"></div>
@@ -745,6 +751,47 @@ $('#manualGo').onclick = async () => {
   try { await api('/api/studio/manual', { method: 'POST', body: JSON.stringify(body) }); $('#msg').textContent = 'Fertig.'; await load(); }
   catch (err) { $('#msg').textContent = 'Fehler: ' + err.message; }
   $('#manualGo').disabled = false;
+};
+
+// ---- Ideen des Tages (news-ideas.js) -------------------------------------------------------
+const NEWS_CAT = { inspiration: '🌍 Inspiration', place: '🏞 Ort', food: '🍽 Essen', cruise: '🚢 Kreuzfahrt', season: '📅 Saison', practical: 'ℹ️ Praktisch' };
+const newsText = (i, l) => {
+  const t = i.texts[l];
+  const credit = i.photo && i.photo.credit && i.photo.credit.author && /Unsplash|Wikimedia/.test(i.photo.credit.source || '') ? `\n📷 ${i.photo.credit.author} / ${i.photo.credit.source}` : '';
+  return `${t.hook}\n\n${t.body}\n\n${({ de: 'Quelle', ar: 'المصدر', ckb: 'ژێدەر' })[l]}: ${i.source}${credit}\n\n${t.hashtags.join(' ')}`;
+};
+function renderNews(day) {
+  const ideas = day.ideas || [];
+  $('#newsList').innerHTML = ideas.length ? ideas.map((i) => `
+    <div class="draft" data-news="${esc(i.id)}">
+      <div class="meta"><span class="badge ${esc(i.status)}">${esc(i.status)}</span><span>${esc(NEWS_CAT[i.cat] || i.cat)}</span>
+        <span>${esc(i.title)}</span><a href="${esc(i.link)}" target="_blank" rel="noopener noreferrer" style="color:#e6c25a">Quelle: ${esc(i.source)} ↗</a></div>
+      ${i.photo ? `<div class="imgs"><a href="/api/studio/news/photo/${esc(i.photo.key)}/${esc(i.photo.file)}" download><img src="/api/studio/news/photo/${esc(i.photo.key)}/${esc(i.photo.file)}" alt=""></a></div>` : '<p class="warn">Kein passendes Foto in der Fotobank – bitte eigenes Foto wählen.</p>'}
+      ${['de', 'ar', 'ckb'].map((l) => `<h3>${esc(LANG[l])}</h3><textarea dir="${l === 'de' ? 'ltr' : 'rtl'}" data-lang="${l}">${esc(newsText(i, l))}</textarea>
+        <div class="row"><button class="ghost" data-nact="copy" data-lang="${l}">📋 Kopieren</button></div>`).join('')}
+      <div class="row"><button class="ok" data-nact="approved">✓ Freigeben</button><button class="no" data-nact="rejected">✕ Verwerfen</button></div>
+    </div>`).join('') : '<p class="warn">Heute keine Ideen gefunden – später „Neue Ideen“ versuchen.</p>';
+}
+async function loadNews(force) {
+  $('#newsList').innerHTML = '<p>Sammle Quellen und schreibe Ideen … (ca. 1 Minute)</p>';
+  try { renderNews(await api('/api/studio/news' + (force ? '/refresh' : ''), force ? { method: 'POST' } : {})); }
+  catch (err) { $('#newsList').innerHTML = `<p class="warn">Fehler: ${esc(err.message)}</p>`; }
+}
+let newsLoaded = false;
+$('#news').addEventListener('toggle', () => { if ($('#news').open && !newsLoaded) { newsLoaded = true; loadNews(false); } });
+$('#newsRefresh').onclick = () => loadNews(true);
+$('#newsList').onclick = async (e) => {
+  const b = e.target.closest('button[data-nact]');
+  if (!b) return;
+  const card = b.closest('[data-news]');
+  if (b.dataset.nact === 'copy') {
+    try { await navigator.clipboard.writeText(card.querySelector(`textarea[data-lang="${b.dataset.lang}"]`).value); b.textContent = '✓ Kopiert'; } catch { /* text stays in the box */ }
+    return;
+  }
+  try {
+    const idea = await api(`/api/studio/news/${card.dataset.news}/status`, { method: 'POST', body: JSON.stringify({ status: b.dataset.nact }) });
+    card.querySelector('.badge').className = 'badge ' + idea.status; card.querySelector('.badge').textContent = idea.status;
+  } catch (err) { $('#msg').textContent = 'Fehler: ' + err.message; }
 };
 
 load();

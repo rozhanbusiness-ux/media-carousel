@@ -11,6 +11,7 @@ const store = require('./store');
 const music = require('./music');
 const ownOffers = require('./own-offers');
 const covers = require('./covers');
+const bank = require('./bank');
 const { FEATURES, BOARD_KEYS } = require('./packages');
 const { createBundleDraft, offerChoices, createPackageDraft, saveToLibrary, deleteDraft, createDailyDraft, createManualDraft, regenerate } = require('./planner');
 const { STYLES } = require('./render');
@@ -256,6 +257,32 @@ module.exports = function mountStudio(app) {
   });
   router.post('/music/:id/used', (req, res) => res.status(music.used(req.params.id) ? 200 : 404).json({}));
   router.delete('/music/:id', (req, res) => res.status(music.remove(req.params.id) ? 200 : 404).json({}));
+
+  // "Ideen des Tages" (news-ideas.js): collected and written once a day; nothing is published.
+  let newsBusy = false;
+  const news = require('./news-ideas');
+  const newsRun = async (req, res, force) => {
+    if (newsBusy) return res.status(429).json({ error: 'Ideen werden gerade erstellt …' });
+    newsBusy = true;
+    try { res.json(await news.today({ force })); }
+    catch (err) { console.error('studio news:', err.message); res.status(500).json({ error: 'Ideen nicht verfügbar' }); }
+    finally { newsBusy = false; }
+  };
+  router.get('/news', (req, res) => newsRun(req, res, false));
+  router.post('/news/refresh', (req, res) => newsRun(req, res, true));
+  router.post('/news/:id/status', (req, res) => {
+    const { status } = req.body || {};
+    if (!ID.test(req.params.id) || !['pending', 'approved', 'rejected'].includes(status)) return res.status(400).json({ error: 'bad request' });
+    const idea = news.setStatus(req.params.id, status);
+    res.status(idea ? 200 : 404).json(idea || {});
+  });
+  // Bank photo of an idea (key and file name validated against the bank index).
+  router.get('/news/photo/:key/:file', (req, res) => {
+    const { key, file } = req.params;
+    if (!/^[a-z0-9-]{2,40}$/.test(key) || !/^[a-f0-9]{16}\.(jpg|png|webp)$/.test(file)) return res.status(400).end();
+    if (!(bank.readIndex(key).photos || []).some((p) => p.file === file)) return res.status(404).end();
+    res.sendFile(path.join(bank.entryDir(key), file), (err) => { if (err && !res.headersSent) res.status(404).end(); });
+  });
 
   app.use('/api/studio', express.json({ limit: '15mb' }), router);
   app.get('/studio', (req, res) => res.sendFile(path.join(__dirname, 'studio.html')));
