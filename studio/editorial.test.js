@@ -157,6 +157,7 @@ test('the prompt asks for a traveller experience, not trivia', () => {
   assert.match(p, /with "du" \(never "Sie"\)/);
   assert.match(p, /Wortwörtlich/);
   assert.match(p, /99 درجة/);
+  assert.match(p, /NOT as a translation/);
 });
 
 test('makeIdeas without an API key returns nothing', async () => {

@@ -775,7 +775,9 @@ function renderNews(day) {
       <div class="row"><button class="ghost" data-nact="photos">🖼 Fotos suchen</button></div>
       ${(i.photoCandidates || []).length ? `<div class="cands">${i.photoCandidates.map((c) => `<button class="cand" data-nact="pick" data-cand="${esc(c.id)}" title="${esc(c.credit && c.credit.author)} / ${esc(c.credit && c.credit.source)}"><img src="${esc(c.thumb)}" alt="" loading="lazy"><span>${esc(c.score)}</span><em>${esc(c.why)}</em></button>`).join('')}</div>` : ''}
       ${Object.keys(i.texts).map((l) => `<h3>${esc(LANG[l] || ({ kmr: 'Kurdî (Kurmancî)' })[l] || l)}</h3><textarea dir="${l === 'ar' || l === 'ckb' ? 'rtl' : 'ltr'}" data-lang="${l}">${esc(newsText(i, l))}</textarea>
-        <div class="row"><button class="ghost" data-nact="copy" data-lang="${l}">📋 Kopieren</button></div>`).join('')}
+        <div class="row"><button class="ghost" data-nact="copy" data-lang="${l}">📋 Kopieren</button>
+          <button class="ghost" data-nact="slides" data-lang="${l}" ${i.photo ? '' : 'disabled title="Erst ein Foto wählen"'}>🎨 Magazin-Slides</button></div>
+        ${i.slides && i.slides[l] ? `<div class="imgs">${[1, 2, 3].map((n) => `<a href="/api/studio/news/${esc(i.id)}/slide/${l}/${n}.jpg?v=${i.slides[l]}" download="${esc((i.place || 'idee').replace(/[^\p{L}\p{N}-]+/gu, '-'))}-${l}-${n}.jpg"><img src="/api/studio/news/${esc(i.id)}/slide/${l}/${n}.jpg?v=${i.slides[l]}" alt=""></a>`).join('')}</div>` : ''}`).join('')}
       <div class="row"><button class="ok" data-nact="approved">✓ Freigeben</button><button class="no" data-nact="rejected">✕ Verwerfen</button></div>
     </div>`).join('') : '<p class="warn">Heute keine Ideen gefunden – später „Neue Ideen“ versuchen.</p>';
 }
@@ -791,6 +793,12 @@ $('#newsList').onclick = async (e) => {
   const b = e.target.closest('button[data-nact]');
   if (!b) return;
   const card = b.closest('[data-news]');
+  if (b.dataset.nact === 'slides') {
+    b.disabled = true; b.textContent = 'Erstelle 3 Slides … (ca. 20 Sekunden)';
+    try { await api(`/api/studio/news/${card.dataset.news}/slides`, { method: 'POST', body: JSON.stringify({ lang: b.dataset.lang }) }); renderNews(await api('/api/studio/news')); }
+    catch (err) { $('#msg').textContent = 'Fehler: ' + err.message; b.disabled = false; b.textContent = '🎨 Magazin-Slides'; }
+    return;
+  }
   if (b.dataset.nact === 'photos' || b.dataset.nact === 'pick') {
     b.disabled = true; b.textContent = b.dataset.nact === 'photos' ? 'Suche und bewerte Fotos … (ca. 1 Minute)' : '…';
     try {

@@ -306,6 +306,37 @@ module.exports = function mountStudio(app) {
     if (!ID.test(req.params.id)) return res.status(400).end();
     res.type('image/jpeg').sendFile(newsPhotos.fileOf(req.params.id), (err) => { if (err && !res.headersSent) res.status(404).end(); });
   });
+  // "Magazin" slides for an idea (3 slides per language, from the chosen photo).
+  const magazin = require('./magazin');
+  const fs = require('fs');
+  const SLIDE_LANG = /^(de|ar|kmr|ckb)$/;
+  const slideFile = (id, lang, n) => path.join(path.dirname(newsPhotos.fileOf(id)), `${id}-${lang}-${n}.jpg`);
+  router.post('/news/:id/slides', async (req, res) => {
+    const lang = (req.body || {}).lang;
+    if (!ID.test(req.params.id) || !SLIDE_LANG.test(lang || '')) return res.status(400).json({ error: 'bad request' });
+    const idea = news.getIdea(req.params.id);
+    if (!idea || !idea.texts[lang]) return res.status(404).json({ error: 'not found' });
+    if (!idea.photo) return res.status(400).json({ error: 'Bitte zuerst ein Foto wählen.' });
+    let photo;
+    try {
+      const file = idea.photo.own ? newsPhotos.fileOf(idea.id) : path.join(bank.entryDir(idea.photo.key), idea.photo.file);
+      photo = 'data:image/jpeg;base64,' + fs.readFileSync(file).toString('base64');
+    } catch { return res.status(400).json({ error: 'Foto fehlt – bitte neu wählen.' }); }
+    if (newsBusy) return res.status(429).json({ error: 'Bitte warten …' });
+    newsBusy = true;
+    try {
+      const slides = await magazin.renderMagazin(idea, lang, photo);
+      slides.forEach((b, i) => fs.writeFileSync(slideFile(idea.id, lang, i + 1), Buffer.from(b)));
+      news.updateIdea(idea.id, (i) => { i.slides = { ...(i.slides || {}), [lang]: Date.now() }; });
+      res.json({ ok: true });
+    } catch (err) { console.error('studio news slides:', err.message); res.status(500).json({ error: 'Slides fehlgeschlagen' }); }
+    finally { newsBusy = false; }
+  });
+  router.get('/news/:id/slide/:lang/:n.jpg', (req, res) => {
+    const { id, lang, n } = req.params;
+    if (!ID.test(id) || !SLIDE_LANG.test(lang) || !/^[123]$/.test(n)) return res.status(400).end();
+    res.type('image/jpeg').sendFile(slideFile(id, lang, n), (err) => { if (err && !res.headersSent) res.status(404).end(); });
+  });
   // Bank photo of an idea (key and file name validated against the bank index).
   router.get('/news/photo/:key/:file', (req, res) => {
     const { key, file } = req.params;

@@ -140,4 +140,4 @@ async function renderSlide(post, size, slide) {
 // Templates that also have the hotel card (package, cruise, holiday home posts).
 const PACKAGE_STYLES = ['flight', 'flight-cover'];
 
-module.exports = { PACKAGE_STYLES, renderSlide, buildPriceHtml, STYLES, SIZES, STYLE_BY_WEEKDAY, LABELS };
+module.exports = { fontCss, LOGO, SLOGAN_HTML, SLOGAN_CSS, esc, PACKAGE_STYLES, renderSlide, buildPriceHtml, STYLES, SIZES, STYLE_BY_WEEKDAY, LABELS };
