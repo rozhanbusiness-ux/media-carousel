@@ -104,7 +104,9 @@ async function renderSlide(post, size, slide) {
   const rtl = post.lang === 'ar' || post.lang === 'ckb'; // Kurmanji (kmr) is written with Latin letters
   const values = {
     ...L, ctaButton: ctaButton(), lang: post.lang, dir: rtl ? 'rtl' : 'ltr', size, slide,
-    titleClass: post.lang === 'de' ? 'script' : '', // the script font is only proven for German letters photoPosition: /^\d{1,3}% 50%$/.test(post.photoPosition || '') ? post.photoPosition : 'center', logo: LOGO,
+    // The script title font is only proven for German letters.
+    titleClass: post.lang === 'de' ? 'script' : '',
+    photoPosition: /^\d{1,3}% 50%$/.test(post.photoPosition || '') ? post.photoPosition : 'center', logo: LOGO,
     destination: post.destination, hook: post.hook,
     fromCity: post.from.city, fromCode: post.from.code, toCity: post.to.city, toCode: post.to.code,
     dates: '\u2066' + post.dates + '\u2069', price: '%%PRICE%%',
