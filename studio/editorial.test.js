@@ -83,6 +83,31 @@ test('textProblem names the reason; Ratgeber posts may mention delays', () => {
   assert.strictEqual(textProblem('Die Kirche wurde 1850 entdeckt und restauriert.', 400), null);
 });
 
+test('article: finds the right page with the site search when the title differs', async () => {
+  const calls = [];
+  const fake = async (url) => {
+    calls.push(url);
+    const ok = (body) => ({ ok: true, json: async () => body });
+    if (url.includes('list=search')) return ok({ query: { search: [{ title: 'Amadiya' }] } });
+    if (url.includes('titles=Amedi')) return ok({ query: { pages: { '-1': { title: 'Amedi', missing: '' } } } });
+    return ok({ query: { pages: { 7: { title: 'Amadiya', extract: '== See ==\n' + 'The town sits on a flat mountain top with the old Badinan gate. '.repeat(10) } } } });
+  };
+  const a = await article('Amedi', fake, ['en'], { onlySeeDo: true });
+  assert.strictEqual(a.title, 'Amadiya');
+  assert.ok(calls.some((u) => u.includes('list=search')));
+});
+
+test('one-time Wikipedia source is credited as Wikipedia', async () => {
+  const fake = async () => ({ ok: true, json: async () => ({ query: { pages: { 1: { title: 'Lalish', extract: 'Lalish is a mountain valley. '.repeat(80) } } } }) });
+  const a = await article('Lalish', fake, ['en'], { site: 'wikipedia' });
+  assert.strictEqual(a.url, 'https://en.wikipedia.org/wiki/Lalish');
+});
+
+test('"Dies" (German "this") is not a sad word', () => {
+  const { SAD } = require('./news-sources');
+  assert.ok(!SAD.test('Dies ist der schönste Blick auf den See.'));
+});
+
 test('place posts read only what a traveller can see and do (See / Do sections)', () => {
   const { seeDo } = require('./editorial');
   const text = 'Intro text.\n\n== Understand ==\nThe name comes from a knight.\n\n== See ==\nRing the wishing bell on the island.\n\n=== Viewpoints ===\nOjstrica at sunrise.\n\n== Do ==\nTake a pletna boat.\n\n== Eat ==\nCream cake.';

@@ -50,7 +50,8 @@ const TIPS = [
 ];
 
 // One-time topics the client asked for (used once, then never again).
-const PINNED = [{ key: 'pinned:lalish', type: 'kurdistan', titles: ['Lalish', 'Lalisch', 'Lalesh', 'Shekhan'] }];
+// Lalish has no Wikivoyage article: the client allowed Wikipedia as the source for this one post.
+const PINNED = [{ key: 'pinned:lalish', type: 'kurdistan', titles: ['Lalish'], site: 'wikipedia' }];
 
 const SALES = /jetzt buchen|buchen sie|mit uns|bei uns|unser angebot|book now|with us|احجز|معنا|لدينا عروض|دگەل مە|ئۆفەر/i;
 const LINKS = /https?:|www\.|\.com\b|\.de\b|@|€|\$|kostenlos|gratis|rabatt|مجان|خصم/i;
@@ -103,21 +104,40 @@ function seeDo(text) {
   return out.trim();
 }
 
-async function article(title, fetchImpl, langs = ['en', 'de'], { onlySeeDo = false } = {}) {
+const UA = { 'User-Agent': 'MEDIA Studio (media-travels.com)' };
+async function getJson(url, fetchImpl) {
+  const res = await fetchImpl(url, { headers: UA, signal: AbortSignal.timeout(20000) });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+/**
+ * Article as plain text: { title, lang, text, url, site } or null (reason logged). Tries English, then
+ * German; when the exact title does not exist, the site's own search finds the right article
+ * (e.g. "Amedi" -> "Amadiya"). `site` is 'wikivoyage' (default) or 'wikipedia' (one-time exceptions).
+ */
+async function article(title, fetchImpl, langs = ['en', 'de'], { onlySeeDo = false, site = 'wikivoyage', log = () => {} } = {}) {
+  let why = 'no article';
   for (const lang of langs) {
+    const api = `https://${lang}.${site}.org/w/api.php?format=json&action=query`;
     try {
-      const url = `https://${lang}.wikivoyage.org/w/api.php?action=query&prop=extracts&explaintext=1&format=json&redirects=1&titles=${encodeURIComponent(title)}`;
-      const res = await fetchImpl(url, { headers: { 'User-Agent': 'MEDIA Studio (media-travels.com)' }, signal: AbortSignal.timeout(20000) });
-      if (!res.ok) continue;
-      const page = Object.values((await res.json()).query?.pages || {})[0];
-      const full = String(page?.extract || '');
+      let page = Object.values((await getJson(`${api}&prop=extracts&explaintext=1&redirects=1&titles=${encodeURIComponent(title)}`, fetchImpl)).query?.pages || {})[0];
+      if (!page || page.missing !== undefined) {
+        const hit = (await getJson(`${api}&list=search&srlimit=1&srnamespace=0&srsearch=${encodeURIComponent(title)}`, fetchImpl)).query?.search?.[0];
+        if (!hit) continue;
+        page = Object.values((await getJson(`${api}&prop=extracts&explaintext=1&redirects=1&titles=${encodeURIComponent(hit.title)}`, fetchImpl)).query?.pages || {})[0];
+        if (!page || page.missing !== undefined) continue;
+      }
+      const full = String(page.extract || '');
       const text = onlySeeDo ? seeDo(full) : full;
-      if (!page || page.missing !== undefined || text.length < (onlySeeDo ? 800 : 1500)) continue;
-      return { title: page.title, lang, text: text.slice(0, MAX_ARTICLE), url: `https://${lang}.wikivoyage.org/wiki/${encodeURIComponent(page.title.replace(/ /g, '_'))}` };
-    } catch { /* try the next language */ }
+      if (text.length < (onlySeeDo ? 300 : 1500)) { why = onlySeeDo ? `"See/Do" too short in ${lang}:${page.title}` : `too short (${lang}:${page.title})`; continue; }
+      return { title: page.title, lang, site, text: text.slice(0, MAX_ARTICLE), url: `https://${lang}.${site}.org/wiki/${encodeURIComponent(page.title.replace(/ /g, '_'))}` };
+    } catch (err) { why = err.message; }
   }
+  log(`${title}: ${why}`);
   return null;
 }
+const credit = (a) => `${a.site === 'wikipedia' ? 'Wikipedia' : 'Wikivoyage'}: ${a.title} (CC BY-SA 4.0)`;
 
 /** A few candidate places of one type, not used before (the model knows Wikivoyage's coverage). */
 async function candidates(slot, avoid, fetchImpl) {
@@ -151,7 +171,7 @@ function storyPrompt(a, slot) {
     : `a post about ${a.title}. Put yourself in the place of a traveller planning a trip. From the "See" and "Do" sections, pick ONE experience a visitor can have there themselves and that makes them want to go: what they see or do, where exactly, the best time or moment for it, and why it is worth the trip (e.g. a boat ride to an island and ringing a bell, bathing in hot springs while it snows, watching the northern lights, a famous viewpoint at sunset, a cable car, a festival, a walk through an old town). NOT trivia a traveller cannot experience: no plants or animals as such, no origin of names, no geology or growth rates, no history dates, no statistics, no lists.`;
   return [
     'You are the editor of the social media pages of MEDIA Travel & Tourism, a travel agency in Germany (readers: Germans, Kurds and Arabs living in Germany).',
-    `Wikivoyage article "${a.title}":\n"""\n${a.text}\n"""`,
+    `${a.site === 'wikipedia' ? 'Wikipedia' : 'Wikivoyage'} article "${a.title}":\n"""\n${a.text}\n"""`,
     `Write ${what}`,
     'Use ONLY facts from this article. Copy into "evidence" the exact sentence (or part of a sentence, at least 40 characters, word for word) of the article your post rests on.',
     'Style: short, precise and vivid, like a sharp travel-magazine note. The headline IS the angle. Narrate; do not address the reader (no "Sie", "du", "you"). No opening with "Imagine", "Stellen Sie sich vor", "تخيل", "Did you know". No sales talk, no calls to book, no prices, no links, no clichés (paradise, hidden gem, breathtaking, unforgettable), no exclamation marks. Nothing about food, restaurants or drinks; nothing about mosques or minarets; nothing sad.',
@@ -209,14 +229,14 @@ async function makeIdeas(n = 3, { avoid = [], fetchImpl = fetch, log = console.l
       if (slot.kind === 'tip') {
         const titles = slot.tip[0] === 'before' ? [...slot.tip[2]].sort(() => rnd() - 0.5).filter((t) => !used.has(`tip:before:${t}`)) : slot.tip[2];
         for (const title of titles.slice(0, 3)) {
-          const a = await article(title, fetchImpl, ['en']);
+          const a = await article(title, fetchImpl, ['en'], { log });
           if (!a) continue;
           const post = await writePost(a, slot, fetchImpl, log);
           if (!post) continue;
           const key = slot.tip[0] === 'before' ? `tip:before:${title}` : `tip:${slot.tip[0]}`;
           used.add(key);
           out.push({ kind: 'tip', type: slot.tip[0], place: slot.tip[0] === 'before' ? a.title : '', topic: key, ...post,
-            sources: [{ title: `Wikivoyage: ${a.title} (CC BY-SA 4.0)`, url: a.url }], photoQuery: slot.tip[0] === 'before' ? `${a.title} landscape` : '' });
+            sources: [{ title: credit(a), url: a.url }], photoQuery: slot.tip[0] === 'before' ? `${a.title} landscape` : '' });
           break;
         }
         continue;
@@ -226,26 +246,26 @@ async function makeIdeas(n = 3, { avoid = [], fetchImpl = fetch, log = console.l
         used.add(pin.key); // once only, also when it fails
         let done = false;
         for (const t of pin.titles) {
-          const a = await article(t, fetchImpl, ['en', 'de'], { onlySeeDo: true });
+          const a = await article(t, fetchImpl, ['en'], { site: pin.site || 'wikivoyage', onlySeeDo: !pin.site, log });
           if (!a) continue;
           const post = await writePost(a, slot, fetchImpl, log);
-          if (post) { out.push({ kind: 'place', type: slot.type, place: a.title, topic: pin.key, ...post, sources: [{ title: `Wikivoyage: ${a.title} (CC BY-SA 4.0)`, url: a.url }], photoQuery: a.title }); done = true; }
+          if (post) { out.push({ kind: 'place', type: slot.type, place: a.title, topic: pin.key, ...post, sources: [{ title: credit(a), url: a.url }], photoQuery: a.title }); done = true; }
           break;
         }
         if (done) continue;
-        log(`${pin.key}: no usable Wikivoyage article (${pin.titles.join(', ')})`);
+        log(`${pin.key}: no post (${pin.titles.join(', ')})`);
       }
       const names = (await candidates(slot, [...used], fetchImpl)).sort(() => rnd() - 0.5);
       for (const name of names.slice(0, 4)) {
         if (used.has(name)) continue;
-        const a = await article(name, fetchImpl, ['en', 'de'], { onlySeeDo: true });
-        if (!a) { log(`${name}: no Wikivoyage article`); continue; }
+        const a = await article(name, fetchImpl, ['en', 'de'], { onlySeeDo: true, log });
+        if (!a) continue;
         if (EXCLUDE.test(a.title)) continue;
         const post = await writePost(a, slot, fetchImpl, log);
         used.add(name);
         if (!post) continue;
         out.push({ kind: 'place', type: slot.type, place: a.title, topic: name, ...post,
-          sources: [{ title: `Wikivoyage: ${a.title} (CC BY-SA 4.0)`, url: a.url }], photoQuery: a.title });
+          sources: [{ title: credit(a), url: a.url }], photoQuery: a.title });
         break;
       }
     } catch (err) { log(`editorial ${slot.type || slot.tip[0]}: ${err.message}`); }
