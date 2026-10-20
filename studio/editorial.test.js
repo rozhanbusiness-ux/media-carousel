@@ -103,6 +103,20 @@ test('one-time Wikipedia source is credited as Wikipedia', async () => {
   assert.strictEqual(a.url, 'https://en.wikipedia.org/wiki/Lalish');
 });
 
+test('events only when they start in 2-10 weeks', async () => {
+  config.GEMINI_API_KEY = 'test';
+  const iso = (d) => new Date(Date.now() + d * 86400000).toISOString().slice(0, 10);
+  const base = { score: 9, evidence: 'built on an artificial island in the river Regnitz because the bishop refused', ...texts('Ein Rathaus auf einer Insel.') };
+  assert.strictEqual(await writePost(a, slot, reply({ ...base, event_start: iso(-10) })), null);
+  assert.strictEqual(await writePost(a, slot, reply({ ...base, event_start: iso(200) })), null);
+  assert.ok(await writePost(a, slot, reply({ ...base, event_start: iso(30) })));
+});
+
+test('food and drink words in every language are excluded', () => {
+  const { EXCLUDE } = require('./news-sources');
+  for (const s of ['ein Fest mit Speisen und Getränken', 'beer tents', 'مهرجان يقدم البيرة والطعام', 'خوارن و ڤەخوارن']) assert.ok(EXCLUDE.test(s), s);
+});
+
 test('"Dies" (German "this") is not a sad word', () => {
   const { SAD } = require('./news-sources');
   assert.ok(!SAD.test('Dies ist der schönste Blick auf den See.'));

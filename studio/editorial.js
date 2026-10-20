@@ -165,7 +165,7 @@ function evidenceFound(evidence, text) {
 
 const squash = (s) => String(s || '').toLowerCase().replace(/\s+/g, ' ').replace(/[„“"'’]/g, '').trim();
 
-function storyPrompt(a, slot) {
+function storyPrompt(a, slot, today = new Date()) {
   const what = slot.kind === 'tip'
     ? `a short, useful "travel advice" post about: ${slot.tip[1]}${slot.tip[0] === 'before' ? ` (country: ${a.title})` : ''}. Pick the 2 or 3 most useful, concrete pieces of advice from the article that many travellers do not know.`
     : `a post about ${a.title}. Put yourself in the place of a traveller planning a trip. From the "See" and "Do" sections, pick ONE experience a visitor can have there themselves and that makes them want to go: what they see or do, where exactly, the best time or moment for it, and why it is worth the trip (e.g. a boat ride to an island and ringing a bell, bathing in hot springs while it snows, watching the northern lights, a famous viewpoint at sunset, a cable car, a festival, a walk through an old town). NOT trivia a traveller cannot experience: no plants or animals as such, no origin of names, no geology or growth rates, no history dates, no statistics, no lists.`;
@@ -175,11 +175,12 @@ function storyPrompt(a, slot) {
     `Write ${what}`,
     'Use ONLY facts from this article. Copy into "evidence" the exact sentence (or part of a sentence, at least 40 characters, word for word) of the article your post rests on.',
     'Style: short, precise and vivid, like a sharp travel-magazine note. The headline IS the angle. Narrate; do not address the reader (no "Sie", "du", "you"). No opening with "Imagine", "Stellen Sie sich vor", "تخيل", "Did you know". No sales talk, no calls to book, no prices, no links, no clichés (paradise, hidden gem, breathtaking, unforgettable), no exclamation marks. Nothing about food, restaurants or drinks; nothing about mosques or minarets; nothing sad.',
-    'Native, natural phrasing in each language (not a word-for-word translation), grammatically correct (check articles and genders, e.g. "das Silberhorn").',
+    `Today is ${today.toISOString().slice(0, 10)}. If the experience is a festival or event with dates, choose it only when it starts between 2 and 10 weeks after today, and put its start date in "event_start" (YYYY-MM-DD); otherwise choose another experience of this place. For anything that is not a dated event, leave "event_start" empty.`,
+    'Native, natural phrasing in each language (not a word-for-word translation). German must be grammatically perfect: check every article, case and gender (e.g. "das Silberhorn", "die Wunschglocke läuten"). Proofread each text once before answering.',
     'Rate your choice honestly: "score" 1-10 = how much a traveller would want to go there and do exactly this after reading. Trivia, a plain name or a general description is at most 3.',
     `For each language (${LANGS.map((l) => `${l} = ${LANG_NAME[l]}`).join('; ')}): hook = the headline (max 60 characters); body = ${slot.kind === 'tip' ? '2-3 short points or sentences (max 420 characters)' : '2-3 sentences (max 360 characters)'}; hashtags = 3 to 5 about this place or topic only (letters only).`,
     'If the article has nothing joyful or interesting enough, return {"skip":true}.',
-    'Return ONLY JSON: {"angle":"the experience, one line in English","score":7,"evidence":"…","de":{"hook":"","body":"","hashtags":["#…"]},"ar":{…},"ckb":{…}}',
+    'Return ONLY JSON: {"angle":"the experience, one line in English","score":7,"event_start":"","evidence":"…","de":{"hook":"","body":"","hashtags":["#…"]},"ar":{…},"ckb":{…}}',
   ].join('\n');
 }
 
@@ -201,6 +202,10 @@ async function writePost(a, slot, fetchImpl = fetch, log = () => {}) {
   if (!ai) { log(`${a.title}: no usable JSON`); return null; }
   if (ai.skip) { log(`${a.title}: skipped by the editor (nothing strong enough)`); return null; }
   if (!evidenceFound(ai.evidence, a.text)) { log(`${a.title}: evidence not found in the article`); return null; }
+  if (ai.event_start) {
+    const days = (Date.parse(ai.event_start) - Date.now()) / 86400000;
+    if (!(days >= 14 && days <= 70)) { log(`${a.title}: event on ${ai.event_start} is not in the next 2-10 weeks`); return null; }
+  }
   const score = Number(ai.score);
   if (!(score >= MIN_SCORE)) { log(`${a.title}: angle too weak (${ai.score}/10: ${String(ai.angle || '').slice(0, 80)})`); return null; }
   const max = slot.kind === 'tip' ? 520 : 460;
