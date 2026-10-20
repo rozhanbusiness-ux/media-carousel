@@ -38,6 +38,14 @@ test('excludes food and restaurant topics (client decision)', () => {
   for (const s of ['Lantern festival in Chiang Mai', 'Hiking the Rawanduz canyon', 'Kurdish New Year in Hessen', 'Weinberg view']) assert.ok(!EXCLUDE.test(s), s);
 });
 
+test('drops sad news before the model sees it (client: joyful news only)', () => {
+  const { SAD } = require('./news-sources');
+  for (const s of ['Gast von Odyssey of the Seas in stürmischer See gerettet', 'Passenger rescued by Italian coast guard', 'Norovirus outbreak on ship',
+    'Flughafen-Streik', 'Flight delays expected', 'Museum closes', 'Sturmwarnung für Mallorca', 'حادث سير', 'Man overboard']) assert.ok(SAD.test(s), s);
+  for (const s of ['Lantern festival in Chiang Mai', 'New glass bridge opens in the Alps', 'Neues Schiff tauft in Hamburg', 'Lake Dukan in autumn',
+    'Nowruz celebrations in Erbil', 'Abu Dhabi opens a new museum', 'Helsinki by night', 'Urban art in Lisbon', 'Studies show', 'Feuerwerk über Valletta', 'Fine sand beaches']) assert.ok(!SAD.test(s), s);
+});
+
 test('fetches only listed hosts', async () => {
   await assert.rejects(fetchText('https://evil.example/feed', async () => ({ ok: true, text: async () => '' })), /host not allowed/);
 });

@@ -20,7 +20,7 @@ test('skips facts already used', () => {
 });
 
 const answer = (de, region = 'kurdistan') => async () => ({ ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify({
-  region, de, ar: { hook: 'بحيرة هادئة', body: 'ماء صافٍ وغروب ذهبي.', hashtags: ['#سفر', '#بحيرة'] },
+  joyful: true, region, de, ar: { hook: 'بحيرة هادئة', body: 'ماء صافٍ وغروب ذهبي.', hashtags: ['#سفر', '#بحيرة'] },
   ckb: { hook: 'گولەکا ئارام', body: 'ئاڤا زەلال.', hashtags: ['#گەشت', '#گول'] } }) }] } }] }) });
 
 test('accepts safe model texts in all three languages', async () => {
@@ -53,6 +53,17 @@ test('rejects advertising tone (client: information, not marketing)', async () =
   for (const body of ['Entdecken Sie die Faszination.', 'Ein unvergessliches Erlebnis.', 'Planen Sie Ihr Abenteuer mit uns.', 'Wow!']) {
     assert.strictEqual(await writeIdea(facts[0], answer({ hook: 'Dukan-See', body, hashtags: ['#Reisen'] })), null, body);
   }
+});
+
+test('rejects news the model marks as not joyful (client: happy news only)', async () => {
+  config.GEMINI_API_KEY = 'test';
+  const sad = async () => ({ ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: '{"joyful":false}' }] } }] }) });
+  assert.strictEqual(await writeIdea(facts[0], sad), null);
+});
+
+test('rejects sad words in the written text', async () => {
+  config.GEMINI_API_KEY = 'test';
+  assert.strictEqual(await writeIdea(facts[0], answer({ hook: 'Gast gerettet', body: 'Die Küstenwache half.', hashtags: ['#Kreuzfahrt'] })), null);
 });
 
 test('no API key: no idea', async () => {

@@ -48,6 +48,10 @@ const STATES = { NW: 'Nordrhein-Westfalen', NI: 'Niedersachsen', HE: 'Hessen', B
 // restaurant or recipe topics (destinations, unusual places, activities and festivals only).
 const EXCLUDE = /moschee|minarett|mosque|minaret|مسجد|جامع|مئذنة|مزگەوت|krieg|\bwar\b|anschlag|terror|attack|killed|tote|absturz|crash|shooting|erdbeben|earthquake|wahl|election|trump|putin|restaurant|rezept|recipe|kochen|cooking|küche|cuisine|\bchef\b|koch\b|\bessen\b|\beat\b|eating|food|\bdish(es)?\b|gericht|menü|menu|michelin|bakery|bäckerei|café|coffee|kaffee|\bwein\b|\bwine|cocktail|bar\b|مطعم|مطاعم|طبخ|أكل|مأكولات|وصفة|خواردن|چێشت/i;
 
+// Client rule: only happy, joyful news. Anything about incidents, danger, illness, crime, delays,
+// disputes or losses is dropped before the model sees it (and checked again in the written text).
+const SAD = /unfall|accident|incident|vorfall|rettung|gerettet|rescue|rescued|evakuier|evacuat|sturm|stürm|storm|unwetter|hurricane|hurrikan|typhoon|taifun|flood|flut|überschwemm|hochwasser|waldbrand|wildfire|\bfire\b|\bbrand\b|explosion|\bsink|\bsank\b|gesunken|untergang|kentern|capsiz|ertrunk|drown|\bdead\b|death|died|\bdies\b|\btod\b|gestorben|starb|verstorb|leiche|body found|\btot\b|verletz|injur|krank|illness|outbreak|ausbruch|virus|norovirus|covid|pandemi|seuche|verhaftet|arrest|festgenommen|polizei|police|crime|verbrechen|diebstahl|theft|stolen|gestohlen|raub|robbery|betrug|fraud|scam|lawsuit|klage|gericht|court|verklagt|sued|strafe|bußgeld|\bban\b|verbot|streik|strike|protest|demonstr|chaos|delay|verspät|cancel|annull|storniert|gestrichen|ausfall|warnung|warning|alarm|gefahr|danger|bedroh|threat|überboo|overbook|overtour|overcrowd|missing|vermisst|verschwunden|lost at sea|over ?board|über bord|notfall|emergency|notlandung|turbulen|lärm|beschwerde|complaint|pleite|insolven|bankrupt|layoff|entlass|schließt|closes|closure|geschlossen|حادث|إنقاذ|غرق|عاصفة|وفاة|موت|قتل|مرض|اعتقال|سرقة|إضراب|تأخير|إلغاء|تحذير|خطر|حريق|فيضان|ڕووداو|مەرگ|کوشتن|نەخۆشی|مانگرتن|هۆشداری|ئاگر|لافاو/i;
+
 const ALLOWED_HOSTS = new Set([...FEEDS.map((f) => new URL(f.url).host), 'en.wikivoyage.org', 'de.wikivoyage.org',
   'ferien-api.de', 'date.nager.at', 'api.open-meteo.com', 'www.auswaertiges-amt.de']);
 
@@ -100,7 +104,7 @@ async function feedFacts(fetchImpl, log) {
   await Promise.all(FEEDS.map(async (f) => {
     try {
       for (const i of parseFeed(await fetchText(f.url, fetchImpl))) {
-        if (!fresh(i.date, 10) || EXCLUDE.test(`${i.title} ${i.summary}`)) continue;
+        if (!fresh(i.date, 10) || EXCLUDE.test(`${i.title} ${i.summary}`) || SAD.test(`${i.title} ${i.summary}`)) continue;
         out.push(fact({ cat: f.cat, source: f.name, sourceId: f.id, title: i.title, summary: i.summary, link: i.link, date: i.date }));
       }
     } catch (err) { log(`news ${f.id}: ${err.message}`); }
@@ -117,7 +121,7 @@ async function placeFacts(fetchImpl, log, rnd = Math.random) {
       const url = `https://${lang}.wikivoyage.org/w/api.php?action=query&prop=extracts&explaintext=1&format=json&redirects=1&titles=${encodeURIComponent(title)}`;
       const page = Object.values((await fetchJson(url, fetchImpl)).query?.pages || {})[0];
       const paras = String(page?.extract || '').split(/\n+/).map((p) => p.trim())
-        .filter((p) => p.length >= 160 && p.length <= 900 && !/^=/.test(p) && !EXCLUDE.test(p));
+        .filter((p) => p.length >= 160 && p.length <= 900 && !/^=/.test(p) && !EXCLUDE.test(p) && !SAD.test(p));
       if (!paras.length) continue;
       const p = paras[Math.floor(rnd() * paras.length)];
       const link = `https://${lang}.wikivoyage.org/wiki/${encodeURIComponent(page.title.replace(/ /g, '_'))}`;
@@ -186,8 +190,9 @@ async function practicalFacts(fetchImpl, log) {
 
 /** All facts of today from every source (sources fail independently). */
 async function collectFacts(fetchImpl = fetch, log = console.log) {
-  const parts = await Promise.all([feedFacts(fetchImpl, log), placeFacts(fetchImpl, log), seasonFacts(fetchImpl, log), weatherFacts(fetchImpl, log), practicalFacts(fetchImpl, log)]);
+  // Foreign Office notes (practicalFacts) are not part of the daily ideas: client wants joyful news only.
+  const parts = await Promise.all([feedFacts(fetchImpl, log), placeFacts(fetchImpl, log), seasonFacts(fetchImpl, log), weatherFacts(fetchImpl, log)]);
   return parts.flat();
 }
 
-module.exports = { FEEDS, PLACES, EXCLUDE, ALLOWED_HOSTS, fetchText, parseFeed, plain, collectFacts, feedFacts, placeFacts, seasonFacts, weatherFacts, practicalFacts };
+module.exports = { FEEDS, PLACES, EXCLUDE, SAD, ALLOWED_HOSTS, fetchText, parseFeed, plain, collectFacts, feedFacts, placeFacts, seasonFacts, weatherFacts, practicalFacts };

@@ -2,7 +2,7 @@
 //  studio/news-ideas.js — "Ideen des Tages": three post ideas a day
 //  from the travel sources (news-sources.js). Mix agreed with the
 //  client: mostly inspiration (places, unusual spots, lakes, cruises, activities, festivals; never food), then
-//  seasons/occasions, rarely practical notes. Gemini writes the text
+//  seasons/occasions; joyful news only (no incidents, warnings or bad news). Gemini writes the text
 //  in its own words (de / ar / ckb); the source is always credited.
 //  Nothing is published from here: the client approves or rejects.
 //  Stored in cache/studio-news.txt (mounted volume, not in git).
@@ -13,7 +13,7 @@ const path = require('path');
 const config = require('../config');
 const bank = require('./bank');
 const { CITY } = require('./captions');
-const { collectFacts } = require('./news-sources');
+const { collectFacts, SAD } = require('./news-sources');
 
 const FILE = path.join(__dirname, '..', 'cache', 'studio-news.txt');
 const LANGS = ['de', 'ar', 'ckb'];
@@ -71,11 +71,12 @@ function buildPrompt(f) {
     'First decide the region the fact is about: "europe" (incl. Cyprus), "kurdistan" (Kurdistan Region and the rest of Iraq), "uae", "world" (every other place: Asia, America, Africa, Australia …) or "general" (travel in general, no specific place).',
     'Tone (client rule): a plain, neutral INFORMATION note, like a short news item or a travel guide entry. Facts only: what, where, when, why it is special or unusual. NOT advertising: no superlatives or hype, no "discover", "unforgettable", "dream", "let yourself be enchanted", no calls to book or travel, no "with us", no exclamation marks.',
     'Write in your OWN words (never copy sentences from the text).',
+    'Client rule: ONLY happy, joyful, uplifting news that makes people want to travel (a beautiful or unusual place, a festival, a celebration, a new museum, bridge, trail or ship, a special activity). If the fact is about an accident, rescue, storm, illness, death, crime, delay, cancellation, strike, warning, dispute, closure or anything sad or worrying, return only {"joyful":false}.',
     'Topics: destinations, the most beautiful or most unusual places, unusual activities, events and festivals. Never write about food, restaurants, dishes or drinks.',
     'Rules: no prices, no links, no discounts or "free", no promises; no religious buildings; no politics; at most one emoji per text.',
     `For each language (${LANGS.map((l) => `${l} = ${LANG_NAME[l]}`).join('; ')}) write: hook (max 60 characters), body (max 320 characters, 2-3 factual sentences), hashtags (4 to 6 about the place or topic, each starting with #, letters only, no brand hashtags).`,
     'Hook: a short factual headline (no exclamation mark).',
-    'Return ONLY JSON: {"region":"…","de":{"hook":"","body":"","hashtags":["#..."]},"ar":{...},"ckb":{...}}',
+    'Return ONLY JSON: {"joyful":true,"region":"…","de":{"hook":"","body":"","hashtags":["#..."]},"ar":{...},"ckb":{...}}',
   ].join('\n');
 }
 
@@ -91,11 +92,11 @@ async function writeIdea(f, fetchImpl = fetch) {
   if (!res.ok) throw new Error(`Gemini ${res.status}`);
   const json = await res.json();
   const ai = JSON.parse(json?.candidates?.[0]?.content?.parts?.[0]?.text || '{}');
-  if (!REGIONS.includes(ai.region)) return null;
+  if (ai.joyful !== true || !REGIONS.includes(ai.region)) return null; // client: joyful news only
   const texts = {};
   for (const l of LANGS) {
     const t = ai[l] || {};
-    if (!safe(t.hook, 70) || !safe(t.body, 400) || !safeTags(t.hashtags) || HYPE.test(t.hook + ' ' + t.body)) return null;
+    if (!safe(t.hook, 70) || !safe(t.body, 400) || !safeTags(t.hashtags) || HYPE.test(t.hook + ' ' + t.body) || SAD.test(t.hook + ' ' + t.body)) return null;
     texts[l] = { hook: t.hook.trim(), body: t.body.trim(), hashtags: [...new Set(t.hashtags)] };
   }
   return { region: ai.region, texts };
