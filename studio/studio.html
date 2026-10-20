@@ -165,8 +165,8 @@
     <div id="tracks"></div>
   </details>
   <details class="manual" id="news">
-    <summary>📰 Ideen des Tages (Orte, besondere Erlebnisse, Festivals, Kreuzfahrten)</summary>
-    <p style="font-size:13px;color:#cfd6e6">Drei Ideen pro Tag aus freien Reisequellen, von der KI in eigenen Worten geschrieben. Quelle immer angeben. Nichts wird automatisch veröffentlicht.</p>
+    <summary>📰 Ideen des Tages (Orte, Naturwunder, Festivals, Traditionen)</summary>
+    <p style="font-size:13px;color:#cfd6e6">Drei Geschichten pro Tag: Fakten per Google-Suche geprüft, als Reise-Magazin-Text geschrieben. Bitte Fakten kurz gegenprüfen (Quellen-Links). Nichts wird automatisch veröffentlicht.</p>
     <div class="row"><button class="ghost" id="newsRefresh">🔄 Neue Ideen</button></div>
     <div id="newsList"></div>
   </details>
@@ -754,19 +754,21 @@ $('#manualGo').onclick = async () => {
 };
 
 // ---- Ideen des Tages (news-ideas.js) -------------------------------------------------------
-const NEWS_CAT = { inspiration: '🌍 Inspiration', place: '🏞 Ort', cruise: '🚢 Kreuzfahrt', season: '📅 Saison', practical: 'ℹ️ Praktisch' };
-const NEWS_REGION = { europe: '🇪🇺 Europa', kurdistan: '☀️ Kurdistan/Irak', uae: '🇦🇪 VAE', world: '🌏 Welt', general: '🧳 Allgemein' };
+const NEWS_THEME = { unusual: '🌀 Ungewöhnlicher Ort', hidden: '🗝 Verborgenes Juwel', nature: '🏞 Naturwunder', festival: '🎉 Festival', tradition: '🎭 Tradition', record: '🏆 Rekord', season: '🍂 Jetzt am schönsten' };
+const NEWS_REGION = { core: '🇪🇺 Europa · Kurdistan · VAE', world: '🌏 Welt' };
 const newsText = (i, l) => {
   const t = i.texts[l];
   const credit = i.photo && i.photo.credit && i.photo.credit.author && /Unsplash|Wikimedia/.test(i.photo.credit.source || '') ? `\n📷 ${i.photo.credit.author} / ${i.photo.credit.source}` : '';
-  return `${t.hook}\n\n${t.body}\n\n${({ de: 'Quelle', ar: 'المصدر', ckb: 'ژێدەر' })[l]}: ${i.source}${credit}\n\n${t.hashtags.join(' ')}`;
+  const src = (i.sources || []).map((x) => x.title).filter(Boolean).slice(0, 2).join(', ');
+  return `${t.hook}\n\n${t.body}${src ? `\n\n${({ de: 'Quellen', ar: 'المصادر', ckb: 'ژێدەر' })[l]}: ${src}` : ''}${credit}\n\n${t.hashtags.join(' ')}`;
 };
 function renderNews(day) {
   const ideas = day.ideas || [];
   $('#newsList').innerHTML = ideas.length ? ideas.map((i) => `
     <div class="draft" data-news="${esc(i.id)}">
-      <div class="meta"><span class="badge ${esc(i.status)}">${esc(i.status)}</span><span>${esc(NEWS_CAT[i.cat] || i.cat)}</span>${i.region ? `<span>${esc(NEWS_REGION[i.region] || i.region)}</span>` : ''}
-        <span>${esc(i.title)}</span><a href="${esc(i.link)}" target="_blank" rel="noopener noreferrer" style="color:#e6c25a">Quelle: ${esc(i.source)} ↗</a></div>
+      <div class="meta"><span class="badge ${esc(i.status)}">${esc(i.status)}</span><span>${esc(NEWS_THEME[i.theme] || i.theme)}</span><span>${esc(NEWS_REGION[i.region] || '')}</span>
+        <span>${esc(i.place)}${i.country ? ', ' + esc(i.country) : ''}</span>
+        ${(i.sources || []).map((x) => `<a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer" style="color:#e6c25a">${esc(x.title || 'Quelle')} ↗</a>`).join(' ')}</div>
       ${i.photo ? `<div class="imgs"><a href="/api/studio/news/photo/${esc(i.photo.key)}/${esc(i.photo.file)}" download><img src="/api/studio/news/photo/${esc(i.photo.key)}/${esc(i.photo.file)}" alt=""></a></div>` : '<p class="warn">Kein passendes Foto in der Fotobank – bitte eigenes Foto wählen.</p>'}
       ${['de', 'ar', 'ckb'].map((l) => `<h3>${esc(LANG[l])}</h3><textarea dir="${l === 'de' ? 'ltr' : 'rtl'}" data-lang="${l}">${esc(newsText(i, l))}</textarea>
         <div class="row"><button class="ghost" data-nact="copy" data-lang="${l}">📋 Kopieren</button></div>`).join('')}
@@ -774,7 +776,7 @@ function renderNews(day) {
     </div>`).join('') : '<p class="warn">Heute keine Ideen gefunden – später „Neue Ideen“ versuchen.</p>';
 }
 async function loadNews(force) {
-  $('#newsList').innerHTML = '<p>Sammle Quellen und schreibe Ideen … (ca. 1 Minute)</p>';
+  $('#newsList').innerHTML = '<p>Recherchiere und schreibe drei Geschichten … (ca. 2 Minuten)</p>';
   try { renderNews(await api('/api/studio/news' + (force ? '/refresh' : ''), force ? { method: 'POST' } : {})); }
   catch (err) { $('#newsList').innerHTML = `<p class="warn">Fehler: ${esc(err.message)}</p>`; }
 }
