@@ -1,83 +1,70 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const config = require('../config');
-const { plan, research, writeStory, jsonIn, okText, trustOf, trustedSources } = require('./editorial');
+const { plan, article, writePost, makeIdeas, textProblem } = require('./editorial');
 
-test('plan: different themes, about 60 % core areas', () => {
-  const p = plan(6, () => 0.3);
-  assert.strictEqual(new Set(p.map((x) => x.theme)).size, 6);
-  assert.strictEqual(p.filter((x) => x.core).length, 4);
-  const three = plan(3, () => 0.1);
-  assert.strictEqual(three.filter((x) => x.core).length, 2);
+const ARTICLE = 'Bamberg is a town in Franconia. '.repeat(40)
+  + 'The Old Town Hall was built on an artificial island in the river Regnitz because the bishop refused to give the citizens land. '
+  + 'It is reached by two bridges. '.repeat(20);
+
+test('plan: two place stories, the third is sometimes a Ratgeber post', () => {
+  const tipDay = plan(3, () => 0.1);
+  assert.deepStrictEqual(tipDay.map((s) => s.kind), ['place', 'place', 'tip']);
+  const placeDay = plan(3, () => 0.95);
+  assert.ok(placeDay.every((s) => s.kind === 'place'));
 });
 
-test('jsonIn reads the JSON block of a grounded answer', () => {
-  assert.deepStrictEqual(jsonIn('Here you go:\n```json\n{"a":1}\n```'), { a: 1 });
-  assert.strictEqual(jsonIn('no json'), null);
+test('article: reads Wikivoyage as plain text, skips missing or tiny pages', async () => {
+  const fake = (extract) => async () => ({ ok: true, json: async () => ({ query: { pages: { 1: { title: 'Bamberg', extract } } } }) });
+  const a = await article('Bamberg', fake(ARTICLE));
+  assert.strictEqual(a.url, 'https://en.wikivoyage.org/wiki/Bamberg');
+  assert.strictEqual(await article('Nowhere', fake('short')), null);
 });
 
-test('okText: stories yes, sales pitches, links, sad or food topics no', () => {
-  assert.ok(okText('Wenn die Sonne sinkt, leuchtet der Sonnenuntergang über dem Tal.', 700));
-  for (const s of ['Jetzt buchen und mitfliegen.', 'Mehr auf www.example.com', 'Gast gerettet', 'Die besten Restaurants der Stadt', 'احجز الآن']) assert.ok(!okText(s, 700), s);
+const reply = (obj) => async () => ({ ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify(obj) }] } }] }) });
+const texts = (deBody) => ({
+  de: { hook: 'Ein Rathaus mitten im Fluss', body: deBody, hashtags: ['#Bamberg', '#Franken'] },
+  ar: { hook: 'دار بلدية وسط النهر', body: 'بُنيت دار البلدية على جزيرة صنعها الأهالي في النهر.', hashtags: ['#بامبرغ', '#ألمانيا'] },
+  ckb: { hook: 'شارەوانیەک د ناڤ رووباری دا', body: 'شارەوانی ل سەر گزیرتەکێ هاتە ئاڤاکرن.', hashtags: ['#بامبێرگ', '#ئەلمانیا'] },
 });
+const a = { title: 'Bamberg', text: ARTICLE, url: 'https://en.wikivoyage.org/wiki/Bamberg' };
+const slot = { kind: 'place', type: 'german_city' };
 
-const grounded = (obj, chunks = []) => async () => ({ ok: true, json: async () => ({ candidates: [{
-  content: { parts: [{ text: 'Result: ' + JSON.stringify(obj) }] }, groundingMetadata: { groundingChunks: chunks } }] }) });
-
-test('research keeps verified facts and takes sources from the grounding data', async () => {
+test('writePost: accepts a post whose evidence is a real sentence of the article', async () => {
   config.GEMINI_API_KEY = 'test';
-  const r = await research({ theme: 'nature', area: 'Europe' }, [], grounded(
-    { topic: 'Plitvice Lakes', place: 'Plitvice', country: 'Croatia', facts: ['16 terraced lakes', 'UNESCO since 1979', 'colours change'], photo_query: 'Plitvice lakes waterfalls' },
-    [{ web: { uri: 'https://en.wikipedia.org/wiki/Plitvice', title: 'wikipedia.org' } }, { web: { uri: 'javascript:x', title: 'bad' } },
-      { web: { uri: 'https://some-blog.example/plitvice', title: 'some-blog.example' } }, { web: { uri: 'https://croatia.hr/en/plitvice', title: 'croatia.hr' } }]));
-  assert.strictEqual(r.place, 'Plitvice');
-  assert.deepStrictEqual(r.sources.map((x) => x.title), ['wikipedia.org', 'croatia.hr']);
+  const p = await writePost(a, slot, reply({ angle: 'town hall on an island', evidence: 'built on an artificial island in the river Regnitz because the bishop refused',
+    ...texts('Der Bischof gab kein Land, also bauten die Bürger ihr Rathaus auf eine künstliche Insel in der Regnitz.') }));
+  assert.deepStrictEqual(Object.keys(p.texts), ['de', 'ar', 'ckb']);
 });
 
-test('research rejects topics without enough trusted sources (client rule)', async () => {
+test('writePost: rejects invented evidence (nothing that is not in the article)', async () => {
   config.GEMINI_API_KEY = 'test';
-  const r = await research({ theme: 'nature', area: 'Europe' }, [], grounded(
-    { topic: 'Some lake', place: 'Somewhere', country: 'X', facts: ['a', 'b', 'c'] },
-    [{ web: { uri: 'https://blog-one.example/a', title: 'blog-one.example' } }, { web: { uri: 'https://en.wikipedia.org/wiki/X', title: 'wikipedia.org' } }]));
-  assert.strictEqual(r, null);
+  const logs = [];
+  const p = await writePost(a, slot, reply({ evidence: 'The town hall is made entirely of gold and glows at night every day', ...texts('Gold.') }), (m) => logs.push(m));
+  assert.strictEqual(p, null);
+  assert.match(logs[0], /evidence not found/);
 });
 
-test('trusted sources: encyclopedias, official boards, governments, the event site; not blogs or portals', () => {
-  assert.strictEqual(trustOf('en.wikipedia.org'), 'strong');
-  assert.strictEqual(trustOf('bot.gov.krd'), 'strong');
-  assert.strictEqual(trustOf('www.salzburg.gv.at'.replace(/^www\./, '')), 'strong');
-  assert.strictEqual(trustOf('duhokiff.com', 'Duhok'), 'strong');
-  assert.strictEqual(trustOf('bbc.com'), 'media');
-  for (const h of ['kurdish.events', 'festagent.com', 'tripadvisor.com', 'myblog.wordpress.com']) assert.strictEqual(trustOf(h, 'Duhok'), null, h);
-  // The Duhok film festival example from the first preview passes: official site + Wikipedia.
-  const t = trustedSources([{ web: { uri: 'https://x', title: 'kurdish.events' } }, { web: { uri: 'https://y', title: 'duhokiff.com' } },
-    { web: { uri: 'https://z', title: 'wikipedia.org' } }, { web: { uri: 'https://w', title: 'festagent.com' } }], 'Duhok');
-  assert.ok(t.ok);
-  assert.deepStrictEqual(t.list.map((x) => x.host), ['duhokiff.com', 'wikipedia.org']);
-});
-
-test('research drops sad or food topics', async () => {
+test('writePost: rejects clichés, direct address openers and sales talk', async () => {
   config.GEMINI_API_KEY = 'test';
-  assert.strictEqual(await research({ theme: 'unusual', area: 'Europe' }, [], grounded({ topic: 'Best restaurants of Rome', place: 'Rome', country: 'Italy', facts: ['a', 'b', 'c'] })), null);
-  assert.strictEqual(await research({ theme: 'unusual', area: 'Europe' }, [], grounded({ topic: 'Ship rescue', place: 'Sea', country: 'Italy', facts: ['passenger rescued', 'b', 'c'] })), null);
-  // a single food fact is dropped, not the whole topic
-  const r = await research({ theme: 'festival', area: 'Europe' }, [], grounded({ topic: 'Lantern festival', place: 'Valletta', country: 'Malta', facts: ['lanterns on the water', 'street food stalls', 'music', 'fireworks'] },
-    [{ web: { uri: 'https://en.wikipedia.org/wiki/V', title: 'wikipedia.org' } }, { web: { uri: 'https://visitmalta.com/v', title: 'visitmalta.com' } }]));
-  assert.deepStrictEqual(r.facts, ['lanterns on the water', 'music', 'fireworks']);
+  for (const body of ['Stellen Sie sich vor: ein Rathaus im Fluss.', 'Ein Paradies am Wasser.', 'Jetzt buchen und hinfliegen.', 'Ein Rathaus im Fluss!']) {
+    const p = await writePost(a, slot, reply({ evidence: 'built on an artificial island in the river Regnitz because the bishop refused', ...texts(body) }));
+    assert.strictEqual(p, null, body);
+  }
 });
 
-const story = (de) => async () => ({ ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify({ de,
-  ar: { hook: 'ست عشرة بحيرة', body: 'تتدرج البحيرات وتصلها الشلالات.', hashtags: ['#كرواتيا', '#بحيرات'] },
-  ckb: { hook: 'شازدە گول', body: 'گول ب شەلالان ڤە گرێداینە.', hashtags: ['#کرواتیا', '#گول'] } }) }] } }] }) });
-const facts = { topic: 'Plitvice', place: 'Plitvice', country: 'Croatia', facts: ['a', 'b', 'c'] };
-
-test('writeStory accepts a story in all three languages', async () => {
+test('writePost: the editor may skip a weak article', async () => {
   config.GEMINI_API_KEY = 'test';
-  const t = await writeStory(facts, story({ hook: '16 Seen und keiner gleicht dem anderen', body: 'Stufe um Stufe fällt das Wasser.', hashtags: ['#Kroatien', '#Plitvice'] }));
-  assert.deepStrictEqual(Object.keys(t), ['de', 'ar', 'ckb']);
+  assert.strictEqual(await writePost(a, slot, reply({ skip: true })), null);
 });
 
-test('writeStory rejects a sales pitch', async () => {
-  config.GEMINI_API_KEY = 'test';
-  assert.strictEqual(await writeStory(facts, story({ hook: 'Plitvice', body: 'Jetzt buchen mit uns.', hashtags: ['#Kroatien', '#Seen'] })), null);
+test('textProblem names the reason; Ratgeber posts may mention delays', () => {
+  assert.match(textProblem('Bei Verspätung haben Fluggäste Rechte.', 400, 'place'), /^sad/);
+  assert.strictEqual(textProblem('Bei Verspätung haben Fluggäste Rechte.', 400, 'tip'), null);
+  assert.strictEqual(textProblem('Die Kirche wurde 1850 entdeckt und restauriert.', 400), null);
+});
+
+test('makeIdeas without an API key returns nothing', async () => {
+  config.GEMINI_API_KEY = '';
+  assert.deepStrictEqual(await makeIdeas(3, { fetchImpl: async () => { throw new Error('no network'); } }), []);
 });

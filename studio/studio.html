@@ -165,8 +165,8 @@
     <div id="tracks"></div>
   </details>
   <details class="manual" id="news">
-    <summary>📰 Ideen des Tages (Orte, Naturwunder, Festivals, Traditionen)</summary>
-    <p style="font-size:13px;color:#cfd6e6">Drei Geschichten pro Tag: Fakten per Google-Suche geprüft, als Reise-Magazin-Text geschrieben. Bitte Fakten kurz gegenprüfen (Quellen-Links). Nichts wird automatisch veröffentlicht.</p>
+    <summary>📰 Ideen des Tages (ein Ort, ein besonderer Blick · Ratgeber)</summary>
+    <p style="font-size:13px;color:#cfd6e6">Drei Beiträge pro Tag aus Wikivoyage: ein Ort und ein besonderer Blick darauf, manchmal ein Ratgeber. Der Beleg-Satz zeigt, worauf der Text beruht. Nichts wird automatisch veröffentlicht.</p>
     <div class="row"><button class="ghost" id="newsRefresh">🔄 Neue Ideen</button></div>
     <div id="newsList"></div>
   </details>
@@ -754,8 +754,9 @@ $('#manualGo').onclick = async () => {
 };
 
 // ---- Ideen des Tages (news-ideas.js) -------------------------------------------------------
-const NEWS_THEME = { unusual: '🌀 Ungewöhnlicher Ort', hidden: '🗝 Verborgenes Juwel', nature: '🏞 Naturwunder', festival: '🎉 Festival', tradition: '🎭 Tradition', record: '🏆 Rekord', season: '🍂 Jetzt am schönsten' };
-const NEWS_REGION = { core: '🇪🇺 Europa · Kurdistan · VAE', world: '🌏 Welt' };
+const NEWS_THEME = { german_city: '🇩🇪 Stadt in Deutschland', lake: '🏞 See', mountain: '⛰ Berge', coast: '🌊 Küste', island: '🏝 Insel', village: '🏘 Dorf', capital: '🏛 Hauptstadt',
+  kurdistan: '☀️ Kurdistan', uae: '🇦🇪 VAE', world: '🌏 Welt', flights: '✈️ Ratgeber: Flüge', hotels: '🏨 Ratgeber: Hotels', river_cruise: '🚢 Ratgeber: Flusskreuzfahrt',
+  packing: '🧳 Ratgeber: Packen', insurance: '🛡 Ratgeber: Versicherung', passenger_rights: '⚖️ Ratgeber: Fluggastrechte', jet_lag: '🌙 Ratgeber: Jetlag', before: 'ℹ️ Ratgeber: Vor der Reise' };
 const newsText = (i, l) => {
   const t = i.texts[l];
   const credit = i.photo && i.photo.credit && i.photo.credit.author && /Unsplash|Wikimedia/.test(i.photo.credit.source || '') ? `\n📷 ${i.photo.credit.author} / ${i.photo.credit.source}` : '';
@@ -766,9 +767,9 @@ function renderNews(day) {
   const ideas = day.ideas || [];
   $('#newsList').innerHTML = ideas.length ? ideas.map((i) => `
     <div class="draft" data-news="${esc(i.id)}">
-      <div class="meta"><span class="badge ${esc(i.status)}">${esc(i.status)}</span><span>${esc(NEWS_THEME[i.theme] || i.theme)}</span><span>${esc(NEWS_REGION[i.region] || '')}</span>
-        <span>${esc(i.place)}${i.country ? ', ' + esc(i.country) : ''}</span>
+      <div class="meta"><span class="badge ${esc(i.status)}">${esc(i.status)}</span><span>${esc(NEWS_THEME[i.type] || i.type)}</span><span>${esc(i.place || '')}</span>
         ${(i.sources || []).map((x) => `<a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer" style="color:#e6c25a">${esc(x.title || 'Quelle')} ↗</a>`).join(' ')}</div>
+      ${i.evidence ? `<p style="font-size:13px;color:#cfd6e6;margin:8px 0">📖 Beleg aus Wikivoyage: „${esc(i.evidence)}“</p>` : ''}
       ${i.photo ? `<div class="imgs"><a href="/api/studio/news/photo/${esc(i.photo.key)}/${esc(i.photo.file)}" download><img src="/api/studio/news/photo/${esc(i.photo.key)}/${esc(i.photo.file)}" alt=""></a></div>` : '<p class="warn">Kein passendes Foto in der Fotobank – bitte eigenes Foto wählen.</p>'}
       ${['de', 'ar', 'ckb'].map((l) => `<h3>${esc(LANG[l])}</h3><textarea dir="${l === 'de' ? 'ltr' : 'rtl'}" data-lang="${l}">${esc(newsText(i, l))}</textarea>
         <div class="row"><button class="ghost" data-nact="copy" data-lang="${l}">📋 Kopieren</button></div>`).join('')}

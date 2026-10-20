@@ -1,10 +1,8 @@
 // ============================================================
-//  studio/news-ideas.js — "Ideen des Tages": three editorial post
-//  ideas a day from the editor engine (editorial.js): unusual places,
-//  hidden villages, natural wonders, festivals, traditions, records,
-//  seasonal beauty. Facts are researched with Google Search grounding
-//  and written as a travel-magazine story in de / ar / ckb; sources
-//  are always shown. Nothing is published from here: the client
+//  studio/news-ideas.js — "Ideen des Tages": three post ideas a day
+//  from the editor engine (editorial.js): one place and one sharp
+//  angle per post (mostly Europe), sometimes a practical Ratgeber
+//  post; single source Wikivoyage (CC BY-SA 4.0, always credited). Nothing is published from here: the client
 //  approves or rejects. Stored in cache/studio-news.txt (mounted
 //  volume, not in git).
 // ============================================================
@@ -51,10 +49,10 @@ async function today({ force = false, fetchImpl = fetch, log = console.log } = {
   data.topics = data.topics || [];
   const made = await editorial.makeIdeas(3, { avoid: data.topics, fetchImpl, log });
   const ideas = made.map((m) => ({
-    id: require('crypto').randomBytes(6).toString('hex'), theme: m.theme, region: m.region, topic: m.topic, place: m.place, country: m.country,
-    facts: m.facts, sources: m.sources, photoQuery: m.photoQuery, texts: m.texts, photo: photoFor(m), status: 'pending', createdAt: new Date().toISOString(),
+    id: require('crypto').randomBytes(6).toString('hex'), kind: m.kind, type: m.type, topic: m.topic, place: m.place,
+    angle: m.angle, evidence: m.evidence, sources: m.sources, photoQuery: m.photoQuery, texts: m.texts, photo: photoFor(m), status: 'pending', createdAt: new Date().toISOString(),
   }));
-  data.topics.push(...ideas.map((i) => `${i.topic} (${i.place})`));
+  data.topics.push(...ideas.map((i) => i.topic));
   data.days[day] = { day, ideas: [...ideas, ...(force && data.days[day] ? data.days[day].ideas.filter((i) => i.status === 'approved') : [])] };
   save(data);
   return data.days[day];

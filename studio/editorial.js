@@ -1,15 +1,17 @@
 // ============================================================
-//  studio/editorial.js — the "editor-in-chief" behind the daily ideas
-//  (client decision after the news-feed test: feeds gave weak, dry
-//  posts). Each idea is an editorial topic from a fixed rotation
-//  (unusual places, hidden villages, natural wonders, festivals,
-//  traditions, records, seasonal beauty). Two Gemini calls:
-//   1. research: picks one concrete topic and collects facts WITH
-//      Google Search grounding (sources come from the grounding data);
-//   2. story: writes the post from those facts only, in de / ar / ckb,
-//      as an engaging travel-magazine story (not advertising).
-//  Client rules: joyful only, no food, no mosques/minarets, no booking
-//  calls; about 60 % Europe / Kurdistan / UAE and 40 % the rest.
+//  studio/editorial.js — the editor behind "Ideen des Tages"
+//  (client model, agreed with examples): ONE place a day and ONE
+//  sharp angle about it (a legend, something that exists only there,
+//  a strange sight, a local custom) in 2-3 sentences — no statistics,
+//  no lists, no long articles. Mostly Europe (lakes, mountains,
+//  coasts, villages, islands, German cities, capitals), some
+//  Kurdistan/UAE and a little of the rest of the world. Plus
+//  practical "Ratgeber" posts (booking flights, choosing hotels,
+//  river cruises, before travelling to …).
+//  Single source: Wikivoyage (reliable, CC BY-SA 4.0, credited).
+//  Gemini must quote the sentence of the article its angle rests on;
+//  the quote is checked against the article, so nothing is invented.
+//  Client rules: joyful, no food, no mosques/minarets, no sales talk.
 // ============================================================
 
 const config = require('../config');
@@ -18,187 +20,192 @@ const { EXCLUDE, SAD } = require('./news-sources');
 const MODEL = 'gemini-2.5-flash';
 const LANGS = ['de', 'ar', 'ckb'];
 const LANG_NAME = { de: 'German', ar: 'Arabic (Modern Standard)', ckb: 'Kurdish Badini (Behdînî, Northern Kurdish of Duhok, written in Arabic script)' };
+const MAX_ARTICLE = 16000; // characters of the article given to the model
 
-const THEMES = {
-  unusual: 'one of the most unusual or surprising places to visit (a strange landscape, a curious village, a place with a story)',
-  hidden: 'a little-known village, island, valley or old town that most travellers have never heard of',
-  nature: 'a natural wonder: a lake, waterfall, cave, canyon, coast, mountain or forest with something special about it',
-  festival: 'a joyful festival, celebration or cultural event that takes place in the next 3 to 10 weeks (verify the dates)',
-  tradition: 'a colourful local tradition or custom that travellers can experience',
-  record: 'a travel record or superlative (the longest, highest, oldest, deepest …) that is a real place to visit',
-  season: 'a place that is at its most beautiful in the current season or the coming weeks, and why',
-};
-const CORE_AREAS = ['Europe', 'Europe', 'Europe', 'the Kurdistan Region of Iraq', 'the United Arab Emirates'];
-const WORLD_AREAS = ['East Asia', 'South-East Asia', 'Central Asia or the Caucasus', 'North Africa', 'the Americas', 'Oceania', 'Southern Africa', 'South Asia'];
+// Place types with weights (client: mostly Europe; Europe has thousands of lakes, mountains, coasts and villages).
+const PLACE_TYPES = [
+  ['german_city', 'a German town or city (not only the big ones)', 3],
+  ['lake', 'a lake in Europe', 3],
+  ['mountain', 'a mountain, mountain village or mountain area in Europe', 2],
+  ['coast', 'a coast, bay, beach area or cliff coast in Europe', 3],
+  ['island', 'an island in Europe', 2],
+  ['village', 'a small village or small old town in Europe', 3],
+  ['capital', 'a European capital city', 2],
+  ['kurdistan', 'a town, valley or natural place in the Kurdistan Region of Iraq', 1],
+  ['uae', 'a place in the United Arab Emirates', 1],
+  ['world', 'a remarkable place outside Europe (Asia, Africa, the Americas, Oceania)', 1],
+];
 
-// Booking calls and empty advertising words (the story may be vivid, but never a sales pitch).
-const SALES = /jetzt buchen|buchen sie|mit uns|bei uns|unser angebot|book now|with us|اكتشف عروض|احجز|معنا|لدينا عروض|دگەل مە|ئۆفەر/i;
+// Ratgeber topics: the Wikivoyage articles to read (first one that exists is used).
+const TIPS = [
+  ['flights', 'when and how to book flights well (timing, flexibility, luggage rules)', ['Air travel', 'Flying', 'Air travel in Europe']],
+  ['hotels', 'what to look at when booking a hotel', ['Accommodation', 'Hotels']],
+  ['river_cruise', 'what to know before booking a river cruise', ['River cruises', 'Cruising on small ships', 'Cruise ships']],
+  ['packing', 'smart packing and hand luggage', ['Packing list', 'Luggage']],
+  ['insurance', 'travel insurance basics', ['Travel insurance']],
+  ['passenger_rights', 'air passenger rights in the EU', ['Air passenger rights in the European Union', 'Air passenger rights']],
+  ['jet_lag', 'arriving rested after a long flight', ['Jet lag']],
+  ['before', 'what to know before travelling to this country (entry, money, customs, etiquette)',
+    ['Turkey', 'Egypt', 'United Arab Emirates', 'Iraqi Kurdistan', 'Greece', 'Spain', 'Cyprus', 'Georgia (country)', 'Jordan', 'Portugal', 'Croatia', 'Thailand', 'Italy', 'Bulgaria', 'Tunisia', 'Morocco']],
+];
+
+const SALES = /jetzt buchen|buchen sie|mit uns|bei uns|unser angebot|book now|with us|احجز|معنا|لدينا عروض|دگەل مە|ئۆفەر/i;
 const LINKS = /https?:|www\.|\.com\b|\.de\b|@|€|\$|kostenlos|gratis|rabatt|مجان|خصم/i;
+// Openers the client found monotonous, and direct address (the posts are narrated, not addressed).
+const CLICHE = /stellen sie sich|stell dir vor|imagine|تخيل|تخيّل|خۆ بێخە|wussten sie|did you know|\bentdecke\b|entdecken sie|\bdiscover\b|اكتشف|verborgenes juwel|hidden gem|paradies|paradise|unvergess|unforgettable|atemberaub|breathtaking|!/i;
 
-// Trusted sources (client rule): a topic is used only when at least two of its grounding sources are
-// on this list and at least one is encyclopedic or official. Other sources are never shown or used.
-const STRONG = ['wikipedia.org', 'wikivoyage.org', 'britannica.com', 'unesco.org',
-  // official tourism boards
-  'germany.travel', 'visitgreece.gr', 'spain.info', 'croatia.hr', 'visitdubai.com', 'visitabudhabi.ae', 'visitportugal.com', 'italia.it',
-  'france.fr', 'austria.info', 'myswitzerland.com', 'visitnorway.com', 'visitcyprus.com', 'goturkiye.com', 'egypt.travel', 'visitmalta.com',
-  'visitbritain.com', 'tourismthailand.org', 'japan.travel', 'visitkorea.or.kr', 'vietnam.travel', 'visitsingapore.com', 'malaysia.travel',
-  'indonesia.travel', 'visitjordan.com', 'georgia.travel', 'visitbulgaria.com', 'romania.travel', 'visitalbania.org', 'holland.com',
-  'visitdenmark.com', 'visitsweden.com', 'visitfinland.com', 'visiticeland.com', 'visitczechia.com', 'poland.travel', 'visitmorocco.com', 'visitqatar.com'];
-const GOV = /(^|\.)(gov(\.[a-z]{2,3})?|gv\.at|gouv\.fr|gob\.es|gov\.krd|bund\.de|europa\.eu|admin\.ch|gov\.uk)$/;
-const MEDIA = ['nationalgeographic.com', 'bbc.com', 'bbc.co.uk', 'dw.com', 'lonelyplanet.com', 'atlasobscura.com', 'cntraveler.com', 'geo.de',
-  'smithsonianmag.com', 'theguardian.com', 'zeit.de', 'spiegel.de', 'sueddeutsche.de', 'faz.net', 'tagesschau.de', 'rudaw.net', 'kurdistan24.net'];
-const onList = (host, list) => list.some((d) => host === d || host.endsWith('.' + d));
-const hostOf = (s) => { try { return new URL(/^https?:/.test(s) ? s : 'https://' + s).hostname.replace(/^www\./, '').toLowerCase(); } catch { return ''; } };
-const norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[^a-z]/g, '');
+const weighted = (list, rnd) => {
+  const total = list.reduce((s, x) => s + x[2], 0);
+  let r = rnd() * total;
+  for (const x of list) { r -= x[2]; if (r < 0) return x; }
+  return list[list.length - 1];
+};
 
-/** Rate a source host: 'strong' (encyclopedic/official/event's own site), 'media', or null (not trusted). */
-function trustOf(host, place = '') {
-  if (!host) return null;
-  if (onList(host, STRONG) || GOV.test(host)) return 'strong';
-  if (onList(host, MEDIA)) return 'media';
-  const p = norm(place);
-  if (p.length >= 4 && norm(host.split('.').slice(0, -1).join('')).includes(p)) return 'strong'; // official site of the place/event (e.g. duhokiff.com)
-  return null;
-}
-
-/** Trusted sources only; true when the client's rule (>= 2 trusted, >= 1 strong) is met. */
-function trustedSources(chunks, place) {
-  const list = [];
-  for (const c of chunks || []) {
-    const w = c && c.web;
-    if (!w || !/^https:\/\//.test(w.uri || '')) continue;
-    const host = hostOf(w.title) || hostOf(w.uri);
-    const trust = trustOf(host, place);
-    if (trust && !list.some((x) => x.host === host)) list.push({ host, trust, title: host, url: w.uri });
+/** Plan for one day: two place stories and a third that is a Ratgeber post on about 3 of 5 days. */
+function plan(n = 3, rnd = Math.random) {
+  const slots = [];
+  for (let i = 0; i < n; i++) {
+    if (i === n - 1 && rnd() < 0.6) slots.push({ kind: 'tip', tip: TIPS[Math.floor(rnd() * TIPS.length)] });
+    else {
+      let t = weighted(PLACE_TYPES, rnd);
+      for (let k = 0; k < 20 && slots.some((s) => s.type === t[0]); k++) t = weighted(PLACE_TYPES, rnd);
+      if (slots.some((s) => s.type === t[0])) t = PLACE_TYPES.find((x) => !slots.some((s) => s.type === x[0])); // no repeat in one day
+      slots.push({ kind: 'place', type: t[0], desc: t[1] });
+    }
   }
-  return { list: list.slice(0, 4), ok: list.length >= 2 && list.some((x) => x.trust === 'strong') };
+  return slots;
 }
 
-/** Grounding links are Google redirects: resolve to the real page (only that redirect host is called). */
-async function resolveUrl(url, fetchImpl) {
-  try {
-    if (new URL(url).hostname !== 'vertexaisearch.cloud.google.com') return url;
-    const res = await fetchImpl(url, { redirect: 'manual', signal: AbortSignal.timeout(10000) });
-    const loc = res.headers && res.headers.get && res.headers.get('location');
-    return loc && /^https:\/\//.test(loc) ? loc : url;
-  } catch { return url; }
-}
-
-const pick = (list, rnd) => list[Math.floor(rnd() * list.length)];
-
-/** Plan for n ideas: themes without repeats, about 60 % core areas. */
-function plan(n, rnd = Math.random) {
-  const themes = Object.keys(THEMES).sort(() => rnd() - 0.5);
-  const coreCount = n === 3 ? (rnd() < 0.8 ? 2 : 1) : Math.round(n * 0.6);
-  return Array.from({ length: n }, (_, i) => ({
-    theme: themes[i % themes.length],
-    area: i < coreCount ? pick(CORE_AREAS, rnd) : pick(WORLD_AREAS, rnd),
-    core: i < coreCount,
-  })).sort(() => rnd() - 0.5);
-}
-
-async function gemini(body, fetchImpl) {
+async function gemini(prompt, fetchImpl, temperature = 0.9) {
   const res = await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': config.GEMINI_API_KEY },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { responseMimeType: 'application/json', temperature, maxOutputTokens: 8192, thinkingConfig: { thinkingBudget: 0 } } }),
     signal: AbortSignal.timeout(90000),
   });
   if (!res.ok) throw new Error(`Gemini ${res.status}`);
-  return res.json();
+  const json = await res.json();
+  try { return JSON.parse(json?.candidates?.[0]?.content?.parts?.[0]?.text || ''); } catch { return null; }
 }
 
-/** First {...} block of a model answer (search-grounded answers cannot use JSON mode). */
-function jsonIn(text) {
-  const s = String(text || '');
-  const a = s.indexOf('{');
-  const b = s.lastIndexOf('}');
-  if (a < 0 || b <= a) return null;
-  try { return JSON.parse(s.slice(a, b + 1)); } catch { return null; }
+/** Wikivoyage article as plain text: { title, text, url } or null (English first, then German). */
+async function article(title, fetchImpl, langs = ['en', 'de']) {
+  for (const lang of langs) {
+    try {
+      const url = `https://${lang}.wikivoyage.org/w/api.php?action=query&prop=extracts&explaintext=1&format=json&redirects=1&titles=${encodeURIComponent(title)}`;
+      const res = await fetchImpl(url, { headers: { 'User-Agent': 'MEDIA Studio (media-travels.com)' }, signal: AbortSignal.timeout(20000) });
+      if (!res.ok) continue;
+      const page = Object.values((await res.json()).query?.pages || {})[0];
+      const text = String(page?.extract || '');
+      if (!page || page.missing !== undefined || text.length < 1500) continue;
+      return { title: page.title, lang, text: text.slice(0, MAX_ARTICLE), url: `https://${lang}.wikivoyage.org/wiki/${encodeURIComponent(page.title.replace(/ /g, '_'))}` };
+    } catch { /* try the next language */ }
+  }
+  return null;
 }
 
-/** Step 1: one concrete topic with verified facts and sources (Google Search grounding). */
-async function research({ theme, area }, avoid = [], fetchImpl = fetch, today = new Date(), log = () => {}) {
-  const prompt = [
-    `Today is ${today.toISOString().slice(0, 10)}. You are the research editor of a travel magazine for people living in Germany.`,
-    `Find ONE specific topic: ${THEMES[theme]}, in ${area}. Use Google Search to verify every fact.`,
-    'It must be joyful and make people want to travel. Not about food, restaurants or drinks. Not about mosques, minarets or religious buildings. Not about politics, accidents, danger or anything sad.',
-    avoid.length ? `Do not choose any of these recent topics: ${avoid.slice(-40).join('; ')}.` : '',
-    'Use only reliable sources: Wikipedia, UNESCO, official tourism boards, government or city websites, the official website of the event, and well-known media (National Geographic, BBC, Lonely Planet, Atlas Obscura). Ignore blogs, forums and booking portals. For events, take the dates from the official event or city website.',
-    'Collect 4 to 6 surprising, concrete, verified facts (what makes it special, a story or legend, the best moment to see it, dates for events). No prices.',
-    'Return ONLY JSON: {"topic":"short title in English","place":"place name","country":"country in English","facts":["…"],"photo_query":"3-6 English words to find a real photo of exactly this place"}',
-  ].filter(Boolean).join('\n');
-  const json = await gemini({ contents: [{ parts: [{ text: prompt }] }], tools: [{ google_search: {} }],
-    generationConfig: { temperature: 1, maxOutputTokens: 2048 } }, fetchImpl);
-  const cand = json?.candidates?.[0];
-  const t = jsonIn((cand?.content?.parts || []).map((p) => p.text || '').join(''));
-  if (!t || typeof t.topic !== 'string' || !Array.isArray(t.facts)) { log('research: no usable JSON'); return null; }
-  const head = `${t.topic} ${t.place}`;
-  if (EXCLUDE.test(head) || SAD.test(head)) { log(`research: topic rejected by filter (${t.topic})`); return null; }
-  // Single facts that touch food, sad news etc. are dropped; the topic itself stays.
-  const facts = t.facts.filter((f) => typeof f === 'string' && f.length < 400 && !EXCLUDE.test(f) && !SAD.test(f)).slice(0, 6);
-  if (facts.length < 3) { log(`research: too few clean facts (${t.topic})`); return null; }
-  const trusted = trustedSources(cand?.groundingMetadata?.groundingChunks, t.place);
-  if (!trusted.ok) { log(`research: not enough trusted sources for ${t.topic} (${trusted.list.map((x) => x.host).join(', ') || 'none'})`); return null; }
-  const sources = [];
-  for (const x of trusted.list) sources.push({ title: x.host, url: await resolveUrl(x.url, fetchImpl) });
-  return { topic: t.topic.slice(0, 120), place: String(t.place || '').slice(0, 80), country: String(t.country || '').slice(0, 60),
-    facts, photoQuery: String(t.photo_query || t.place || '').replace(/[^\p{L}\p{N} '-]/gu, '').slice(0, 60), sources };
+/** A few candidate places of one type, not used before (the model knows Wikivoyage's coverage). */
+async function candidates(slot, avoid, fetchImpl) {
+  const ai = await gemini([
+    `List 12 real places that are ${slot.desc} and have their own article on English Wikivoyage.`,
+    'Prefer places with something special: a legend, an unusual sight, a local custom, a striking landscape. Mix well-known and lesser-known places.',
+    avoid.length ? `Do not list any of these: ${avoid.slice(-150).join('; ')}.` : '',
+    'Return ONLY JSON: {"places":["exact Wikivoyage article title", …]}',
+  ].filter(Boolean).join('\n'), fetchImpl, 1);
+  return Array.isArray(ai?.places) ? ai.places.filter((p) => typeof p === 'string' && p.length < 80 && !avoid.includes(p)) : [];
 }
 
-function storyPrompt(r) {
+const squash = (s) => String(s || '').toLowerCase().replace(/\s+/g, ' ').replace(/[„“"'’]/g, '').trim();
+
+function storyPrompt(a, slot) {
+  const what = slot.kind === 'tip'
+    ? `a short, useful "travel advice" post about: ${slot.tip[1]}${slot.tip[0] === 'before' ? ` (country: ${a.title})` : ''}. Pick the 2 or 3 most useful, concrete pieces of advice from the article that many travellers do not know.`
+    : `a post about ${a.title}. Read the whole article and pick ONE single angle: a legend or story, something that exists only here, a strange or beautiful sight, or a striking local custom. The angle must make a reader stop and think "I did not know that". NOT statistics, NOT population, NOT lists of sights, NOT general descriptions.`;
   return [
-    'You write one social media post (Instagram/Facebook carousel caption) for MEDIA Travel & Tourism, a travel agency in Germany. Readers: Germans, Kurds and Arabs living in Germany.',
-    `Topic: ${r.topic} (${r.place}, ${r.country}). Facts (use ONLY these; do not add facts, numbers or dates that are not here):\n- ${r.facts.join('\n- ')}`,
-    'Style (client rule): an engaging travel-magazine STORY, like National Geographic or Atlas Obscura. Open with curiosity or a striking image, give one or two surprising facts, a sensory detail (light, sound, colour), and close with a line that stays in the mind.',
-    'It is information and storytelling, NOT advertising: no calls to book or travel, no "with us", no prices, no links, no clichés ("hidden gem", "paradise", "unforgettable", "breathtaking", "Entdecke", "اكتشف"), no exclamation marks.',
-    'Native, natural phrasing in each language (not a translation of the German). At most one emoji per text.',
-    `For each language (${LANGS.map((l) => `${l} = ${LANG_NAME[l]}`).join('; ')}): hook = headline that makes people stop scrolling (max 60 characters); body = 3 to 5 sentences (max 650 characters); hashtags = 4 to 6 about the place and topic (letters only, no brand tags).`,
-    'Return ONLY JSON: {"de":{"hook":"","body":"","hashtags":["#…"]},"ar":{…},"ckb":{…}}',
+    'You are the editor of the social media pages of MEDIA Travel & Tourism, a travel agency in Germany (readers: Germans, Kurds and Arabs living in Germany).',
+    `Wikivoyage article "${a.title}":\n"""\n${a.text}\n"""`,
+    `Write ${what}`,
+    'Use ONLY facts from this article. Copy into "evidence" the exact sentence (or part of a sentence, at least 40 characters, word for word) of the article your post rests on.',
+    'Style: short, precise and vivid, like a sharp travel-magazine note. The headline IS the angle. Narrate; do not address the reader (no "Sie", "du", "you"). No opening with "Imagine", "Stellen Sie sich vor", "تخيل", "Did you know". No sales talk, no calls to book, no prices, no links, no clichés (paradise, hidden gem, breathtaking, unforgettable), no exclamation marks. Nothing about food, restaurants or drinks; nothing about mosques or minarets; nothing sad.',
+    'Native, natural phrasing in each language (not a word-for-word translation).',
+    `For each language (${LANGS.map((l) => `${l} = ${LANG_NAME[l]}`).join('; ')}): hook = the headline (max 60 characters); body = ${slot.kind === 'tip' ? '2-3 short points or sentences (max 420 characters)' : '2-3 sentences (max 360 characters)'}; hashtags = 3 to 5 about this place or topic only (letters only).`,
+    'If the article has nothing joyful or interesting enough, return {"skip":true}.',
+    'Return ONLY JSON: {"angle":"one line in English","evidence":"…","de":{"hook":"","body":"","hashtags":["#…"]},"ar":{…},"ckb":{…}}',
   ].join('\n');
 }
 
-const okText = (s, max) => typeof s === 'string' && s.trim().length > 0 && s.length <= max && !/[<>{}]/.test(s)
-  && !LINKS.test(s) && !SALES.test(s) && !EXCLUDE.test(s) && !SAD.test(s);
-const okTags = (t) => Array.isArray(t) && t.length >= 2 && t.length <= 8 && t.every((x) => typeof x === 'string' && /^#[\p{L}\p{N}_]{2,30}$/u.test(x));
+/** Why a text is rejected (null when fine). Ratgeber posts may mention delays or cancellations. */
+function textProblem(s, max, kind = 'place') {
+  if (typeof s !== 'string' || !s.trim()) return 'empty';
+  if (s.length > max) return `too long (${s.length})`;
+  for (const [name, re] of [['markup', /[<>{}]/], ['link/price', LINKS], ['sales', SALES], ['cliche', CLICHE], ['food/excluded', EXCLUDE], ...(kind === 'tip' ? [] : [['sad', SAD]])]) {
+    const m = re.exec(s);
+    if (m) return `${name}: "${m[0]}"`;
+  }
+  return null;
+}
+const okTags = (t) => Array.isArray(t) && t.length >= 2 && t.length <= 6 && t.every((x) => typeof x === 'string' && /^#[\p{L}\p{N}_]{2,30}$/u.test(x));
 
-/** Step 2: the story in de / ar / ckb from the researched facts. */
-async function writeStory(r, fetchImpl = fetch, log = () => {}) {
-  const json = await gemini({ contents: [{ parts: [{ text: storyPrompt(r) }] }],
-    generationConfig: { responseMimeType: 'application/json', temperature: 0.9, maxOutputTokens: 4096, thinkingConfig: { thinkingBudget: 0 } } }, fetchImpl);
-  const ai = jsonIn(json?.candidates?.[0]?.content?.parts?.[0]?.text);
-  if (!ai) { log('story: no usable JSON'); return null; }
+/** The post for one article, or null (reason logged). */
+async function writePost(a, slot, fetchImpl = fetch, log = () => {}) {
+  const ai = await gemini(storyPrompt(a, slot), fetchImpl);
+  if (!ai) { log(`${a.title}: no usable JSON`); return null; }
+  if (ai.skip) { log(`${a.title}: skipped by the editor (nothing strong enough)`); return null; }
+  const ev = squash(ai.evidence);
+  if (ev.length < 40 || !squash(a.text).includes(ev)) { log(`${a.title}: evidence not found in the article`); return null; }
+  const max = slot.kind === 'tip' ? 520 : 460;
   const texts = {};
   for (const l of LANGS) {
     const t = ai[l] || {};
-    if (!okText(t.hook, 90) || !okText(t.body, 900) || !okTags(t.hashtags)) { log(`story ${l} rejected: ${JSON.stringify(t).slice(0, 300)}`); return null; }
+    const why = textProblem(t.hook, 90, slot.kind) || textProblem(t.body, max, slot.kind) || (okTags(t.hashtags) ? null : 'hashtags');
+    if (why) { log(`${a.title} ${l}: ${why}`); return null; }
     texts[l] = { hook: t.hook.trim(), body: t.body.trim(), hashtags: [...new Set(t.hashtags)] };
   }
-  return texts;
+  return { angle: String(ai.angle || '').slice(0, 160), evidence: String(ai.evidence).slice(0, 400), texts };
 }
 
 /**
- * n ideas (default 3). Each: { theme, region: 'core'|'world', topic, place, country, facts, sources, photoQuery, texts }.
- * Topics in `avoid` (recent ones) are not repeated. Failed slots are retried once with a new theme.
+ * n ideas for today. Each: { kind, type, place, topic, angle, evidence, sources, photoQuery, texts }.
+ * `avoid` holds places and tips used before (not repeated).
  */
 async function makeIdeas(n = 3, { avoid = [], fetchImpl = fetch, log = console.log, rnd = Math.random } = {}) {
   if (!config.GEMINI_API_KEY) return [];
   const out = [];
-  const slots = plan(n, rnd);
-  for (let i = 0; i < slots.length; i++) {
-    for (let attempt = 0; attempt < 3; attempt++) {
-      const slot = attempt ? { ...slots[i], theme: pick(Object.keys(THEMES), rnd) } : slots[i];
-      try {
-        const r = await research(slot, [...avoid, ...out.map((o) => o.topic)], fetchImpl, new Date(), log);
-        if (!r) continue;
-        const texts = await writeStory(r, fetchImpl, log);
-        if (!texts) continue;
-        out.push({ theme: slot.theme, region: slot.core ? 'core' : 'world', ...r, texts });
+  const used = new Set(avoid);
+  for (const slot of plan(n, rnd)) {
+    try {
+      if (slot.kind === 'tip') {
+        const titles = slot.tip[0] === 'before' ? [...slot.tip[2]].sort(() => rnd() - 0.5).filter((t) => !used.has(`tip:before:${t}`)) : slot.tip[2];
+        for (const title of titles.slice(0, 3)) {
+          const a = await article(title, fetchImpl, ['en']);
+          if (!a) continue;
+          const post = await writePost(a, slot, fetchImpl, log);
+          if (!post) continue;
+          const key = slot.tip[0] === 'before' ? `tip:before:${title}` : `tip:${slot.tip[0]}`;
+          used.add(key);
+          out.push({ kind: 'tip', type: slot.tip[0], place: slot.tip[0] === 'before' ? a.title : '', topic: key, ...post,
+            sources: [{ title: `Wikivoyage: ${a.title} (CC BY-SA 4.0)`, url: a.url }], photoQuery: slot.tip[0] === 'before' ? `${a.title} landscape` : '' });
+          break;
+        }
+        continue;
+      }
+      const names = (await candidates(slot, [...used], fetchImpl)).sort(() => rnd() - 0.5);
+      for (const name of names.slice(0, 4)) {
+        if (used.has(name)) continue;
+        const a = await article(name, fetchImpl);
+        if (!a) { log(`${name}: no Wikivoyage article`); continue; }
+        if (EXCLUDE.test(a.title)) continue;
+        const post = await writePost(a, slot, fetchImpl, log);
+        used.add(name);
+        if (!post) continue;
+        out.push({ kind: 'place', type: slot.type, place: a.title, topic: name, ...post,
+          sources: [{ title: `Wikivoyage: ${a.title} (CC BY-SA 4.0)`, url: a.url }], photoQuery: a.title });
         break;
-      } catch (err) { log(`editorial ${slot.theme}/${slot.area}: ${err.message}`); }
-    }
+      }
+    } catch (err) { log(`editorial ${slot.type || slot.tip[0]}: ${err.message}`); }
   }
   return out;
 }
 
-module.exports = { trustOf, trustedSources, THEMES, plan, research, writeStory, storyPrompt, makeIdeas, jsonIn, okText };
+module.exports = { PLACE_TYPES, TIPS, plan, article, candidates, storyPrompt, writePost, makeIdeas, textProblem };
