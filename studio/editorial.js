@@ -93,15 +93,26 @@ async function gemini(prompt, fetchImpl, temperature = 0.9) {
 }
 
 /** Wikivoyage article as plain text: { title, text, url } or null (English first, then German). */
-async function article(title, fetchImpl, langs = ['en', 'de']) {
+// Sections a traveller can act on (client rule: write what a traveller can see and do there, not trivia).
+const SEE_DO = /^(see|do|sehenswürdigkeiten|aktivitäten|unternehmungen)$/i;
+/** Only the "See" and "Do" sections of a Wikivoyage plain-text article (with their sub-sections). */
+function seeDo(text) {
+  const parts = String(text).split(/^==\s*([^=\n]+?)\s*==\s*$/m);
+  let out = '';
+  for (let i = 1; i < parts.length; i += 2) if (SEE_DO.test(parts[i].trim())) out += `== ${parts[i].trim()} ==\n${parts[i + 1]}\n`;
+  return out.trim();
+}
+
+async function article(title, fetchImpl, langs = ['en', 'de'], { onlySeeDo = false } = {}) {
   for (const lang of langs) {
     try {
       const url = `https://${lang}.wikivoyage.org/w/api.php?action=query&prop=extracts&explaintext=1&format=json&redirects=1&titles=${encodeURIComponent(title)}`;
       const res = await fetchImpl(url, { headers: { 'User-Agent': 'MEDIA Studio (media-travels.com)' }, signal: AbortSignal.timeout(20000) });
       if (!res.ok) continue;
       const page = Object.values((await res.json()).query?.pages || {})[0];
-      const text = String(page?.extract || '');
-      if (!page || page.missing !== undefined || text.length < 1500) continue;
+      const full = String(page?.extract || '');
+      const text = onlySeeDo ? seeDo(full) : full;
+      if (!page || page.missing !== undefined || text.length < (onlySeeDo ? 800 : 1500)) continue;
       return { title: page.title, lang, text: text.slice(0, MAX_ARTICLE), url: `https://${lang}.wikivoyage.org/wiki/${encodeURIComponent(page.title.replace(/ /g, '_'))}` };
     } catch { /* try the next language */ }
   }
@@ -137,7 +148,7 @@ const squash = (s) => String(s || '').toLowerCase().replace(/\s+/g, ' ').replace
 function storyPrompt(a, slot) {
   const what = slot.kind === 'tip'
     ? `a short, useful "travel advice" post about: ${slot.tip[1]}${slot.tip[0] === 'before' ? ` (country: ${a.title})` : ''}. Pick the 2 or 3 most useful, concrete pieces of advice from the article that many travellers do not know.`
-    : `a post about ${a.title}. Read the whole article and pick ONE single angle: a legend or story, something that exists only here, a strange or beautiful sight, or a striking local custom. The angle must make a reader stop and think "I did not know that". NOT statistics, NOT population, NOT lists of sights, NOT general descriptions.`;
+    : `a post about ${a.title}. Put yourself in the place of a traveller planning a trip. From the "See" and "Do" sections, pick ONE experience a visitor can have there themselves and that makes them want to go: what they see or do, where exactly, the best time or moment for it, and why it is worth the trip (e.g. a boat ride to an island and ringing a bell, bathing in hot springs while it snows, watching the northern lights, a famous viewpoint at sunset, a cable car, a festival, a walk through an old town). NOT trivia a traveller cannot experience: no plants or animals as such, no origin of names, no geology or growth rates, no history dates, no statistics, no lists.`;
   return [
     'You are the editor of the social media pages of MEDIA Travel & Tourism, a travel agency in Germany (readers: Germans, Kurds and Arabs living in Germany).',
     `Wikivoyage article "${a.title}":\n"""\n${a.text}\n"""`,
@@ -145,10 +156,10 @@ function storyPrompt(a, slot) {
     'Use ONLY facts from this article. Copy into "evidence" the exact sentence (or part of a sentence, at least 40 characters, word for word) of the article your post rests on.',
     'Style: short, precise and vivid, like a sharp travel-magazine note. The headline IS the angle. Narrate; do not address the reader (no "Sie", "du", "you"). No opening with "Imagine", "Stellen Sie sich vor", "تخيل", "Did you know". No sales talk, no calls to book, no prices, no links, no clichés (paradise, hidden gem, breathtaking, unforgettable), no exclamation marks. Nothing about food, restaurants or drinks; nothing about mosques or minarets; nothing sad.',
     'Native, natural phrasing in each language (not a word-for-word translation), grammatically correct (check articles and genders, e.g. "das Silberhorn").',
-    'Rate your angle honestly: "score" 1-10 = how strongly a reader would stop and think "I did not know that". A plain name, a view or a general description is at most 4.',
+    'Rate your choice honestly: "score" 1-10 = how much a traveller would want to go there and do exactly this after reading. Trivia, a plain name or a general description is at most 3.',
     `For each language (${LANGS.map((l) => `${l} = ${LANG_NAME[l]}`).join('; ')}): hook = the headline (max 60 characters); body = ${slot.kind === 'tip' ? '2-3 short points or sentences (max 420 characters)' : '2-3 sentences (max 360 characters)'}; hashtags = 3 to 5 about this place or topic only (letters only).`,
     'If the article has nothing joyful or interesting enough, return {"skip":true}.',
-    'Return ONLY JSON: {"angle":"one line in English","score":7,"evidence":"…","de":{"hook":"","body":"","hashtags":["#…"]},"ar":{…},"ckb":{…}}',
+    'Return ONLY JSON: {"angle":"the experience, one line in English","score":7,"evidence":"…","de":{"hook":"","body":"","hashtags":["#…"]},"ar":{…},"ckb":{…}}',
   ].join('\n');
 }
 
@@ -191,7 +202,9 @@ async function makeIdeas(n = 3, { avoid = [], fetchImpl = fetch, log = console.l
   if (!config.GEMINI_API_KEY) return [];
   const out = [];
   const used = new Set(avoid);
-  for (const slot of plan(n, rnd)) {
+  const slots = plan(n, rnd);
+  for (const p of PINNED) if (!used.has(p.key) && !slots.some((s) => s.type === p.type)) slots[0] = { kind: 'place', type: p.type, desc: PLACE_TYPES.find((t) => t[0] === p.type)[1] };
+  for (const slot of slots) {
     try {
       if (slot.kind === 'tip') {
         const titles = slot.tip[0] === 'before' ? [...slot.tip[2]].sort(() => rnd() - 0.5).filter((t) => !used.has(`tip:before:${t}`)) : slot.tip[2];
@@ -213,7 +226,7 @@ async function makeIdeas(n = 3, { avoid = [], fetchImpl = fetch, log = console.l
         used.add(pin.key); // once only, also when it fails
         let done = false;
         for (const t of pin.titles) {
-          const a = await article(t, fetchImpl);
+          const a = await article(t, fetchImpl, ['en', 'de'], { onlySeeDo: true });
           if (!a) continue;
           const post = await writePost(a, slot, fetchImpl, log);
           if (post) { out.push({ kind: 'place', type: slot.type, place: a.title, topic: pin.key, ...post, sources: [{ title: `Wikivoyage: ${a.title} (CC BY-SA 4.0)`, url: a.url }], photoQuery: a.title }); done = true; }
@@ -225,7 +238,7 @@ async function makeIdeas(n = 3, { avoid = [], fetchImpl = fetch, log = console.l
       const names = (await candidates(slot, [...used], fetchImpl)).sort(() => rnd() - 0.5);
       for (const name of names.slice(0, 4)) {
         if (used.has(name)) continue;
-        const a = await article(name, fetchImpl);
+        const a = await article(name, fetchImpl, ['en', 'de'], { onlySeeDo: true });
         if (!a) { log(`${name}: no Wikivoyage article`); continue; }
         if (EXCLUDE.test(a.title)) continue;
         const post = await writePost(a, slot, fetchImpl, log);
@@ -240,4 +253,4 @@ async function makeIdeas(n = 3, { avoid = [], fetchImpl = fetch, log = console.l
   return out;
 }
 
-module.exports = { evidenceFound, PLACE_TYPES, TIPS, plan, article, candidates, storyPrompt, writePost, makeIdeas, textProblem };
+module.exports = { seeDo, evidenceFound, PLACE_TYPES, TIPS, plan, article, candidates, storyPrompt, writePost, makeIdeas, textProblem };

@@ -83,6 +83,23 @@ test('textProblem names the reason; Ratgeber posts may mention delays', () => {
   assert.strictEqual(textProblem('Die Kirche wurde 1850 entdeckt und restauriert.', 400), null);
 });
 
+test('place posts read only what a traveller can see and do (See / Do sections)', () => {
+  const { seeDo } = require('./editorial');
+  const text = 'Intro text.\n\n== Understand ==\nThe name comes from a knight.\n\n== See ==\nRing the wishing bell on the island.\n\n=== Viewpoints ===\nOjstrica at sunrise.\n\n== Do ==\nTake a pletna boat.\n\n== Eat ==\nCream cake.';
+  const out = seeDo(text);
+  assert.match(out, /wishing bell/);
+  assert.match(out, /Ojstrica/);
+  assert.match(out, /pletna/);
+  assert.doesNotMatch(out, /knight|Cream cake/);
+});
+
+test('the prompt asks for a traveller experience, not trivia', () => {
+  const { storyPrompt } = require('./editorial');
+  const p = storyPrompt({ title: 'Bled', text: '…' }, { kind: 'place', type: 'lake' });
+  assert.match(p, /experience a visitor can have/);
+  assert.match(p, /NOT trivia/);
+});
+
 test('makeIdeas without an API key returns nothing', async () => {
   config.GEMINI_API_KEY = '';
   assert.deepStrictEqual(await makeIdeas(3, { fetchImpl: async () => { throw new Error('no network'); } }), []);
