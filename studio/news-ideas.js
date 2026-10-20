@@ -67,4 +67,15 @@ function setStatus(id, status) {
   return null;
 }
 
-module.exports = { today, setStatus, photoFor };
+/** Change one idea in place (fn gets the idea); returns the idea or null. */
+function updateIdea(id, fn) {
+  const data = load();
+  for (const d of Object.values(data.days)) {
+    const idea = d.ideas.find((i) => i.id === id);
+    if (idea) { fn(idea); save(data); return idea; }
+  }
+  return null;
+}
+const getIdea = (id) => updateIdea(id, () => {});
+
+module.exports = { today, setStatus, updateIdea, getIdea, photoFor };

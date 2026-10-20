@@ -33,6 +33,7 @@ const OFFER_TYPE = { flight: 'flights', package: 'holiday packages', cruise: 'ri
 const WINTER = new Set([10, 11, 0, 1, 2]); // Nov-Mar
 
 function criteria(city, kind, month = new Date().getMonth()) {
+  if (kind === 'story') return storyCriteria(city);
   if (!kind) return coverCriteria(city); // type covers (airplane / resort), no destination
   // Client's four rules (2026-10-18, kept short on purpose: longer rule lists made the model too strict).
   return [
@@ -47,6 +48,20 @@ function criteria(city, kind, month = new Date().getMonth()) {
     '"shot" (one of: aerial, panorama, bay, waterfront, landmark, sunset, resort, street, other), "sky" (clear, cloudy or overcast)',
     'and "why" (very short German reason, max 4 words, e.g. "Luftbild, Bucht, strahlend").',
     'Return ONLY JSON: {"scores":[{"i":0,"score":9,"x":50,"shot":"aerial","sky":"clear","why":"Luftbild, Bucht, strahlend"}, ...]} with one entry per photo.',
+  ].join('\n');
+}
+
+// "Ideen des Tages" posts: the photo must show exactly the place and the experience of the post.
+function storyCriteria(subject) {
+  return [
+    `You select the photo for a travel-magazine post about: ${subject}. A great photo has:`,
+    '1. High resolution: sharp and professional.',
+    '2. It clearly shows exactly this place and, if possible, this experience (not a similar place).',
+    '3. Clean, without clutter, no text or watermarks, no close-up faces.',
+    '4. Day or night, with high contrast.',
+    'Score 0-10 for how well a photo meets these four points. Score 0-2 if it shows a different place or any mosque or minaret.',
+    'Photos are numbered from 0 in the order given. Also give "x" (horizontal centre of the main subject in percent) and a very short German reason (max 4 words).',
+    'Return ONLY JSON: {"scores":[{"i":0,"score":8,"x":50,"why":"Wasserfall, Felsvorsprung"}, ...]} with one entry per photo.',
   ].join('\n');
 }
 

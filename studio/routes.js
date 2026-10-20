@@ -276,6 +276,36 @@ module.exports = function mountStudio(app) {
     const idea = news.setStatus(req.params.id, status);
     res.status(idea ? 200 : 404).json(idea || {});
   });
+  // Real photos for an idea: search + rank (about a minute), then the client picks one.
+  const newsPhotos = require('./news-photos');
+  router.post('/news/:id/photos', async (req, res) => {
+    if (!ID.test(req.params.id)) return res.status(400).json({ error: 'bad id' });
+    const idea = news.getIdea(req.params.id);
+    if (!idea) return res.status(404).json({ error: 'not found' });
+    if (newsBusy) return res.status(429).json({ error: 'Bitte warten …' });
+    newsBusy = true;
+    try {
+      const cands = await newsPhotos.search(idea);
+      news.updateIdea(idea.id, (i) => { i.photoCandidates = cands; });
+      res.json(cands);
+    } catch (err) { console.error('studio news photos:', err.message); res.status(500).json({ error: 'Fotosuche fehlgeschlagen' }); }
+    finally { newsBusy = false; }
+  });
+  router.post('/news/:id/photo', async (req, res) => {
+    const { cand } = req.body || {};
+    if (!ID.test(req.params.id) || typeof cand !== 'string' || cand.length > 80) return res.status(400).json({ error: 'bad request' });
+    const idea = news.getIdea(req.params.id);
+    const c = idea && (idea.photoCandidates || []).find((x) => x.id === cand); // only candidates found by the search
+    if (!c) return res.status(404).json({ error: 'not found' });
+    try {
+      const photo = await newsPhotos.choose(idea.id, c);
+      res.json(news.updateIdea(idea.id, (i) => { i.photo = photo; }));
+    } catch (err) { console.error('studio news photo:', err.message); res.status(500).json({ error: 'Download fehlgeschlagen' }); }
+  });
+  router.get('/news/:id/photo.jpg', (req, res) => {
+    if (!ID.test(req.params.id)) return res.status(400).end();
+    res.type('image/jpeg').sendFile(newsPhotos.fileOf(req.params.id), (err) => { if (err && !res.headersSent) res.status(404).end(); });
+  });
   // Bank photo of an idea (key and file name validated against the bank index).
   router.get('/news/photo/:key/:file', (req, res) => {
     const { key, file } = req.params;

@@ -759,7 +759,7 @@ const NEWS_THEME = { german_city: '🇩🇪 Stadt in Deutschland', lake: '🏞 S
   packing: '🧳 Ratgeber: Packen', insurance: '🛡 Ratgeber: Versicherung', passenger_rights: '⚖️ Ratgeber: Fluggastrechte', jet_lag: '🌙 Ratgeber: Jetlag', before: 'ℹ️ Ratgeber: Vor der Reise' };
 const newsText = (i, l) => {
   const t = i.texts[l];
-  const credit = i.photo && i.photo.credit && i.photo.credit.author && /Unsplash|Wikimedia/.test(i.photo.credit.source || '') ? `\n📷 ${i.photo.credit.author} / ${i.photo.credit.source}` : '';
+  const credit = i.photo && i.photo.credit && i.photo.credit.author && /Unsplash|Wikimedia/.test(i.photo.credit.source || '') ? `\n📷 ${i.photo.credit.author} / ${i.photo.credit.source}${/Wikimedia/.test(i.photo.credit.source) && i.photo.credit.license ? ` (${i.photo.credit.license})` : ''}` : '';
   const src = (i.sources || []).map((x) => x.title).filter(Boolean).slice(0, 2).join(', ');
   return `${t.hook}\n\n${t.body}${src ? `\n\n${({ de: 'Quellen', ar: 'المصادر', ckb: 'ژێدەر' })[l]}: ${src}` : ''}${credit}\n\n${t.hashtags.join(' ')}`;
 };
@@ -770,7 +770,10 @@ function renderNews(day) {
       <div class="meta"><span class="badge ${esc(i.status)}">${esc(i.status)}</span><span>${esc(NEWS_THEME[i.type] || i.type)}</span><span>${esc(i.place || '')}</span>
         ${(i.sources || []).map((x) => `<a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer" style="color:#e6c25a">${esc(x.title || 'Quelle')} ↗</a>`).join(' ')}</div>
       ${i.evidence ? `<p style="font-size:13px;color:#cfd6e6;margin:8px 0">📖 Beleg aus Wikivoyage: „${esc(i.evidence)}“</p>` : ''}
-      ${i.photo ? `<div class="imgs"><a href="/api/studio/news/photo/${esc(i.photo.key)}/${esc(i.photo.file)}" download><img src="/api/studio/news/photo/${esc(i.photo.key)}/${esc(i.photo.file)}" alt=""></a></div>` : '<p class="warn">Kein passendes Foto in der Fotobank – bitte eigenes Foto wählen.</p>'}
+      ${(() => { const src = i.photo ? (i.photo.own ? `/api/studio/news/${esc(i.id)}/photo.jpg?v=${Date.now()}` : `/api/studio/news/photo/${esc(i.photo.key)}/${esc(i.photo.file)}`) : '';
+        return src ? `<div class="imgs"><a href="${src}" download="${esc(i.place || 'foto')}.jpg"><img src="${src}" alt=""></a></div>` : '<p class="warn">Noch kein Foto – „🖼 Fotos suchen“.</p>'; })()}
+      <div class="row"><button class="ghost" data-nact="photos">🖼 Fotos suchen</button></div>
+      ${(i.photoCandidates || []).length ? `<div class="cands">${i.photoCandidates.map((c) => `<button class="cand" data-nact="pick" data-cand="${esc(c.id)}" title="${esc(c.credit && c.credit.author)} / ${esc(c.credit && c.credit.source)}"><img src="${esc(c.thumb)}" alt="" loading="lazy"><span>${esc(c.score)}</span><em>${esc(c.why)}</em></button>`).join('')}</div>` : ''}
       ${['de', 'ar', 'ckb'].map((l) => `<h3>${esc(LANG[l])}</h3><textarea dir="${l === 'de' ? 'ltr' : 'rtl'}" data-lang="${l}">${esc(newsText(i, l))}</textarea>
         <div class="row"><button class="ghost" data-nact="copy" data-lang="${l}">📋 Kopieren</button></div>`).join('')}
       <div class="row"><button class="ok" data-nact="approved">✓ Freigeben</button><button class="no" data-nact="rejected">✕ Verwerfen</button></div>
@@ -788,6 +791,15 @@ $('#newsList').onclick = async (e) => {
   const b = e.target.closest('button[data-nact]');
   if (!b) return;
   const card = b.closest('[data-news]');
+  if (b.dataset.nact === 'photos' || b.dataset.nact === 'pick') {
+    b.disabled = true; b.textContent = b.dataset.nact === 'photos' ? 'Suche und bewerte Fotos … (ca. 1 Minute)' : '…';
+    try {
+      if (b.dataset.nact === 'photos') await api(`/api/studio/news/${card.dataset.news}/photos`, { method: 'POST' });
+      else await api(`/api/studio/news/${card.dataset.news}/photo`, { method: 'POST', body: JSON.stringify({ cand: b.dataset.cand }) });
+      renderNews(await api('/api/studio/news'));
+    } catch (err) { $('#msg').textContent = 'Fehler: ' + err.message; b.disabled = false; }
+    return;
+  }
   if (b.dataset.nact === 'copy') {
     try { await navigator.clipboard.writeText(card.querySelector(`textarea[data-lang="${b.dataset.lang}"]`).value); b.textContent = '✓ Kopiert'; } catch { /* text stays in the box */ }
     return;
