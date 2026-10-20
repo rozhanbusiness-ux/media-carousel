@@ -19,6 +19,11 @@ const FILE = path.join(__dirname, '..', 'cache', 'studio-news.txt');
 const LANGS = ['de', 'ar', 'ckb'];
 const LANG_NAME = { de: 'German', ar: 'Arabic (Modern Standard, warm tone)', ckb: 'Kurdish Badini (Behdînî, Northern Kurdish of Duhok, written in Arabic script)' };
 const TEXT_MODEL = 'gemini-2.5-flash';
+// Client mix: about 60 % Europe, Kurdistan/Iraq and the UAE; about 40 % the rest of the world.
+const CORE = ['europe', 'kurdistan', 'uae'];
+const REGIONS = [...CORE, 'world', 'general'];
+// Advertising words the client rejected; ideas must read like information, not marketing.
+const HYPE = /!|entdeck|unvergess|traum|verzauber|atemberaub|mit uns|jetzt buchen|discover|unforgettable|dream|book now|اكتشف|لا تُنسى|لا تنسى|أحلام|احجز|معنا|بیرنەکرن|خەون/i;
 const INSPIRATION = ['inspiration', 'place', 'cruise'];
 
 function load() { try { return JSON.parse(fs.readFileSync(FILE, 'utf8')); } catch { return { days: {}, seen: [] }; } }
@@ -35,7 +40,7 @@ function save(data) {
  * Three ideas: two inspiration ideas of different kinds (e.g. a place and a cruise), then one
  * season idea (about 2 of 3 days) or a practical note; unseen facts only, newest first.
  */
-function pickIdeas(facts, seen = new Set(), rnd = Math.random) {
+function pickIdeas(facts, seen = new Set(), rnd = Math.random, n = 3) {
   const pool = facts.filter((f) => !seen.has(f.id)).sort((a, b) => (b.date || '').localeCompare(a.date || '') || rnd() - 0.5);
   const byCat = (cats) => pool.filter((f) => cats.includes(f.cat));
   const picks = [];
@@ -49,8 +54,8 @@ function pickIdeas(facts, seen = new Set(), rnd = Math.random) {
   const third = rnd() < 0.62 ? [byCat(['season']), byCat(['practical'])] : [byCat(['practical']), byCat(['season'])];
   const extra = [...third[0], ...third[1], ...byCat(INSPIRATION)].find((f) => !picks.includes(f));
   if (extra) picks.push(extra);
-  for (const f of pool) if (picks.length < 3 && !picks.includes(f)) picks.push(f); // quiet days: any kind
-  return picks.slice(0, 3);
+  for (const f of [...byCat(INSPIRATION), ...pool]) if (picks.length < n && !picks.includes(f)) picks.push(f); // reserves / quiet days
+  return picks.slice(0, n);
 }
 
 // Model text: no links, prices, contact data or promises; numbers are allowed (temperatures, dates).
@@ -63,11 +68,14 @@ function buildPrompt(f) {
     'You write a short social media post (Instagram/Facebook) for a travel agency in Germany (MEDIA Travel & Tourism). Customers: Germans, Kurds and Arabs living in Germany.',
     `Kind of post: ${f.cat}. Source: ${f.source}.`,
     `Fact (use ONLY these facts, do not invent anything): Title: ${f.title}. Text: ${f.summary}`,
-    'Write in your OWN words (never copy sentences from the text). Brand voice: luxurious, warm, elegant, positive; like a high-end travel magazine; never pushy.',
+    'First decide the region the fact is about: "europe" (incl. Cyprus), "kurdistan" (Kurdistan Region and the rest of Iraq), "uae", "world" (every other place: Asia, America, Africa, Australia …) or "general" (travel in general, no specific place).',
+    'Tone (client rule): a plain, neutral INFORMATION note, like a short news item or a travel guide entry. Facts only: what, where, when, why it is special or unusual. NOT advertising: no superlatives or hype, no "discover", "unforgettable", "dream", "let yourself be enchanted", no calls to book or travel, no "with us", no exclamation marks.',
+    'Write in your OWN words (never copy sentences from the text).',
     'Topics: destinations, the most beautiful or most unusual places, unusual activities, events and festivals. Never write about food, restaurants, dishes or drinks.',
     'Rules: no prices, no links, no discounts or "free", no promises; no religious buildings; no politics; at most one emoji per text.',
-    `For each language (${LANGS.map((l) => `${l} = ${LANG_NAME[l]}`).join('; ')}) write: hook (max 60 characters), body (max 320 characters, 2-3 sentences, end with a gentle invitation to travel), hashtags (5 to 8, each starting with #, letters only).`,
-    'Return ONLY JSON: {"de":{"hook":"","body":"","hashtags":["#..."]},"ar":{...},"ckb":{...}}',
+    `For each language (${LANGS.map((l) => `${l} = ${LANG_NAME[l]}`).join('; ')}) write: hook (max 60 characters), body (max 320 characters, 2-3 factual sentences), hashtags (4 to 6 about the place or topic, each starting with #, letters only, no brand hashtags).`,
+    'Hook: a short factual headline (no exclamation mark).',
+    'Return ONLY JSON: {"region":"…","de":{"hook":"","body":"","hashtags":["#..."]},"ar":{...},"ckb":{...}}',
   ].join('\n');
 }
 
@@ -83,13 +91,14 @@ async function writeIdea(f, fetchImpl = fetch) {
   if (!res.ok) throw new Error(`Gemini ${res.status}`);
   const json = await res.json();
   const ai = JSON.parse(json?.candidates?.[0]?.content?.parts?.[0]?.text || '{}');
+  if (!REGIONS.includes(ai.region)) return null;
   const texts = {};
   for (const l of LANGS) {
     const t = ai[l] || {};
-    if (!safe(t.hook, 70) || !safe(t.body, 400) || !safeTags(t.hashtags)) return null;
+    if (!safe(t.hook, 70) || !safe(t.body, 400) || !safeTags(t.hashtags) || HYPE.test(t.hook + ' ' + t.body)) return null;
     texts[l] = { hook: t.hook.trim(), body: t.body.trim(), hashtags: [...new Set(t.hashtags)] };
   }
-  return texts;
+  return { region: ai.region, texts };
 }
 
 /** Bank photo for the idea when it names one of our destinations: { key, file, credit }. */
@@ -117,14 +126,21 @@ async function today({ force = false, fetchImpl = fetch, log = console.log } = {
   if (force && data.days[day]) for (const i of data.days[day].ideas) seen.add(i.factId);
   const facts = await collectFacts(fetchImpl, log);
   const ideas = [];
-  for (const f of pickIdeas(facts, seen)) {
-    let texts = null;
-    try { texts = await writeIdea(f, fetchImpl); } catch (err) { log(`news idea ${f.id}: ${err.message}`); }
-    seen.add(f.id);
-    if (!texts) continue;
-    ideas.push({ id: require('crypto').randomBytes(6).toString('hex'), factId: f.id, cat: f.cat, source: f.source, sourceId: f.sourceId,
-      title: f.title, link: f.link, texts, photo: photoFor(f), status: 'pending', createdAt: new Date().toISOString() });
+  const reserve = [];
+  const coreTarget = Math.random() < 0.8 ? 2 : 1; // 2 or 1 of 3 per day: about 60 % over time
+  const fits = (region) => region === 'general'
+    || (CORE.includes(region) ? ideas.filter((i) => CORE.includes(i.region)).length < coreTarget
+      : ideas.filter((i) => i.region === 'world').length < 3 - coreTarget);
+  const make = (f, w) => ({ id: require('crypto').randomBytes(6).toString('hex'), factId: f.id, cat: f.cat, region: w.region, source: f.source, sourceId: f.sourceId,
+    title: f.title, link: f.link, texts: w.texts, photo: photoFor(f), status: 'pending', createdAt: new Date().toISOString() });
+  for (const f of pickIdeas(facts, seen, Math.random, 8)) { // reserves keep the regional mix
+    if (ideas.length >= 3) break;
+    let w = null;
+    try { w = await writeIdea(f, fetchImpl); } catch (err) { log(`news idea ${f.id}: ${err.message}`); }
+    if (!w) { seen.add(f.id); continue; }
+    if (fits(w.region)) { ideas.push(make(f, w)); seen.add(f.id); } else reserve.push([f, w]);
   }
+  for (const [f, w] of reserve) if (ideas.length < 3) { ideas.push(make(f, w)); seen.add(f.id); } // quiet days
   data.days[day] = { day, facts: facts.length, ideas };
   data.seen = [...seen];
   save(data);
@@ -140,4 +156,4 @@ function setStatus(id, status) {
   return null;
 }
 
-module.exports = { today, setStatus, pickIdeas, writeIdea, photoFor, buildPrompt, LANGS };
+module.exports = { CORE, today, setStatus, pickIdeas, writeIdea, photoFor, buildPrompt, LANGS };

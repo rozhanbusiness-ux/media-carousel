@@ -755,6 +755,7 @@ $('#manualGo').onclick = async () => {
 
 // ---- Ideen des Tages (news-ideas.js) -------------------------------------------------------
 const NEWS_CAT = { inspiration: '🌍 Inspiration', place: '🏞 Ort', cruise: '🚢 Kreuzfahrt', season: '📅 Saison', practical: 'ℹ️ Praktisch' };
+const NEWS_REGION = { europe: '🇪🇺 Europa', kurdistan: '☀️ Kurdistan/Irak', uae: '🇦🇪 VAE', world: '🌏 Welt', general: '🧳 Allgemein' };
 const newsText = (i, l) => {
   const t = i.texts[l];
   const credit = i.photo && i.photo.credit && i.photo.credit.author && /Unsplash|Wikimedia/.test(i.photo.credit.source || '') ? `\n📷 ${i.photo.credit.author} / ${i.photo.credit.source}` : '';
@@ -764,7 +765,7 @@ function renderNews(day) {
   const ideas = day.ideas || [];
   $('#newsList').innerHTML = ideas.length ? ideas.map((i) => `
     <div class="draft" data-news="${esc(i.id)}">
-      <div class="meta"><span class="badge ${esc(i.status)}">${esc(i.status)}</span><span>${esc(NEWS_CAT[i.cat] || i.cat)}</span>
+      <div class="meta"><span class="badge ${esc(i.status)}">${esc(i.status)}</span><span>${esc(NEWS_CAT[i.cat] || i.cat)}</span>${i.region ? `<span>${esc(NEWS_REGION[i.region] || i.region)}</span>` : ''}
         <span>${esc(i.title)}</span><a href="${esc(i.link)}" target="_blank" rel="noopener noreferrer" style="color:#e6c25a">Quelle: ${esc(i.source)} ↗</a></div>
       ${i.photo ? `<div class="imgs"><a href="/api/studio/news/photo/${esc(i.photo.key)}/${esc(i.photo.file)}" download><img src="/api/studio/news/photo/${esc(i.photo.key)}/${esc(i.photo.file)}" alt=""></a></div>` : '<p class="warn">Kein passendes Foto in der Fotobank – bitte eigenes Foto wählen.</p>'}
       ${['de', 'ar', 'ckb'].map((l) => `<h3>${esc(LANG[l])}</h3><textarea dir="${l === 'de' ? 'ltr' : 'rtl'}" data-lang="${l}">${esc(newsText(i, l))}</textarea>
