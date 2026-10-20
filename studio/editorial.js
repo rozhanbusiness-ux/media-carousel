@@ -18,8 +18,9 @@ const config = require('../config');
 const { EXCLUDE, SAD } = require('./news-sources');
 
 const MODEL = 'gemini-2.5-flash';
-const LANGS = ['de', 'ar', 'ckb'];
-const LANG_NAME = { de: 'German', ar: 'Arabic (Modern Standard)', ckb: 'Kurdish Badini (Behdînî, the Kurmanji of Duhok, in Arabic script) — NOT Sorani: verbs with "د-" not "دە-" (دبیت، دکەت، دچیت), prepositions "ل" / "ژ" with "دا" / "ڤە" (ل سەر، ل ناڤ ... دا), no Sorani definite ending "-ەکە", "ئەڤ" not "ئەم"' };
+// Kurdish in Kurmanji with Latin letters (client decision: written better and readable without Arabic script).
+const LANGS = ['de', 'ar', 'kmr'];
+const LANG_NAME = { de: 'German', ar: 'Arabic (Modern Standard)', kmr: 'Kurdish Kurmanji in Latin script (Hawar alphabet with ç, ê, î, ş, û), natural everyday Kurmanji as spoken by Kurds in Germany; no Turkish words, no Arabic script' };
 const MAX_ARTICLE = 16000; // characters of the article given to the model
 
 // Place types with weights (client: mostly Europe; Europe has thousands of lakes, mountains, coasts and villages).
@@ -198,7 +199,7 @@ function storyPrompt(a, slot, today = new Date()) {
     'Rate your choice honestly: "score" 1-10 = how much a traveller would want to go there and do exactly this after reading. Trivia, a plain name or a general description is at most 3.',
     `For each language (${LANGS.map((l) => `${l} = ${LANG_NAME[l]}`).join('; ')}): hook = the headline (max 65 characters); body = ${slot.kind === 'tip' ? '3-4 short lines (max 450 characters)' : '3-4 short sentences like the examples (max 420 characters)'}; hashtags = 3 to 5 about this place or topic only (letters only).`,
     'If the article has nothing joyful or interesting enough, return {"skip":true}.',
-    'Return ONLY JSON: {"angle":"the experience, one line in English","score":7,"event_start":"","evidence":"…","de":{"hook":"","body":"","hashtags":["#…"]},"ar":{…},"ckb":{…}}',
+    'Return ONLY JSON: {"angle":"the experience, one line in English","score":7,"event_start":"","evidence":"…","de":{"hook":"","body":"","hashtags":["#…"]},"ar":{…},"kmr":{…}}',
   ].join('\n');
 }
 

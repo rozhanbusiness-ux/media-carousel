@@ -761,7 +761,7 @@ const newsText = (i, l) => {
   const t = i.texts[l];
   const credit = i.photo && i.photo.credit && i.photo.credit.author && /Unsplash|Wikimedia/.test(i.photo.credit.source || '') ? `\n📷 ${i.photo.credit.author} / ${i.photo.credit.source}${/Wikimedia/.test(i.photo.credit.source) && i.photo.credit.license ? ` (${i.photo.credit.license})` : ''}` : '';
   const src = (i.sources || []).map((x) => x.title).filter(Boolean).slice(0, 2).join(', ');
-  return `${t.hook}\n\n${t.body}${src ? `\n\n${({ de: 'Quellen', ar: 'المصادر', ckb: 'ژێدەر' })[l]}: ${src}` : ''}${credit}\n\n${t.hashtags.join(' ')}`;
+  return `${t.hook}\n\n${t.body}${src ? `\n\n${({ de: 'Quellen', ar: 'المصادر', ckb: 'ژێدەر', kmr: 'Çavkanî' })[l]}: ${src}` : ''}${credit}\n\n${t.hashtags.join(' ')}`;
 };
 function renderNews(day) {
   const ideas = day.ideas || [];
@@ -774,7 +774,7 @@ function renderNews(day) {
         return src ? `<div class="imgs"><a href="${src}" download="${esc(i.place || 'foto')}.jpg"><img src="${src}" alt=""></a></div>` : '<p class="warn">Noch kein Foto – „🖼 Fotos suchen“.</p>'; })()}
       <div class="row"><button class="ghost" data-nact="photos">🖼 Fotos suchen</button></div>
       ${(i.photoCandidates || []).length ? `<div class="cands">${i.photoCandidates.map((c) => `<button class="cand" data-nact="pick" data-cand="${esc(c.id)}" title="${esc(c.credit && c.credit.author)} / ${esc(c.credit && c.credit.source)}"><img src="${esc(c.thumb)}" alt="" loading="lazy"><span>${esc(c.score)}</span><em>${esc(c.why)}</em></button>`).join('')}</div>` : ''}
-      ${['de', 'ar', 'ckb'].map((l) => `<h3>${esc(LANG[l])}</h3><textarea dir="${l === 'de' ? 'ltr' : 'rtl'}" data-lang="${l}">${esc(newsText(i, l))}</textarea>
+      ${Object.keys(i.texts).map((l) => `<h3>${esc(LANG[l] || ({ kmr: 'Kurdî (Kurmancî)' })[l] || l)}</h3><textarea dir="${l === 'ar' || l === 'ckb' ? 'rtl' : 'ltr'}" data-lang="${l}">${esc(newsText(i, l))}</textarea>
         <div class="row"><button class="ghost" data-nact="copy" data-lang="${l}">📋 Kopieren</button></div>`).join('')}
       <div class="row"><button class="ok" data-nact="approved">✓ Freigeben</button><button class="no" data-nact="rejected">✕ Verwerfen</button></div>
     </div>`).join('') : '<p class="warn">Heute keine Ideen gefunden – später „Neue Ideen“ versuchen.</p>';

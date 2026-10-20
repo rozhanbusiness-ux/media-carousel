@@ -12,7 +12,7 @@ const { makeIdeas } = require('./editorial');
   const ideas = await makeIdeas(n, { log: (m) => console.error(m) });
   for (const [i, idea] of ideas.entries()) {
     console.log(`\n==================== ${i + 1}. ${idea.kind} · ${idea.type} · ${idea.place}\nAngle: ${idea.angle}\nEvidence: ${idea.evidence}`);
-    for (const l of ['de', 'ar', 'ckb']) {
+    for (const l of ['de', 'ar', 'kmr']) {
       const t = idea.texts[l];
       console.log(`\n--- ${l}\n${t.hook}\n\n${t.body}\n${t.hashtags.join(' ')}`);
     }

@@ -25,7 +25,7 @@ const reply = (obj) => async () => ({ ok: true, json: async () => ({ candidates:
 const texts = (deBody) => ({
   de: { hook: 'Ein Rathaus mitten im Fluss', body: deBody, hashtags: ['#Bamberg', '#Franken'] },
   ar: { hook: 'دار بلدية وسط النهر', body: 'بُنيت دار البلدية على جزيرة صنعها الأهالي في النهر.', hashtags: ['#بامبرغ', '#ألمانيا'] },
-  ckb: { hook: 'شارەوانیەک د ناڤ رووباری دا', body: 'شارەوانی ل سەر گزیرتەکێ هاتە ئاڤاکرن.', hashtags: ['#بامبێرگ', '#ئەلمانیا'] },
+  kmr: { hook: 'Şaredariyek di nav çem de', body: 'Şaredarî li ser giravekê hatiye avakirin.', hashtags: ['#Bamberg', '#Almanya'] },
 });
 const a = { title: 'Bamberg', text: ARTICLE, url: 'https://en.wikivoyage.org/wiki/Bamberg' };
 const slot = { kind: 'place', type: 'german_city' };
@@ -34,7 +34,7 @@ test('writePost: accepts a post whose evidence is a real sentence of the article
   config.GEMINI_API_KEY = 'test';
   const p = await writePost(a, slot, reply({ angle: 'town hall on an island', score: 9, evidence: 'built on an artificial island in the river Regnitz because the bishop refused',
     ...texts('Der Bischof gab kein Land, also bauten die Bürger ihr Rathaus auf eine künstliche Insel in der Regnitz.') }));
-  assert.deepStrictEqual(Object.keys(p.texts), ['de', 'ar', 'ckb']);
+  assert.deepStrictEqual(Object.keys(p.texts), ['de', 'ar', 'kmr']);
 });
 
 test('writePost: rejects invented evidence (nothing that is not in the article)', async () => {
@@ -117,10 +117,10 @@ test('food and drink words in every language are excluded', () => {
   for (const s of ['ein Fest mit Speisen und Getränken', 'beer tents', 'مهرجان يقدم البيرة والطعام', 'خوارن و ڤەخوارن']) assert.ok(EXCLUDE.test(s), s);
 });
 
-test('Kurdish and Arabic hashtags with ZWNJ, tatweel or marks are accepted', async () => {
+test('Kurmanji (ê, î, ş) and Arabic hashtags with tatweel or marks are accepted', async () => {
   config.GEMINI_API_KEY = 'test';
   const t = texts('Ein Rathaus auf einer Insel.');
-  t.ckb.hashtags = ['#گەشت\u200cو\u200cگوزار', '#کوردستان'];
+  t.kmr.hashtags = ['#Kurdistan', '#Gerîyan'];
   t.ar.hashtags = ['#سفـر', '#رحلاتٌ'];
   assert.ok(await writePost(a, slot, reply({ score: 9, evidence: 'built on an artificial island in the river Regnitz because the bishop refused', ...t })));
 });
