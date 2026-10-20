@@ -19,7 +19,7 @@ const { EXCLUDE, SAD } = require('./news-sources');
 
 const MODEL = 'gemini-2.5-flash';
 const LANGS = ['de', 'ar', 'ckb'];
-const LANG_NAME = { de: 'German', ar: 'Arabic (Modern Standard)', ckb: 'Kurdish Badini (Behdînî, Northern Kurdish of Duhok, written in Arabic script)' };
+const LANG_NAME = { de: 'German', ar: 'Arabic (Modern Standard)', ckb: 'Kurdish Badini (Behdînî, the Kurmanji of Duhok, in Arabic script) — NOT Sorani: verbs with "د-" not "دە-" (دبیت، دکەت، دچیت), prepositions "ل" / "ژ" with "دا" / "ڤە" (ل سەر، ل ناڤ ... دا), no Sorani definite ending "-ەکە", "ئەڤ" not "ئەم"' };
 const MAX_ARTICLE = 16000; // characters of the article given to the model
 
 // Place types with weights (client: mostly Europe; Europe has thousands of lakes, mountains, coasts and villages).
@@ -50,8 +50,8 @@ const TIPS = [
 ];
 
 // One-time topics the client asked for (used once, then never again).
-// Lalish has no Wikivoyage article: the client allowed Wikipedia as the source for this one post.
-const PINNED = [{ key: 'pinned:lalish', type: 'kurdistan', titles: ['Lalish'], site: 'wikipedia' }];
+// One-time topics the client asks for (used once, then never again). Lalish was removed by the client.
+const PINNED = [];
 
 const SALES = /jetzt buchen|buchen sie|mit uns|bei uns|unser angebot|book now|with us|احجز|معنا|لدينا عروض|دگەل مە|ئۆفەر/i;
 const LINKS = /https?:|www\.|\.com\b|\.de\b|@|€|\$|kostenlos|gratis|rabatt|مجان|خصم/i;
@@ -104,11 +104,22 @@ function seeDo(text) {
   return out.trim();
 }
 
-const UA = { 'User-Agent': 'MEDIA Studio (media-travels.com)' };
-async function getJson(url, fetchImpl) {
-  const res = await fetchImpl(url, { headers: UA, signal: AbortSignal.timeout(20000) });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
+// Wikimedia API etiquette: a descriptive User-Agent with contact, one request at a time with a pause,
+// and a polite retry when the API answers 429 (too many requests).
+const UA = { 'User-Agent': 'MEDIA-Studio/1.0 (https://media-travels.com; info@media-travels.com)' };
+const GAP_MS = 1100;
+let lastCall = 0;
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+async function getJson(url, fetchImpl, retries = [3000, 8000]) {
+  for (let attempt = 0; ; attempt++) {
+    const pause = lastCall + GAP_MS - Date.now();
+    if (pause > 0 && fetchImpl === fetch) await wait(pause);
+    lastCall = Date.now();
+    const res = await fetchImpl(url, { headers: UA, signal: AbortSignal.timeout(20000) });
+    if (res.status === 429 && attempt < retries.length) { await wait(fetchImpl === fetch ? retries[attempt] : 0); continue; }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  }
 }
 
 /**
@@ -178,6 +189,7 @@ function storyPrompt(a, slot, today = new Date()) {
     '- Hook: creates curiosity or a twist that makes people stop scrolling (e.g. "Du stehst hinter einem Wasserfall. Wortwörtlich.", "99 Stufen für einen Wunsch").',
     '- Speak to the reader directly: German with "du" (never "Sie"), Arabic and Kurdish in the second person.',
     '- One sensory moment (sound, cold, light, spray), one practical detail (when or how), and a short closing line that stays in the mind (it may be a question to the reader). One fitting emoji at the end.',
+    '- Start directly inside the scene. NEVER begin with "Stell dir vor", "Imagine", "تخيل" or "خۆ بێخە" (those posts are rejected).',
     '- Short lines, natural rhythm. No calls to book, no prices, no links, no clichés (paradise, hidden gem, breathtaking, unforgettable, "Stell dir vor", "Imagine", "تخيل"), no exclamation marks. Nothing about food, restaurants or drinks; nothing about mosques or minarets; nothing sad.',
     `Example (German):\n"Du stehst hinter einem Wasserfall. Wortwörtlich."\n"Ein Tunnel im Fels, ein paar Schritte ins Halbdunkel – und plötzlich donnert der Staubbachfall direkt vor dir herab. Die Gischt kühlt dein Gesicht, das Tal leuchtet grün dahinter. Am stärksten rauscht er im Frühsommer, wenn der Schnee schmilzt. Manche Aussichten muss man sich erlaufen. 💧"`,
     `Example (Arabic):\n"99 درجة… مقابل أمنية"\n"قارب خشبي ينساب فوق البحيرة الزمردية نحو جزيرة صغيرة. في الأعلى، داخل الكنيسة، حبل يتدلى من جرس قديم. من يقرعه يتمنى أمنية، هكذا يقول أهل بليد منذ قرون. وأنت، ماذا ستتمنى؟ 🔔"`,
@@ -200,7 +212,8 @@ function textProblem(s, max, kind = 'place') {
   }
   return null;
 }
-const okTags = (t) => Array.isArray(t) && t.length >= 2 && t.length <= 6 && t.every((x) => typeof x === 'string' && /^#[\p{L}\p{N}_]{2,30}$/u.test(x));
+// Letters incl. Arabic/Kurdish marks, ZWNJ and tatweel (Kurdish and Arabic hashtags use them).
+const okTags = (t) => Array.isArray(t) && t.length >= 2 && t.length <= 6 && t.every((x) => typeof x === 'string' && /^#[\p{L}\p{M}\p{N}_\u200c\u0640]{2,30}$/u.test(x));
 
 /** The post for one article, or null (reason logged). */
 async function writePost(a, slot, fetchImpl = fetch, log = () => {}) {
@@ -208,6 +221,7 @@ async function writePost(a, slot, fetchImpl = fetch, log = () => {}) {
   if (!ai) { log(`${a.title}: no usable JSON`); return null; }
   if (ai.skip) { log(`${a.title}: skipped by the editor (nothing strong enough)`); return null; }
   if (!evidenceFound(ai.evidence, a.text)) { log(`${a.title}: evidence not found in the article`); return null; }
+  if (EXCLUDE.test(ai.evidence)) { log(`${a.title}: the experience is about food/drink or an excluded topic`); return null; }
   if (ai.event_start) {
     const days = (Date.parse(ai.event_start) - Date.now()) / 86400000;
     if (!(days >= 14 && days <= 70)) { log(`${a.title}: event on ${ai.event_start} is not in the next 2-10 weeks`); return null; }

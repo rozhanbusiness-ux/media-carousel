@@ -117,6 +117,22 @@ test('food and drink words in every language are excluded', () => {
   for (const s of ['ein Fest mit Speisen und Getränken', 'beer tents', 'مهرجان يقدم البيرة والطعام', 'خوارن و ڤەخوارن']) assert.ok(EXCLUDE.test(s), s);
 });
 
+test('Kurdish and Arabic hashtags with ZWNJ, tatweel or marks are accepted', async () => {
+  config.GEMINI_API_KEY = 'test';
+  const t = texts('Ein Rathaus auf einer Insel.');
+  t.ckb.hashtags = ['#گەشت\u200cو\u200cگوزار', '#کوردستان'];
+  t.ar.hashtags = ['#سفـر', '#رحلاتٌ'];
+  assert.ok(await writePost(a, slot, reply({ score: 9, evidence: 'built on an artificial island in the river Regnitz because the bishop refused', ...t })));
+});
+
+test('Wikivoyage 429: retried politely instead of failing', async () => {
+  let n = 0;
+  const fake = async () => (++n === 1 ? { ok: false, status: 429 } : { ok: true, status: 200, json: async () => ({ query: { pages: { 1: { title: 'Bamberg', extract: ARTICLE } } } }) });
+  const r = await article('Bamberg', fake, ['en']);
+  assert.strictEqual(r.title, 'Bamberg');
+  assert.strictEqual(n, 2);
+});
+
 test('"Dies" (German "this") is not a sad word', () => {
   const { SAD } = require('./news-sources');
   assert.ok(!SAD.test('Dies ist der schönste Blick auf den See.'));
