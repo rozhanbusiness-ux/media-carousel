@@ -56,7 +56,7 @@
     <span style="font-size:14px;color:#cfd6e6">Sprachen:</span>
     <label class="chk"><input type="checkbox" name="deflang" value="de"> Deutsch</label>
     <label class="chk"><input type="checkbox" name="deflang" value="ar"> العربية</label>
-    <label class="chk"><input type="checkbox" name="deflang" value="ckb"> کوردی</label>
+    <label class="chk"><input type="checkbox" name="deflang" value="kmr"> Kurdî</label>
     <span style="font-size:12px;color:#8e98b3">(leer = automatisch)</span>
   </div>
   <details class="manual">
@@ -177,7 +177,7 @@
 <script>
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const LANG = { de: 'Deutsch', ar: 'العربية', ckb: 'کوردی (بادینی)' };
+const LANG = { de: 'Deutsch', ar: 'العربية', kmr: 'Kurdî (Kurmancî)', ckb: 'کوردی (بادینی)' };
 const STYLE_NAMES = [['flight', '1 Glas'], ['flight-cover', '★ Magazin'], ['flight-ticket', '2 Bordkarte'], ['flight-split', '3 Geteilt'], ['flight-diagonal', '4 Diagonal'],
   ['flight-postcard', '5 Postkarte'], ['flight-ribbon', '6 Schleife'], ['flight-band', '7 Goldband']];
 const defLangs = () => [...document.querySelectorAll('input[name=deflang]:checked')].map((i) => i.value);
@@ -216,7 +216,7 @@ function render(drafts) {
         </div>` : (d.needsPhoto ? '<p class="warn">⚠ Kein passendes echtes Foto gefunden. Bitte eigenes Foto hochladen (⬆) oder im Notfall 🤖 KI-Foto.</p>' : '')}
       <div class="tools">
         ${d.bundle ? `<select data-act="style">${STYLE_NAMES.filter(([v]) => ['flight', 'flight-cover'].includes(v)).map(([v, n]) => `<option value="${v}" ${v === d.style ? 'selected' : ''}>${n}</option>`).join('')}</select>` : `<select data-act="style">${STYLE_NAMES.map(([v, n]) => `<option value="${v}" ${v === d.style ? 'selected' : ''}>${n}</option>`).join('')}</select>`}
-        ${['de', 'ar', 'ckb'].map((l) => `<label class="chk"><input type="checkbox" data-lang-box value="${l}" ${(d.langs || []).includes(l) ? 'checked' : ''}> ${LANG[l]}</label>`).join('')}
+        ${['de', 'ar', 'kmr'].map((l) => `<label class="chk"><input type="checkbox" data-lang-box value="${l}" ${(d.langs || []).includes(l) ? 'checked' : ''}> ${LANG[l]}</label>`).join('')}
         <button class="ghost" data-act="langs">Sprachen übernehmen</button>
       </div>
       ${d.bundle ? '<div class="row"><button class="ghost" data-act="all">↻ Neue Fotos</button></div>' : `<div class="row">
@@ -232,7 +232,7 @@ function render(drafts) {
       ${d.versions.map((v) => `
         <h3>${esc(LANG[v.lang] || v.lang)} ${v.aiWritten ? '' : '(Standardtext)'}</h3>
         <div class="imgs">${v.files.map((f) => `<a href="${esc(f.url)}" download><img src="${esc(f.url)}" alt="${esc(f.size)} ${f.slide}" loading="lazy"></a>`).join('')}</div>
-        <textarea dir="${v.lang === 'de' ? 'ltr' : 'rtl'}" data-lang="${esc(v.lang)}">${esc(v.caption)}</textarea>
+        <textarea dir="${v.lang === 'ar' || v.lang === 'ckb' ? 'rtl' : 'ltr'}" data-lang="${esc(v.lang)}">${esc(v.caption)}</textarea>
         <div class="row"><button class="ghost" data-act="save" data-lang="${esc(v.lang)}">Text speichern</button>
           <button class="ghost" data-act="copy" data-lang="${esc(v.lang)}">Text kopieren</button></div>
         <div class="row">

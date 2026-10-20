@@ -7,23 +7,23 @@
 
 // Arabic/Badini use plain wording (client decision): "stay + breakfast" instead of terms like "half board".
 const BOARDS = [
-  { re: /all[\s-]*inclusive|alles inklusive/i, de: 'All Inclusive', ar: 'إقامة شاملة', ckb: 'مانا گشتگیر' },
-  { re: /vollpension/i, de: 'Vollpension', ar: 'إقامة + ثلاث وجبات', ckb: 'مان + سێ ژەمێن خوارنێ' },
-  { re: /halbpension/i, de: 'Halbpension', ar: 'إقامة + وجبتان', ckb: 'مان + دوو ژەمێن خوارنێ' },
-  { re: /frühstück/i, de: 'Frühstück', ar: 'إقامة + فطور', ckb: 'مان + تێشت' },
-  { re: /nur übernachtung|ohne verpflegung/i, de: 'Nur Übernachtung', ar: 'إقامة فقط', ckb: 'تنێ مان' },
+  { re: /all[\s-]*inclusive|alles inklusive/i, de: 'All Inclusive', ar: 'إقامة شاملة', kmr: 'All Inclusive' },
+  { re: /vollpension/i, de: 'Vollpension', ar: 'إقامة + ثلاث وجبات', kmr: 'Xwarina tevahî' },
+  { re: /halbpension/i, de: 'Halbpension', ar: 'إقامة + وجبتان', kmr: 'Nîv xwarin' },
+  { re: /frühstück/i, de: 'Frühstück', ar: 'إقامة + فطور', kmr: 'Taştê' },
+  { re: /nur übernachtung|ohne verpflegung/i, de: 'Nur Übernachtung', ar: 'إقامة فقط', kmr: 'Bê xwarin' },
 ];
-const NIGHTS = { de: (n) => `${n} ${n === 1 ? 'Nacht' : 'Nächte'}`, ar: (n) => `${n} ليالٍ`, ckb: (n) => `${n} شەڤ` };
-const FLIGHT = { de: 'inkl. Flug', ar: 'شامل الطيران', ckb: 'دگەل فرۆکێ' };
+const NIGHTS = { de: (n) => `${n} ${n === 1 ? 'Nacht' : 'Nächte'}`, ar: (n) => `${n} ليالٍ`, kmr: (n) => `${n} şev` };
+const FLIGHT = { de: 'inkl. Flug', ar: 'شامل الطيران', kmr: 'bi firînê re' };
 
-// Countries as specials writes them (German) → Arabic / Badini. Unknown countries stay German.
+// Countries as specials writes them (German) → Arabic / Kurmanji. Unknown countries stay German.
 const COUNTRIES = {
-  'Türkei': ['تركيا', 'تورکیا'], 'Ägypten': ['مصر', 'میسر'], 'Spanien': ['إسبانيا', 'ئیسپانیا'], 'Griechenland': ['اليونان', 'یۆنان'],
-  'Malta': ['مالطا', 'ماڵتا'], 'Zypern': ['قبرص', 'قوبرس'], 'Italien': ['إيطاليا', 'ئیتالیا'], 'Portugal': ['البرتغال', 'پورتوگال'],
-  'Kroatien': ['كرواتيا', 'کرواتیا'], 'Tunesien': ['تونس', 'تونس'], 'Marokko': ['المغرب', 'مەغریب'], 'Bulgarien': ['بلغاريا', 'بولگاریا'],
-  'Vereinigte Arabische Emirate': ['الإمارات', 'ئیمارات'], 'Thailand': ['تايلاند', 'تایلەند'], 'Frankreich': ['فرنسا', 'فەرەنسا'],
-  'Montenegro': ['الجبل الأسود', 'مۆنتینیگرۆ'], 'Albanien': ['ألبانيا', 'ئەلبانیا'], 'Mexiko': ['المكسيك', 'مەکسیک'],
-  'Dominikanische Republik': ['جمهورية الدومينيكان', 'دۆمینیکان'], 'Malediven': ['جزر المالديف', 'مالدیڤ'], 'Kap Verde': ['الرأس الأخضر', 'کاپ ڤێردێ'],
+  'Türkei': ['تركيا', 'Tirkiye'], 'Ägypten': ['مصر', 'Misir'], 'Spanien': ['إسبانيا', 'Spanya'], 'Griechenland': ['اليونان', 'Yewnanistan'],
+  'Malta': ['مالطا', 'Malta'], 'Zypern': ['قبرص', 'Qibris'], 'Italien': ['إيطاليا', 'Îtalya'], 'Portugal': ['البرتغال', 'Portekîz'],
+  'Kroatien': ['كرواتيا', 'Xirwatistan'], 'Tunesien': ['تونس', 'Tûnis'], 'Marokko': ['المغرب', 'Fas'], 'Bulgarien': ['بلغاريا', 'Bulgaristan'],
+  'Vereinigte Arabische Emirate': ['الإمارات', 'Mîrnişînên Erebî'], 'Thailand': ['تايلاند', 'Tayland'], 'Frankreich': ['فرنسا', 'Fransa'],
+  'Montenegro': ['الجبل الأسود', 'Montenegro'], 'Albanien': ['ألبانيا', 'Albanya'], 'Mexiko': ['المكسيك', 'Meksîk'],
+  'Dominikanische Republik': ['جمهورية الدومينيكان', 'Komara Domînîkê'], 'Malediven': ['جزر المالديف', 'Maldîv'], 'Kap Verde': ['الرأس الأخضر', 'Kap Verde'],
 };
 function countryName(de, lang) {
   if (!de || lang === 'de') return de || '';
@@ -70,21 +70,21 @@ const offerKey = (o) => o.key || (o.kind === 'package' ? 'p-' + o.giataId : `${o
 
 // ---- Manual offers: river cruises and holiday homes (client enters them in the studio) ----
 const FEATURES = {
-  pool: { de: 'Pool', ar: 'مسبح', ckb: 'حەوز' },
-  sea: { de: 'Meerblick', ar: 'إطلالة على البحر', ckb: 'دیمەنێ دەریایێ' },
-  garden: { de: 'Garten', ar: 'حديقة', ckb: 'باخچە' },
-  wifi: { de: 'WLAN', ar: 'واي فاي', ckb: 'وای فای' },
-  parking: { de: 'Parkplatz', ar: 'موقف سيارات', ckb: 'جهێ ترومبێلێ' },
-  pets: { de: 'Haustiere erlaubt', ar: 'يسمح بالحيوانات', ckb: 'گیانەوەر دهێنە قەبوولکرن' },
+  pool: { de: 'Pool', ar: 'مسبح', kmr: 'Hewz' },
+  sea: { de: 'Meerblick', ar: 'إطلالة على البحر', kmr: 'Dîmena deryayê' },
+  garden: { de: 'Garten', ar: 'حديقة', kmr: 'Baxçe' },
+  wifi: { de: 'WLAN', ar: 'واي فاي', kmr: 'WLAN' },
+  parking: { de: 'Parkplatz', ar: 'موقف سيارات', kmr: 'Parkkirin' },
+  pets: { de: 'Haustiere erlaubt', ar: 'يسمح بالحيوانات', kmr: 'Heywan destûr in' },
 };
 const BOARD_KEYS = { none: 4, breakfast: 3, half: 2, full: 1, all: 0 };
 const KIND_LABELS = {
-  cruise: { de: ['Flusskreuzfahrt', 'Deine Reise'], ar: ['رحلة نهرية', 'رحلتك'], ckb: ['گەشتا ڕووباری', 'گەشتا تە'] },
-  home: { de: ['Ferienhaus', 'Dein Zuhause auf Zeit'], ar: ['بيت عطلات', 'بيتك في العطلة'], ckb: ['خانیێ بێهنڤەدانێ', 'خانیێ تە'] },
+  cruise: { de: ['Flusskreuzfahrt', 'Deine Reise'], ar: ['رحلة نهرية', 'رحلتك'], kmr: ['Gera li ser çem', 'Rêwîtiya te'] },
+  home: { de: ['Ferienhaus', 'Dein Zuhause auf Zeit'], ar: ['بيت عطلات', 'بيتك في العطلة'], kmr: ['Xaniyê betlaneyê', 'Mala te ya betlaneyê'] },
 };
 const PER = {
-  person: { de: 'pro Person', ar: 'للشخص', ckb: 'بۆ هەر کەسەکی' },
-  night: { de: 'pro Nacht', ar: 'لليلة', ckb: 'بۆ شەڤەکێ' },
+  person: { de: 'pro Person', ar: 'للشخص', kmr: 'bo her kesî' },
+  night: { de: 'pro Nacht', ar: 'لليلة', kmr: 'bo şevekê' },
 };
 
 /** Card content for non-flight posts: { kicker, detailsTitle, title, stars, place, line, priceValue, per }. */
@@ -100,10 +100,10 @@ function cardFor(o, lang, fmtPrice) {
     };
   }
   if (o.kind === 'home') {
-    const persons = { de: `bis ${o.persons} Personen`, ar: `حتى ${o.persons} أشخاص`, ckb: `هەتا ${o.persons} کەس` }[lang];
-    const rooms = { de: `${o.bedrooms} Schlafzimmer`, ar: `${o.bedrooms} غرف نوم`, ckb: `${o.bedrooms} ژوورێن نڤستنێ` }[lang];
+    const persons = { de: `bis ${o.persons} Personen`, ar: `حتى ${o.persons} أشخاص`, kmr: `heta ${o.persons} kes` }[lang];
+    const rooms = { de: `${o.bedrooms} Schlafzimmer`, ar: `${o.bedrooms} غرف نوم`, kmr: `${o.bedrooms} odeyên razanê` }[lang];
     const night = o.priceNight > 0;
-    const total = o.priceTotal > 0 && o.nights ? `${NIGHTS[lang](o.nights)} ${({ de: 'ab', ar: 'ابتداءً من', ckb: 'ژ' })[lang]} ${fmtPrice(o.priceTotal)}` : '';
+    const total = o.priceTotal > 0 && o.nights ? `${NIGHTS[lang](o.nights)} ${({ de: 'ab', ar: 'ابتداءً من', kmr: 'ji' })[lang]} ${fmtPrice(o.priceTotal)}` : '';
     return {
       kicker: KIND_LABELS.home[lang][0], detailsTitle: KIND_LABELS.home[lang][1],
       title: o.home, stars: '', place: [o.to.name, countryName(o.country, lang)].filter(Boolean).join(', '),

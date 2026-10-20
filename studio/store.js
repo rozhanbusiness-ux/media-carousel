@@ -22,7 +22,10 @@ function save(data) {
 
 function listDrafts() { return load().drafts.sort((a, b) => b.createdAt.localeCompare(a.createdAt)); }
 
-function getDraft(id) { return load().drafts.find((d) => d.id === id) || null; }
+// Drafts made before the switch to Kurmanji (2026-10-20) used 'ckb' (Badini): new renders use 'kmr'.
+const migrate = (d) => (d && Array.isArray(d.langs) ? { ...d, langs: [...new Set(d.langs.map((l) => (l === 'ckb' ? 'kmr' : l)))] } : d);
+
+function getDraft(id) { return migrate(load().drafts.find((d) => d.id === id) || null); }
 
 function upsertDraft(draft) {
   const data = load();

@@ -1,5 +1,5 @@
 // ============================================================
-//  studio/captions.js — social captions in de / ar / ckb
+//  studio/captions.js — social captions in de / ar / kmr (Kurmanji, Latin letters)
 //  Gemini writes ONLY the creative words (hook, short text,
 //  hashtags). Prices, dates, routes, the call to action and the
 //  legal notice are added by code, so the model can never invent
@@ -11,58 +11,58 @@ const config = require('../config');
 const { factLine, starText, countryName, cardFor } = require('./packages');
 
 const TEXT_MODEL = 'gemini-2.5-flash';
-const LANGS = ['de', 'ar', 'ckb'];
+const LANGS = ['de', 'ar', 'kmr'];
 
 // City names per airport code; unknown codes keep the provider's (German) name.
 const CITY = {
-  ATH: { de: 'Athen', ar: 'أثينا', ckb: 'ئەسینا' },
-  BEY: { de: 'Beirut', ar: 'بيروت', ckb: 'بەیروت' },
-  AMM: { de: 'Amman', ar: 'عمّان', ckb: 'عەممان' },
-  AGA: { de: 'Agadir', ar: 'أغادير', ckb: 'ئەگادیر' },
-  MAD: { de: 'Madrid', ar: 'مدريد', ckb: 'مادرید' },
-  STO: { de: 'Stockholm', ar: 'ستوكهولم', ckb: 'ستۆکهۆڵم' },
-  ARN: { de: 'Stockholm', ar: 'ستوكهولم', ckb: 'ستۆکهۆڵم' },
-  OSL: { de: 'Oslo', ar: 'أوسلو', ckb: 'ئۆسلۆ' },
-  WAW: { de: 'Warschau', ar: 'وارسو', ckb: 'وارشۆ' },
-  DUS: { de: 'Düsseldorf', ar: 'دوسلدورف', ckb: 'دۆسێڵدۆرف' },
-  FRA: { de: 'Frankfurt', ar: 'فرانكفورت', ckb: 'فرانکفۆرت' },
-  MUC: { de: 'München', ar: 'ميونخ', ckb: 'میونخ' },
-  HAJ: { de: 'Hannover', ar: 'هانوفر', ckb: 'هانۆڤەر' },
-  STR: { de: 'Stuttgart', ar: 'شتوتغارت', ckb: 'شتوتگارت' },
-  IST: { de: 'Istanbul', ar: 'إسطنبول', ckb: 'ئیستانبوڵ' },
-  AYT: { de: 'Antalya', ar: 'أنطاليا', ckb: 'ئەنتاڵیا' },
-  PMI: { de: 'Mallorca', ar: 'مايوركا', ckb: 'مایۆرکا' },
-  DXB: { de: 'Dubai', ar: 'دبي', ckb: 'دوبەی' },
-  LON: { de: 'London', ar: 'لندن', ckb: 'لەندەن' },
-  EBL: { de: 'Erbil', ar: 'أربيل', ckb: 'هەولێر' },
-  ISU: { de: 'Sulaimaniyya', ar: 'السليمانية', ckb: 'سلێمانی' },
-  BGW: { de: 'Bagdad', ar: 'بغداد', ckb: 'بەغدا' },
-  HAM: { de: 'Hamburg', ar: 'هامبورغ', ckb: 'هامبۆرگ' },
-  CGN: { de: 'Köln', ar: 'كولونيا', ckb: 'کۆڵن' },
-  BER: { de: 'Berlin', ar: 'برلين', ckb: 'بەرلین' },
-  BCN: { de: 'Barcelona', ar: 'برشلونة', ckb: 'بارسێلۆنا' },
-  ROM: { de: 'Rom', ar: 'روما', ckb: 'ڕۆما' },
-  FCO: { de: 'Rom', ar: 'روما', ckb: 'ڕۆما' },
-  HER: { de: 'Heraklion (Kreta)', ar: 'هيراكليون (كريت)', ckb: 'هێراکلیۆن (کریت)' },
-  PAR: { de: 'Paris', ar: 'باريس', ckb: 'پاریس' },
-  AMS: { de: 'Amsterdam', ar: 'أمستردام', ckb: 'ئەمستردام' },
-  TBS: { de: 'Tiflis', ar: 'تبليسي', ckb: 'تبلیسی' },
-  CAI: { de: 'Kairo', ar: 'القاهرة', ckb: 'قاهیرە' },
-  BKK: { de: 'Bangkok', ar: 'بانكوك', ckb: 'بانکۆک' },
-  VIE: { de: 'Wien', ar: 'فيينا', ckb: 'ڤیەننا' },
-  LCA: { de: 'Larnaka', ar: 'لارنكا', ckb: 'لارناکا' },
+  ATH: { de: 'Athen', ar: 'أثينا', kmr: 'Atîna' },
+  BEY: { de: 'Beirut', ar: 'بيروت', kmr: 'Beyrût' },
+  AMM: { de: 'Amman', ar: 'عمّان', kmr: 'Eman' },
+  AGA: { de: 'Agadir', ar: 'أغادير', kmr: 'Agadir' },
+  MAD: { de: 'Madrid', ar: 'مدريد', kmr: 'Madrîd' },
+  STO: { de: 'Stockholm', ar: 'ستوكهولم', kmr: 'Stockholm' },
+  ARN: { de: 'Stockholm', ar: 'ستوكهولم', kmr: 'Stockholm' },
+  OSL: { de: 'Oslo', ar: 'أوسلو', kmr: 'Oslo' },
+  WAW: { de: 'Warschau', ar: 'وارسو', kmr: 'Varşova' },
+  DUS: { de: 'Düsseldorf', ar: 'دوسلدورف', kmr: 'Düsseldorf' },
+  FRA: { de: 'Frankfurt', ar: 'فرانكفورت', kmr: 'Frankfurt' },
+  MUC: { de: 'München', ar: 'ميونخ', kmr: 'München' },
+  HAJ: { de: 'Hannover', ar: 'هانوفر', kmr: 'Hannover' },
+  STR: { de: 'Stuttgart', ar: 'شتوتغارت', kmr: 'Stuttgart' },
+  IST: { de: 'Istanbul', ar: 'إسطنبول', kmr: 'Stenbol' },
+  AYT: { de: 'Antalya', ar: 'أنطاليا', kmr: 'Antalya' },
+  PMI: { de: 'Mallorca', ar: 'مايوركا', kmr: 'Mallorca' },
+  DXB: { de: 'Dubai', ar: 'دبي', kmr: 'Dubai' },
+  LON: { de: 'London', ar: 'لندن', kmr: 'London' },
+  EBL: { de: 'Erbil', ar: 'أربيل', kmr: 'Hewlêr' },
+  ISU: { de: 'Sulaimaniyya', ar: 'السليمانية', kmr: 'Silêmanî' },
+  BGW: { de: 'Bagdad', ar: 'بغداد', kmr: 'Bexda' },
+  HAM: { de: 'Hamburg', ar: 'هامبورغ', kmr: 'Hamburg' },
+  CGN: { de: 'Köln', ar: 'كولونيا', kmr: 'Köln' },
+  BER: { de: 'Berlin', ar: 'برلين', kmr: 'Berlîn' },
+  BCN: { de: 'Barcelona', ar: 'برشلونة', kmr: 'Barcelona' },
+  ROM: { de: 'Rom', ar: 'روما', kmr: 'Roma' },
+  FCO: { de: 'Rom', ar: 'روما', kmr: 'Roma' },
+  HER: { de: 'Heraklion (Kreta)', ar: 'هيراكليون (كريت)', kmr: 'Heraklîon (Girîd)' },
+  PAR: { de: 'Paris', ar: 'باريس', kmr: 'Parîs' },
+  AMS: { de: 'Amsterdam', ar: 'أمستردام', kmr: 'Amsterdam' },
+  TBS: { de: 'Tiflis', ar: 'تبليسي', kmr: 'Tiflîs' },
+  CAI: { de: 'Kairo', ar: 'القاهرة', kmr: 'Qahîre' },
+  BKK: { de: 'Bangkok', ar: 'بانكوك', kmr: 'Bangkok' },
+  VIE: { de: 'Wien', ar: 'فيينا', kmr: 'Viyana' },
+  LCA: { de: 'Larnaka', ar: 'لارنكا', kmr: 'Larnaka' },
 };
 // Fixed hashtags per language (always added); the destination adds its own.
 const BASE_TAGS = {
   de: ['#Reisen', '#Urlaub', '#Flugangebot', '#Reiseangebote', '#Reisebüro', '#Fernweh', '#Reiselust', '#UrlaubBuchen', '#Herbsturlaub', '#Halle', '#Düsseldorf'],
   ar: ['#سفر', '#سياحة', '#عروض_سفر', '#طيران', '#حجز_طيران', '#عطلة', '#سفر_من_المانيا', '#المانيا', '#رحلات', '#عروض_طيران'],
-  ckb: ['#گەشت', '#گەشتیاری', '#فرۆکە', '#پێشنیار', '#کوردستان', '#ئەڵمانیا', '#بەهدینان', '#دهۆک', '#گەشتکرن', '#هەولێر'],
+  kmr: ['#Rêwîtî', '#Geşt', '#Firîn', '#Pêşniyar', '#Kurdistan', '#Almanya', '#Behdînan', '#Duhok', '#Hewlêr', '#Betlane'],
 };
 const tagWord = (s) => '#' + String(s).replace(/[^\p{L}]/gu, '');
 
 const cityName = (place, lang) => (place.code && CITY[place.code] && CITY[place.code][lang]) || place.name;
 
-const LANG_NAME = { de: 'German', ar: 'Arabic (Modern Standard, warm tone)', ckb: 'Kurdish Badini (Behdînî, Northern Kurdish of Duhok, written in Arabic script)' };
+const LANG_NAME = { de: 'German', ar: 'Arabic (Modern Standard, warm tone)', kmr: 'Kurdish Kurmanji in Latin script (Hawar alphabet with ç, ê, î, ş, û), natural everyday Kurmanji as spoken by Kurds in Germany; no Turkish words, no Arabic script' };
 
 // Random choice from a small pool, so default texts do not repeat every day.
 const pick = (list) => (o) => list[Math.floor(Math.random() * list.length)](o);
@@ -94,17 +94,17 @@ const FIXED = {
     ]),
     fallbackBody: 'المقاعد بهذا السعر محدودة، ومن يحجز أولاً يسافر أولاً.',
   },
-  ckb: {
-    from: 'ژ', perPerson: 'بۆ هەر کەسەکی', route: (o) => `ژ ${o.from} بۆ ${o.to}`,
-    dates: (o) => `ژ ${o.dateOut} بۆ ${o.dateBack}`,
-    cta: '👈 لینک د بایۆیێ دایە – نوکە بوک بکە.',
-    notice: 'نرخ بەردەوام دگوهۆڕن، ئەوێ زوی بوک بکەت ب نرخەکێ باشتر گەشتێ دکەت.',
+  kmr: {
+    from: 'ji', perPerson: 'bo her kesî', route: (o) => `Ji ${o.from} bo ${o.to}`,
+    dates: (o) => `${o.dateOut} – ${o.dateBack}`,
+    cta: '👉 Lînk di bio de ye – niha cihê xwe rezerv bike.',
+    notice: 'Biha her roj diguherin – yê zû rezerv bike, erzantir digere.',
     fallbackHook: pick([
-      (o) => `${o.toName}، نێزیکترە ژ ئەوا تو هزر دکەی.`,
-      (o) => `${o.toName} ل هیڤیا تە یە.`,
-      (o) => `دەمێ ${o.toName} هات.`,
+      (o) => `${o.toName} li benda te ye.`,
+      (o) => `Dema ${o.toName} hat.`,
+      (o) => `${o.toName} ji ya tu difikirî nêziktir e.`,
     ]),
-    fallbackBody: 'گەشتا تە یا بهێت ئێک کلیک دویرە.',
+    fallbackBody: 'Rêwîtiya te ya bê tenê klîkekê dûr e.',
   },
 };
 
@@ -114,7 +114,7 @@ function formatDate(iso) {
   return m ? `${m[3]}.${m[2]}.${m[1]}` : '';
 }
 
-/** 184.77 -> "184,77 €" (German format, also used in ar/ckb for clarity). */
+/** 184.77 -> "184,77 €" (German format, also used in ar/kmr for clarity). */
 function formatPrice(n) {
   // LRI ... PDI keeps "184,77 €" left-to-right (euro sign on the right) inside Arabic/Kurdish text.
   const [whole, cents] = n.toFixed(2).split('.');

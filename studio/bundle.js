@@ -29,24 +29,24 @@ const photoPath = (id, n) => path.join(CACHE, `studio-photo-${id}-${n}.txt`);
 const COVER = {
   de: { kicker: 'Unsere Auswahl', swipe: 'Wischen für alle Angebote →' },
   ar: { kicker: 'اختيارنا لك', swipe: '← اسحب لكل العروض' },
-  ckb: { kicker: 'هەلبژارتنا مە', swipe: '← بکێشە بۆ هەمی پێشنیاران' },
+  kmr: { kicker: 'Bijartina me', swipe: 'Ji bo hemû pêşniyaran bikişîne →' },
 };
 // Cover titles per offer kind (client approved all; one is picked at random per post).
 const TITLES = {
   flight: [
-    { de: 'Ziele, die auf dich warten', ar: 'وجهات تنتظرك', ckb: 'جهێن چاڤەڕێیا تە دکەن' },
-    { de: 'Handverlesene Flüge', ar: 'رحلات مختارة بعناية', ckb: 'گەشتێن ب هویری هاتینە هەلبژارتن' },
-    { de: 'Abheben nach …', ar: 'حلّق إلى…', ckb: 'بفڕە بۆ…' },
+    { de: 'Ziele, die auf dich warten', ar: 'وجهات تنتظرك', kmr: 'Cihên ku li benda te ne' },
+    { de: 'Handverlesene Flüge', ar: 'رحلات مختارة بعناية', kmr: 'Firînên bi baldarî hatine bijartin' },
+    { de: 'Abheben nach …', ar: 'حلّق إلى…', kmr: 'Bifire bo …' },
   ],
   package: [
-    { de: 'Urlaub, den du verdienst', ar: 'عطلات تستحقها', ckb: 'بێهنڤەدانا تو هێژایی' },
-    { de: 'Handverlesene Auszeiten', ar: 'إقامات مختارة بعناية', ckb: 'مانێن ب هویری هاتینە هەلبژارتن' },
-    { de: 'Momente, die bleiben', ar: 'لحظات لا تُنسى', ckb: 'ساتێن ناهێنە ژبیرکرن' },
+    { de: 'Urlaub, den du verdienst', ar: 'عطلات تستحقها', kmr: 'Betlaneya ku tu hêjayî wê yî' },
+    { de: 'Handverlesene Auszeiten', ar: 'إقامات مختارة بعناية', kmr: 'Betlaneyên bi baldarî hatine bijartin' },
+    { de: 'Momente, die bleiben', ar: 'لحظات لا تُنسى', kmr: 'Demên ku dimînin' },
   ],
 };
 const KINDS = Object.keys(TITLES);
 const titleOf = (draft, lang) => TITLES[draft.bundleKind || 'flight'][draft.titleIndex || 0][lang];
-const CAPTION_HEAD = { de: 'Wähle dein nächstes Ziel:', ar: 'اختر وجهتك القادمة:', ckb: 'جهێ خۆ یێ دی هەلبژێرە:' };
+const CAPTION_HEAD = { de: 'Wähle dein nächstes Ziel:', ar: 'اختر وجهتك القادمة:', kmr: 'Cihê xwe yê din hilbijêre:' };
 
 const local = (p, lang) => (lang === 'de' ? p.name : cityName(p, lang));
 

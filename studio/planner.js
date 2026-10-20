@@ -29,7 +29,7 @@ const LIBRARY = path.join(CACHE, 'studio-library'); // approved photos, kept acr
 const REPEAT_DAYS = 14; // no destination (packages: no country) again within 14 days (client plan)
 const KURDISH_DAYS = new Set([1, 3, 5]);
 
-const defaultLangs = (date) => ['de', KURDISH_DAYS.has(date.getDay()) ? 'ckb' : 'ar'];
+const defaultLangs = (date) => ['de', KURDISH_DAYS.has(date.getDay()) ? 'kmr' : 'ar'];
 const photoPath = (id) => path.join(CACHE, `studio-photo-${id}.txt`);
 const slidePath = (id, slide) => path.join(CACHE, `studio-photo-${id}-s${slide}.txt`); // own photo for slide 2/3 (AI sets)
 
@@ -222,7 +222,7 @@ function datesText(offer, lang) {
   if (!offer.returnDate) return out;
   const back = formatDate(offer.returnDate);
   if (lang === 'de') return `${out} – ${back}`;
-  return lang === 'ar' ? `من ${out} إلى ${back}` : `ژ ${out} بۆ ${back}`;
+  return lang === 'ar' ? `من ${out} إلى ${back}` : `${out} – ${back}`;
 }
 
 /** Render all slides of a draft from its stored photo and texts. */

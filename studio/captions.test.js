@@ -28,14 +28,15 @@ test('rejects model text with prices, links or free promises and falls back', as
   }
 });
 
-test('works without an API key (safe fixed caption) in ar and ckb', async () => {
+test('works without an API key (safe fixed caption) in ar and kmr (Kurmanji, Latin letters)', async () => {
   config.GEMINI_API_KEY = '';
   const ar = await buildCaption(flight, 'ar');
   assert.equal(ar.aiWritten, false);
   assert.match(ar.text, /ابتداءً من \u2066184,77 €\u2069/);
   assert.match(ar.text, /الأسعار تتغير باستمرار/);
-  const ckb = await buildCaption(flight, 'ckb');
-  assert.match(ckb.text, /بۆ هەر کەسەکی/);
+  const kmr = await buildCaption(flight, 'kmr');
+  assert.match(kmr.text, /bo her kesî/);
+  assert.match(kmr.text, /Stenbol/); // Istanbul in Kurmanji
 });
 
 test('hashtag filter drops numbers and markup', () => {

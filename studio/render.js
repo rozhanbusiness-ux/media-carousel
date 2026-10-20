@@ -21,7 +21,7 @@ const STYLE_BY_WEEKDAY = { 1: 'flight', 2: 'flight', 3: 'flight', 4: 'flight', 5
 const PACKAGE_LABELS = {
   de: { kicker: 'Pauschalreise', detailsTitle: 'Dein Urlaub' },
   ar: { kicker: 'باقة سياحية', detailsTitle: 'عطلتك' },
-  ckb: { kicker: 'پاکێجا گەشتێ', detailsTitle: 'بێهنڤەدانا تە' },
+  kmr: { kicker: 'Rêwîtiya pakêt', detailsTitle: 'Betlaneya te' },
 };
 
 const LABELS = {
@@ -31,9 +31,9 @@ const LABELS = {
   ar: { kicker: 'عرض طيران', swipe: '← اسحب للتفاصيل', detailsTitle: 'رحلتك', priceLabel: 'ابتداءً من', perPerson: 'للشخص',
     fromLabel: 'من', toLabel: 'إلى', datesLabel: 'موعد السفر', airlineLabel: 'شركة الطيران',
     ctaTitle: 'احجز الآن', ctaText: 'راسلنا على واتساب – المقاعد محدودة بهذا السعر.', ctaButton: '', notice: 'الأسعار تتغير باستمرار، ومن يحجز أولاً يسافر بسعر أفضل.' },
-  ckb: { kicker: 'پێشنیارا فرۆکێ', swipe: '← بکێشە بۆ وردەکاریان', detailsTitle: 'گەشتا تە', priceLabel: 'ژ', perPerson: 'بۆ هەر کەسەکی',
-    fromLabel: 'ژ', toLabel: 'بۆ', datesLabel: 'دەمێ گەشتێ', airlineLabel: 'کۆمپانیا فرۆکێ',
-    ctaTitle: 'نوکە بوک بکە', ctaText: 'ل سەر واتسئاپێ نامەیەکێ بۆ مە بنێرە – جهێن ب ڤی نرخی کێمن.', ctaButton: '', notice: 'نرخ بەردەوام دگوهۆڕن، ئەوێ زوی بوک بکەت ب نرخەکێ باشتر گەشتێ دکەت.' },
+  kmr: { kicker: 'Pêşniyara firînê', swipe: 'Ji bo hûrguliyan bikişîne →', detailsTitle: 'Firîna te', priceLabel: 'ji', perPerson: 'bo her kesî',
+    fromLabel: 'Ji', toLabel: 'Bo', datesLabel: 'Dema rêwîtiyê', airlineLabel: 'Şîrketa firînê',
+    ctaTitle: 'Niha rezerv bike', ctaText: 'Li ser WhatsAppê ji me re binivîse – cih bi vê bihayê kêm in.', ctaButton: '', notice: 'Biha her roj diguherin – yê zû rezerv bike, erzantir digere.' },
 };
 
 // Slide 3 button: the business WhatsApp number from the server .env (STUDIO_WHATSAPP,
@@ -101,10 +101,10 @@ async function renderSlide(post, size, slide) {
   if (!SIZES.includes(size)) throw new Error('unknown size');
   if (![1, 2, 3].includes(slide)) throw new Error('unknown slide');
   const L = LABELS[post.lang] || LABELS.de;
-  const rtl = post.lang !== 'de';
+  const rtl = post.lang === 'ar' || post.lang === 'ckb'; // Kurmanji (kmr) is written with Latin letters
   const values = {
     ...L, ctaButton: ctaButton(), lang: post.lang, dir: rtl ? 'rtl' : 'ltr', size, slide,
-    titleClass: rtl ? '' : 'script', photoPosition: /^\d{1,3}% 50%$/.test(post.photoPosition || '') ? post.photoPosition : 'center', logo: LOGO,
+    titleClass: post.lang === 'de' ? 'script' : '', // the script font is only proven for German letters photoPosition: /^\d{1,3}% 50%$/.test(post.photoPosition || '') ? post.photoPosition : 'center', logo: LOGO,
     destination: post.destination, hook: post.hook,
     fromCity: post.from.city, fromCode: post.from.code, toCity: post.to.city, toCode: post.to.code,
     dates: '\u2066' + post.dates + '\u2069', price: '%%PRICE%%',

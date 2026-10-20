@@ -18,7 +18,7 @@ const { STYLES } = require('./render');
 const { getFlightOffers } = require('./offers');
 
 const ID = /^[a-f0-9]{12}$/;
-const LANG_SET = ['de', 'ar', 'ckb'];
+const LANG_SET = ['de', 'ar', 'kmr'];
 const cleanLangs = (v) => (Array.isArray(v) && v.length && v.length <= 3 && v.every((l) => LANG_SET.includes(l)) ? [...new Set(v)] : null);
 let generating = false;
 
