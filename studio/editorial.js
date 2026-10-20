@@ -174,11 +174,17 @@ function storyPrompt(a, slot, today = new Date()) {
     `${a.site === 'wikipedia' ? 'Wikipedia' : 'Wikivoyage'} article "${a.title}":\n"""\n${a.text}\n"""`,
     `Write ${what}`,
     'Use ONLY facts from this article. Copy into "evidence" the exact sentence (or part of a sentence, at least 40 characters, word for word) of the article your post rests on.',
-    'Style: short, precise and vivid, like a sharp travel-magazine note. The headline IS the angle. Narrate; do not address the reader (no "Sie", "du", "you"). No opening with "Imagine", "Stellen Sie sich vor", "تخيل", "Did you know". No sales talk, no calls to book, no prices, no links, no clichés (paradise, hidden gem, breathtaking, unforgettable), no exclamation marks. Nothing about food, restaurants or drinks; nothing about mosques or minarets; nothing sad.',
+    'Style (approved by the client with the examples below): like a friend who has just been there and tells you about it. Not an advert, not an encyclopedia.',
+    '- Hook: creates curiosity or a twist that makes people stop scrolling (e.g. "Du stehst hinter einem Wasserfall. Wortwörtlich.", "99 Stufen für einen Wunsch").',
+    '- Speak to the reader directly: German with "du" (never "Sie"), Arabic and Kurdish in the second person.',
+    '- One sensory moment (sound, cold, light, spray), one practical detail (when or how), and a short closing line that stays in the mind (it may be a question to the reader). One fitting emoji at the end.',
+    '- Short lines, natural rhythm. No calls to book, no prices, no links, no clichés (paradise, hidden gem, breathtaking, unforgettable, "Stell dir vor", "Imagine", "تخيل"), no exclamation marks. Nothing about food, restaurants or drinks; nothing about mosques or minarets; nothing sad.',
+    `Example (German):\n"Du stehst hinter einem Wasserfall. Wortwörtlich."\n"Ein Tunnel im Fels, ein paar Schritte ins Halbdunkel – und plötzlich donnert der Staubbachfall direkt vor dir herab. Die Gischt kühlt dein Gesicht, das Tal leuchtet grün dahinter. Am stärksten rauscht er im Frühsommer, wenn der Schnee schmilzt. Manche Aussichten muss man sich erlaufen. 💧"`,
+    `Example (Arabic):\n"99 درجة… مقابل أمنية"\n"قارب خشبي ينساب فوق البحيرة الزمردية نحو جزيرة صغيرة. في الأعلى، داخل الكنيسة، حبل يتدلى من جرس قديم. من يقرعه يتمنى أمنية، هكذا يقول أهل بليد منذ قرون. وأنت، ماذا ستتمنى؟ 🔔"`,
     `Today is ${today.toISOString().slice(0, 10)}. If the experience is a festival or event with dates, choose it only when it starts between 2 and 10 weeks after today, and put its start date in "event_start" (YYYY-MM-DD); otherwise choose another experience of this place. For anything that is not a dated event, leave "event_start" empty.`,
     'Native, natural phrasing in each language (not a word-for-word translation). German must be grammatically perfect: check every article, case and gender (e.g. "das Silberhorn", "die Wunschglocke läuten"). Proofread each text once before answering.',
     'Rate your choice honestly: "score" 1-10 = how much a traveller would want to go there and do exactly this after reading. Trivia, a plain name or a general description is at most 3.',
-    `For each language (${LANGS.map((l) => `${l} = ${LANG_NAME[l]}`).join('; ')}): hook = the headline (max 60 characters); body = ${slot.kind === 'tip' ? '2-3 short points or sentences (max 420 characters)' : '2-3 sentences (max 360 characters)'}; hashtags = 3 to 5 about this place or topic only (letters only).`,
+    `For each language (${LANGS.map((l) => `${l} = ${LANG_NAME[l]}`).join('; ')}): hook = the headline (max 65 characters); body = ${slot.kind === 'tip' ? '3-4 short lines (max 450 characters)' : '3-4 short sentences like the examples (max 420 characters)'}; hashtags = 3 to 5 about this place or topic only (letters only).`,
     'If the article has nothing joyful or interesting enough, return {"skip":true}.',
     'Return ONLY JSON: {"angle":"the experience, one line in English","score":7,"event_start":"","evidence":"…","de":{"hook":"","body":"","hashtags":["#…"]},"ar":{…},"ckb":{…}}',
   ].join('\n');
@@ -208,11 +214,11 @@ async function writePost(a, slot, fetchImpl = fetch, log = () => {}) {
   }
   const score = Number(ai.score);
   if (!(score >= MIN_SCORE)) { log(`${a.title}: angle too weak (${ai.score}/10: ${String(ai.angle || '').slice(0, 80)})`); return null; }
-  const max = slot.kind === 'tip' ? 520 : 460;
+  const max = slot.kind === 'tip' ? 560 : 540;
   const texts = {};
   for (const l of LANGS) {
     const t = ai[l] || {};
-    const why = textProblem(t.hook, 90, slot.kind) || textProblem(t.body, max, slot.kind) || (okTags(t.hashtags) ? null : 'hashtags');
+    const why = textProblem(t.hook, 100, slot.kind) || textProblem(t.body, max, slot.kind) || (okTags(t.hashtags) ? null : 'hashtags');
     if (why) { log(`${a.title} ${l}: ${why}`); return null; }
     texts[l] = { hook: t.hook.trim(), body: t.body.trim(), hashtags: [...new Set(t.hashtags)] };
   }

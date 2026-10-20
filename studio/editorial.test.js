@@ -137,6 +137,10 @@ test('the prompt asks for a traveller experience, not trivia', () => {
   const p = storyPrompt({ title: 'Bled', text: '…' }, { kind: 'place', type: 'lake' });
   assert.match(p, /experience a visitor can have/);
   assert.match(p, /NOT trivia/);
+  // approved style: friend's voice, "du", the two client-approved examples
+  assert.match(p, /with "du" \(never "Sie"\)/);
+  assert.match(p, /Wortwörtlich/);
+  assert.match(p, /99 درجة/);
 });
 
 test('makeIdeas without an API key returns nothing', async () => {
