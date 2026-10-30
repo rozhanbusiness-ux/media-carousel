@@ -112,7 +112,7 @@ async function renderSlide(post, size, slide) {
     destination: post.destination, hook: post.hook,
     fromCity: post.from.city, fromCode: post.from.code, toCity: post.to.city, toCode: post.to.code,
     dates: '\u2066' + post.dates + '\u2069', price: '%%PRICE%%',
-    kind: post.card ? 'package' : 'flight', // every non-flight offer uses the hotel-style card
+    kind: post.isCover && post.style === 'flight-simple' ? 'cover' : post.card ? 'package' : 'flight', // every non-flight offer uses the hotel-style card; 'cover' only exists in flight-simple
     country: post.country || '', hotel: '', stars: '', pkgLine: '', place: '',
     // Short trip tag under the route (flight-simple): only for round trips, nothing for one-way.
     trip: post.roundTrip ? (TRIP[post.lang] || TRIP.de) : '',

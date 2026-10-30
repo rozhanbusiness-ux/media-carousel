@@ -14,7 +14,7 @@ const { formatDate, formatPrice, cityName, BASE_TAGS, FIXED } = require('./capti
 const { renderSlide, PACKAGE_STYLES } = require('./render');
 const sources = require('./photo-sources');
 const bank = require('./bank');
-const { generatePhoto, enhancePhoto } = require('./image');
+const { generatePhoto, generateCover, enhancePhoto } = require('./image');
 const { rankPhotos } = require('./photo-rank');
 const store = require('./store');
 const covers = require('./covers');
@@ -138,7 +138,7 @@ async function renderBundle(draft) {
     const posts = draft.offers.map((o, n) => ({ ...postFor(o, lang, photos[n], PACKAGE_STYLES.includes(draft.style) ? draft.style : 'flight'), photoPosition: (draft.photoPos || [])[n] || '' }));
     const title = titleOf(draft, lang);
     // Never a destination photo on the cover (client rule).
-    const cover = { ...posts[0], photo: coverImg, photoPosition: '', kind: 'flight', card: null, country: '', destination: title,
+    const cover = { ...posts[0], isCover: true, photo: coverImg, photoPosition: '', kind: 'flight', card: null, country: '', destination: title,
       hook: draft.offers.map((o) => local(o.to, lang)).join(' · '), labels: { kicker: COVER[lang].kicker, swipe: COVER[lang].swipe } };
     const slides = [[cover, 1], ...posts.map((p) => [p, 2]), [{ ...posts[0], photo: coverImg || posts[0].photo, photoPosition: coverImg ? '' : posts[0].photoPosition }, 3]]; // last slide: cover photo, not a repeat of slide 2
     const files = [];
@@ -203,7 +203,8 @@ async function slotCandidates(draft, n, queriesFor) {
 }
 
 /** Bundle actions: 'langs', 'all' (new photos), 'style', 'bundle-photos' (show suggestions for a slide),
- *  'bundle-photo-pick' ({ n, id }), 'bundle-photo-upload' ({ n, data }), 'bundle-photo-ai' (n, offer slides only). */
+ *  'bundle-photo-pick' ({ n, id }), 'bundle-photo-upload' ({ n, data }), 'bundle-photo-ai' (n; -1 = AI cover),
+ *  'bundle-photo-ai-all' (value = optional progress callback). */
 async function regenerateBundle(draft, what, value, queriesFor, choosePhoto, LANGS) {
   if (what === 'bundle-photos') {
     if (!validSlot(draft, value)) throw new Error('bad slide');
@@ -215,8 +216,7 @@ async function regenerateBundle(draft, what, value, queriesFor, choosePhoto, LAN
     if (!validSlot(draft, n)) throw new Error('bad slide');
     let dataUri;
     if (what === 'bundle-photo-ai') {
-      if (n === -1) throw new Error('Cover: nur gespeicherte Cover-Fotos (kein KI-Bild).');
-      dataUri = await generatePhoto(draft.offers[n]);
+      dataUri = n === -1 ? await generateCover() : await generatePhoto(draft.offers[n]);
     } else if (what === 'bundle-photo-upload') dataUri = value.data;
     else {
       const c = draft.bundlePick && draft.bundlePick.n === n && draft.bundlePick.list.find((x) => x.id === value.id);
@@ -229,6 +229,27 @@ async function regenerateBundle(draft, what, value, queriesFor, choosePhoto, LAN
     if (n >= 0) sources.use(draft.offers[n], what === 'bundle-photo-pick' ? value.id : null, dataUri);
     fs.writeFileSync(slotPath(draft, n), dataUri);
     if (n >= 0 && draft.photoPos) draft.photoPos[n] = null; // new photo: centred
+    draft.bundlePick = null;
+  } else if (what === 'bundle-photo-ai-all') {
+    // One AI photo per offer, two at a time (client: one button for all offers). A failed offer
+    // keeps its photo and is reported; the per-offer button can retry it.
+    const report = typeof value === 'function' ? value : () => {};
+    const failed = [];
+    let done = 0;
+    const total = draft.offers.length + 1; // + the cover (n = -1)
+    const one = async (n) => {
+      try {
+        const dataUri = n === -1 ? await generateCover() : await generatePhoto(draft.offers[n]);
+        if (n >= 0) sources.use(draft.offers[n], null, dataUri);
+        fs.writeFileSync(slotPath(draft, n), dataUri);
+        if (n >= 0 && draft.photoPos) draft.photoPos[n] = null;
+      } catch (err) { console.error('studio bundle ai:', err.message); failed.push(n === -1 ? 'Cover' : draft.offers[n].to.name); }
+      report(++done, total);
+    };
+    const queue = [-1, ...draft.offers.map((_, n) => n)];
+    await Promise.all([0, 1].map(async () => { while (queue.length) await one(queue.shift()); }));
+    if (failed.length === total) throw new Error('KI-Fotos fehlgeschlagen – bitte später erneut versuchen.');
+    draft.warning = failed.length ? `Kein KI-Foto für: ${failed.join(', ')} – bitte einzeln mit 🤖 KI erneut versuchen.` : '';
     draft.bundlePick = null;
   } else if (what === 'style') {
     if (!PACKAGE_STYLES.includes(value)) throw new Error('Für Sammel-Beiträge: Glas, Magazin oder Schlicht.');

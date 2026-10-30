@@ -22,6 +22,7 @@ const LANG_SET = ['de', 'ar', 'ckb'];
 const cleanLangs = (v) => (Array.isArray(v) && v.length && v.length <= 3 && v.every((l) => LANG_SET.includes(l)) ? [...new Set(v)] : null);
 let generating = false;
 let bundleJob = { running: false, error: null, id: null };
+let aiJob = { running: false, error: null, done: 0, total: 0, id: null };
 
 module.exports = function mountStudio(app) {
   const router = express.Router();
@@ -59,6 +60,7 @@ module.exports = function mountStudio(app) {
   });
 
   router.get('/drafts/bundle/status', (req, res) => res.json(bundleJob));
+  router.get('/drafts/ai-photos/status', (req, res) => res.json(aiJob));
 
   // Package draft (hotel + flight), on demand.
   router.post('/drafts/package', async (req, res) => {
@@ -159,7 +161,7 @@ module.exports = function mountStudio(app) {
     const draft = store.getDraft(req.params.id);
     if (!draft) return res.status(404).json({ error: 'not found' });
     const { what, value } = req.body || {};
-    if (!['offer-next', 'offer-pick', 'photo', 'photo-pick', 'photo-auto', 'photo-ai', 'text', 'all', 'style', 'langs', 'photo-upload', 'bundle-photos', 'bundle-photo-pick', 'bundle-photo-upload', 'bundle-photo-ai'].includes(what)) return res.status(400).json({ error: 'bad request' });
+    if (!['offer-next', 'offer-pick', 'photo', 'photo-pick', 'photo-auto', 'photo-ai', 'text', 'all', 'style', 'langs', 'photo-upload', 'bundle-photos', 'bundle-photo-pick', 'bundle-photo-upload', 'bundle-photo-ai', 'bundle-photo-ai-all'].includes(what)) return res.status(400).json({ error: 'bad request' });
     if (what === 'photo-upload' && !(typeof value === 'string' && value.length < 12000000 && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(value))) {
       return res.status(400).json({ error: 'bad image' });
     }
@@ -168,12 +170,22 @@ module.exports = function mountStudio(app) {
     if (what === 'photo-pick' && !pid(value)) return res.status(400).json({ error: 'bad photo' });
     const slot = (n) => Number.isInteger(n) && n >= -1 && n < 6;
     if (what === 'bundle-photos' && !slot(value)) return res.status(400).json({ error: 'bad slide' });
-    if (what === 'bundle-photo-ai' && !(slot(value) && value >= 0)) return res.status(400).json({ error: 'bad slide' });
+    if (what === 'bundle-photo-ai' && !slot(value)) return res.status(400).json({ error: 'bad slide' });
     if (what === 'bundle-photo-pick' && !(value && slot(value.n) && pid(value.id))) return res.status(400).json({ error: 'bad photo' });
     if (what === 'bundle-photo-upload' && !(value && slot(value.n) && typeof value.data === 'string' && value.data.length < 12000000
       && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(value.data))) return res.status(400).json({ error: 'bad image' });
     if (generating) return res.status(429).json({ error: 'already generating' });
     generating = true;
+    if (what === 'bundle-photo-ai-all') {
+      if (!draft.bundle) { generating = false; return res.status(400).json({ error: 'bad request' }); }
+      // Background job (6 AI photos take minutes, longer than the Nginx timeout); the page polls.
+      aiJob = { running: true, error: null, done: 0, total: draft.offers.length + 1, id: draft.id };
+      regenerate(draft, what, (done, total) => { aiJob = { ...aiJob, done, total }; })
+        .then(() => { aiJob = { ...aiJob, running: false }; })
+        .catch((err) => { console.error('studio bundle ai:', err.message); aiJob = { ...aiJob, running: false, error: err.message }; })
+        .finally(() => { generating = false; });
+      return res.status(202).json({ started: true });
+    }
     try { res.json(await regenerate(draft, what, value)); }
     catch (err) { console.error('studio regenerate:', err.message); res.status(500).json({ error: err.message }); }
     finally { generating = false; }

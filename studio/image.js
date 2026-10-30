@@ -35,7 +35,7 @@ function buildPrompt(city, variant, kind) {
     'REALISM: must look like a real photo by a top travel photographer (full-frame camera, 24-35mm lens, f/8, RAW, natural colour grading); real materials, real proportions, architecturally accurate; ONE real viewpoint: only landmarks that are really visible together from one place, no collage of distant landmarks; no CGI, no illustration, no painted or plastic AI look, no HDR glow, no oversaturation.',
     'POSTER COMPOSITION (vertical 9:16): the top 35% is open, clean sky only (soft gradient, a few light clouds), with no buildings, birds or objects, because text is placed there;',
     'the middle (35% to 80% from the top) holds the hero scene, horizontally centred, tack-sharp and instantly recognisable;',
-    'the bottom 15% is calm and simple (water, plaza, promenade or soft shadow), because a logo is placed there.',
+    'the bottom 20% is calm, simple and darker (shaded ground, calm water or a plaza in soft shadow, low detail), because a light logo is placed there.',
     'LIGHT: golden hour or early blue hour, warm sun from the side, glowing highlights on the main subject, deep clean sky, crystal-clear air, no haze.',
     'MOOD: aspirational, premium and inviting; tidy scene, no traffic, no cranes, no construction, no rubbish, at most a few small distant people, none facing the camera.',
     'FORBIDDEN: any mosque or minaret anywhere in the frame; any text, letters, signs with words, logos, flags with writing, watermarks, borders or frames.',
@@ -116,4 +116,51 @@ async function enhancePhoto(dataUri) {
   return `data:${inline.mimeType || inline.mime_type || 'image/png'};base64,${inline.data}`;
 }
 
-module.exports = { generatePhoto, generateSet, enhancePhoto, buildPrompt, scenesFor };
+// Cover of multi-offer posts (client decision 2026-10-30): never a destination; a realistic view
+// from an airplane window above the clouds, different every time (random light, clouds, framing).
+const COVER_SCENES = [
+  'golden sunset light, a soft sea of clouds far below, the sun low on the horizon',
+  'early sunrise with pink and orange light over towering cumulus clouds',
+  'bright midday, deep blue sky, white cloud layer with gaps showing a distant coastline far below',
+  'blue hour just after sunset, last warm glow on the horizon, calm clouds below',
+  'late afternoon, warm light, scattered clouds with soft shadows, hazy mountains far below',
+  'sunrise above a flat cloud blanket, rays of light, crisp clear air',
+];
+const COVER_FRAMES = [
+  'the oval window frame visible at the edges, slightly out of focus',
+  'a clean part of a plain white wing (no logo, no text) in the lower part of the view',
+  'looking through the window, no wing visible, only sky and clouds',
+];
+const pick = (a) => a[Math.floor(Math.random() * a.length)];
+
+function buildCoverPrompt() {
+  return [
+    `Photorealistic photograph taken from a passenger airplane window above the clouds: ${pick(COVER_SCENES)}; ${pick(COVER_FRAMES)}.`,
+    'REALISM: looks like a real photo taken with a good camera through the window; natural colours, no CGI, no illustration, no HDR glow, no oversaturation.',
+    'COMPOSITION (vertical 9:16): the top 35% is open, clean sky (text is placed there); the bottom 20% is darker and calm (shaded clouds or the shaded window frame), because a light logo is placed there.',
+    'FORBIDDEN: any airline name, logo, livery or text; any people; any cabin interior apart from the window frame; any mosque or minaret; any watermark, border or frame added to the image.',
+  ].join(' ');
+}
+
+/** AI cover photo (data URI), a different scene every call. */
+async function generateCover() {
+  if (!config.GEMINI_API_KEY) throw new Error('GEMINI_API_KEY is not set');
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${config.GEMINI_IMAGE_MODEL}:generateContent`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': config.GEMINI_API_KEY },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: buildCoverPrompt() }] }],
+      generationConfig: { responseModalities: ['Image'], imageConfig: { imageSize: config.GEMINI_IMAGE_SIZE || '2K', aspectRatio: '9:16' } },
+    }),
+    signal: AbortSignal.timeout(120000),
+  });
+  require('./ai-status').report(res.status);
+  if (!res.ok) throw new Error(`Gemini image error ${res.status}`);
+  const json = await res.json();
+  const part = (json?.candidates?.[0]?.content?.parts || []).find((p) => p.inlineData || p.inline_data);
+  if (!part) throw new Error('Gemini returned no image');
+  const inline = part.inlineData || part.inline_data;
+  return `data:${inline.mimeType || inline.mime_type || 'image/png'};base64,${inline.data}`;
+}
+
+module.exports = { generateCover, buildCoverPrompt, generatePhoto, generateSet, enhancePhoto, buildPrompt, scenesFor };

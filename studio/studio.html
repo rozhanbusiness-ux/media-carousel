@@ -199,8 +199,8 @@ function render(drafts) {
         <span>${esc(d.offer.price)} €</span>`}</div>
       ${d.warning ? `<p class="warn">⚠ ${esc(d.warning)}</p>` : ''}
       ${d.aiPhoto ? '<p class="warn">🤖 KI-Foto – bitte genau prüfen (Ort, Details), sonst 🤖 KI neu oder 🖼 Fotos zeigen.</p>' : ''}
-      ${d.bundle ? `<div class="row"><span>🖼 Foto ändern:</span>
-        <button class="ghost" data-act="bundle-photos" data-n="-1">Cover</button>
+      ${d.bundle ? `<div class="row"><button data-act="bundle-ai-all">🤖 KI-Fotos für alle Angebote</button></div><div class="row"><span>🖼 Foto ändern:</span>
+        <button class="ghost" data-act="bundle-photos" data-n="-1">Cover</button><button class="ghost" data-act="bundle-photo-ai" data-n="-1" title="KI-Cover (Blick aus dem Flugzeugfenster) – jedes Mal anders">🤖 KI</button>
         ${d.offers.map((o, n) => `<button class="ghost" data-act="bundle-photos" data-n="${n}">${n + 1}. ${esc(o.to.name)}</button><button class="ghost" data-act="bundle-photo-ai" data-n="${n}" title="KI-Foto für ${esc(o.to.name)} – bitte genau prüfen">🤖 KI</button>`).join('')}</div>` : ''}
       ${d.bundle && d.bundlePick ? `
         <div class="photo-pick"><h3>Foto für ${d.bundlePick.n === -1 ? 'Cover' : esc(d.offers[d.bundlePick.n].to.name)} wählen <small>(beste zuerst)</small></h3>
@@ -498,6 +498,22 @@ $('#gen').onclick = async () => {
   $('#gen').disabled = false;
 };
 
+// All AI photos of a bundle: runs in the background on the server, the page polls the progress.
+async function aiAll(box) {
+  box.classList.add('busy'); $('#msg').textContent = 'KI-Fotos werden erstellt …';
+  try {
+    await api(`/api/studio/drafts/${box.dataset.id}/regenerate`, { method: 'POST', body: JSON.stringify({ what: 'bundle-photo-ai-all' }) });
+    const t0 = Date.now();
+    for (;;) {
+      await new Promise((r) => setTimeout(r, 5000));
+      const job = await api('/api/studio/drafts/ai-photos/status');
+      if (!job.running) { if (job.error) throw new Error(job.error); break; }
+      if (Date.now() - t0 > 20 * 60000) throw new Error('dauert zu lange, bitte später die Liste neu laden');
+      $('#msg').textContent = `KI-Fotos werden erstellt … ${job.done} / ${job.total}`;
+    }
+    $('#msg').textContent = 'Fertig.'; await load();
+  } catch (err) { $('#msg').textContent = 'Fehler: ' + err.message; box.classList.remove('busy'); }
+}
 async function regen(box, what, value) {
   box.classList.add('busy'); $('#msg').textContent = 'Wird neu erstellt … (bis ca. 1 Minute)';
   try { await api(`/api/studio/drafts/${box.dataset.id}/regenerate`, { method: 'POST', body: JSON.stringify({ what, value }) }); $('#msg').textContent = 'Fertig.'; await load(); }
@@ -516,6 +532,7 @@ $('#list').onclick = async (e) => {
   if (act === 'photo-ai' && !confirm('KI-Foto nur im Notfall verwenden. Fortfahren?')) return;
   if (act === 'photo-pick') return regen(box, 'photo-pick', pidOf(b.dataset.pid));
   if (act === 'bundle-photos') return regen(box, 'bundle-photos', Number(b.dataset.n));
+  if (act === 'bundle-ai-all') return confirm('KI-Fotos für alle Angebote erzeugen (einige Minuten)? Bitte danach genau prüfen.') && aiAll(box);
   if (act === 'bundle-photo-ai') return confirm('KI-Foto erzeugen? Bitte danach genau prüfen.') && regen(box, 'bundle-photo-ai', Number(b.dataset.n));
   if (act === 'bundle-photo-pick') return regen(box, 'bundle-photo-pick', { n: Number(b.dataset.n), id: pidOf(b.dataset.pid) });
   if (['photo', 'photo-auto', 'photo-ai', 'text', 'all'].includes(act)) return regen(box, act);

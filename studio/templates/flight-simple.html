@@ -41,6 +41,8 @@
   .rtl .route .ic { transform: rotate(-90deg); }
   .trip { margin-top: calc(10 * var(--u)); font-size: calc(32 * var(--u)); font-weight: 600; }
   .trip:empty { display: none; }
+  .covtitle { font-size: calc(84 * var(--u)); font-weight: 800; line-height: 1.1; text-wrap: balance; }
+  .covlist { display: inline-block; margin-top: calc(26 * var(--u)); padding-bottom: calc(10 * var(--u)); border-bottom: calc(4 * var(--u)) solid var(--gold); font-size: calc(40 * var(--u)); font-weight: 600; line-height: 1.4; text-wrap: balance; }
   .hotel { margin-top: calc(18 * var(--u)); font-size: calc(36 * var(--u)); font-weight: 600; }
 
   .foot { position: absolute; bottom: calc(80 * var(--u)); left: 0; right: 0; text-align: center; }
@@ -71,6 +73,13 @@
       <div class="hotel pkg">{{hotel}}</div>
     </div>
 
+    <!-- bundle cover (slide 1 of a multi-offer post): title and destinations, no price -->
+    <div class="top cov" data-only="1">
+      <div class="covtitle">{{destination}}</div>
+      <div class="covlist">{{hook}}</div>
+      <div class="trip">{{swipe}}</div>
+    </div>
+
     <!-- slide 3 -->
     <div class="end" data-only="3">
       <div class="big">{{ctaTitle}}</div>
@@ -82,8 +91,9 @@
   </div>
   <style>
     [data-only] { display: none; }
-    .s1 [data-only="12"], .s2 [data-only="12"], .s3 [data-only="3"] { display: block; }
+    .s1 [data-only="12"], .s2 [data-only="12"], .s1 [data-only="1"], .s3 [data-only="3"] { display: block; }
     .k-flight .pkg, .k-package .flt { display: none !important; }
+    .k-cover .s1 [data-only="12"], .k-flight .cov, .k-package .cov { display: none !important; }
   </style>
 </body>
 </html>
