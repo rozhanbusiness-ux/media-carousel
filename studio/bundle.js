@@ -48,7 +48,7 @@ const KINDS = Object.keys(TITLES);
 const titleOf = (draft, lang) => TITLES[draft.bundleKind || 'flight'][draft.titleIndex || 0][lang];
 const CAPTION_HEAD = { de: 'Wähle dein nächstes Ziel:', ar: 'اختر وجهتك القادمة:', ckb: 'جهێ خۆ یێ دی هەلبژێرە:' };
 
-const local = (p, lang) => (lang === 'de' ? p.name : cityName(p, lang));
+const local = (p, lang) => cityName(p, lang);
 
 /** One caption line per offer, e.g. "✈️ Düsseldorf → Istanbul · 12.11. · ab 184,99 €". */
 function offerLine(o, lang) {
@@ -93,6 +93,40 @@ async function photoFor(offer, used, queriesFor, choosePhoto) {
 // covers come first (rotating), else the best-ranked Pexels photo (studio/covers.js).
 async function coverPhoto(kind, used) {
   return covers.next(kind) || (await covers.auto(kind, used));
+}
+
+/** AI photos for the cover (n = -1) and every offer, two at a time (client: AI first, one go).
+ *  Writes each photo that succeeds; returns the slots that failed. */
+async function aiPhotos(draft, report = () => {}) {
+  const total = draft.offers.length + 1;
+  const failed = [];
+  let done = 0;
+  const one = async (n) => {
+    try {
+      const dataUri = n === -1 ? await generateCover() : await generatePhoto(draft.offers[n]);
+      if (n >= 0) sources.use(draft.offers[n], null, dataUri);
+      fs.writeFileSync(slotPath(draft, n), dataUri);
+      if (n >= 0 && draft.photoPos) draft.photoPos[n] = null;
+    } catch (err) { console.error('studio bundle ai:', err.message); failed.push(n); }
+    report(++done, total);
+  };
+  const queue = [-1, ...draft.offers.map((_, n) => n)];
+  await Promise.all([0, 1].map(async () => { while (queue.length) await one(queue.shift()); }));
+  return failed;
+}
+
+/** New bundle: AI photos first; a slot whose AI photo fails gets a real photo instead. */
+async function pickPhotosAiFirst(draft, queriesFor, choosePhoto) {
+  draft.pexelsIds = []; draft.photoPos = []; draft.photoCredits = [];
+  const failed = await aiPhotos(draft);
+  if (!failed.length) return;
+  const used = new Set(store.listDrafts().flatMap((d) => [d.pexelsId, ...(d.pexelsIds || []), d.photoFile]).filter(Boolean));
+  for (const n of failed) {
+    const p = n === -1 ? await coverPhoto(draft.bundleKind || 'flight', used) : await photoFor(draft.offers[n], used, queriesFor, choosePhoto);
+    if (!p) throw new Error(n === -1 ? 'Kein Cover-Foto (KI fehlgeschlagen) – bitte erneut versuchen.' : `Kein Foto für ${draft.offers[n].to.name} – bitte erneut versuchen.`);
+    fs.writeFileSync(slotPath(draft, n), p.dataUri);
+    if (n >= 0) { draft.photoPos[n] = p.pos || null; draft.photoCredits[n] = p.credit || null; }
+  }
 }
 
 async function pickPhotos(draft, queriesFor, choosePhoto) {
@@ -162,7 +196,7 @@ async function renderBundle(draft) {
 }
 
 /** Bundle draft from offer keys of ONE kind (client rule: never mix flights, packages, cruises, ...). */
-async function createBundleDraft({ kind, keys, langs, date, liveOffers, queriesFor, choosePhoto }) {
+async function createBundleDraft({ kind, keys, style, langs, date, liveOffers, queriesFor, choosePhoto }) {
   if (!KINDS.includes(kind)) throw new Error('unknown kind');
   if (!Array.isArray(keys) || keys.length < MIN || keys.length > MAX) throw new Error(`Bitte ${MIN} bis ${MAX} Angebote wählen.`);
   const all = await liveOffers(kind);
@@ -174,11 +208,11 @@ async function createBundleDraft({ kind, keys, langs, date, liveOffers, queriesF
   if (new Set(offers.map(place)).size !== offers.length) throw new Error(kind === 'package' ? 'Jedes Land nur einmal pro Beitrag.' : 'Jede Destination nur einmal pro Beitrag.');
   const draft = {
     id: crypto.randomBytes(6).toString('hex'), createdAt: new Date().toISOString(), forDate: date.toISOString().slice(0, 10),
-    status: 'pending', style: 'flight', source: 'specials', bundle: true, bundleKind: kind,
+    status: 'pending', style: PACKAGE_STYLES.includes(style) ? style : 'flight', source: 'specials', // template chosen before the photos (client) bundle: true, bundleKind: kind,
     titleIndex: Math.floor(Math.random() * TITLES[kind].length), offers, offer: offers[0], langs, texts: {}, versions: [],
   };
   for (const l of langs) draft.texts[l] = { caption: bundleCaption(offers, l, titleOf(draft, l)) };
-  await pickPhotos(draft, queriesFor, choosePhoto);
+  await pickPhotosAiFirst(draft, queriesFor, choosePhoto);
   return renderBundle(draft);
 }
 
@@ -231,25 +265,9 @@ async function regenerateBundle(draft, what, value, queriesFor, choosePhoto, LAN
     if (n >= 0 && draft.photoPos) draft.photoPos[n] = null; // new photo: centred
     draft.bundlePick = null;
   } else if (what === 'bundle-photo-ai-all') {
-    // One AI photo per offer, two at a time (client: one button for all offers). A failed offer
-    // keeps its photo and is reported; the per-offer button can retry it.
-    const report = typeof value === 'function' ? value : () => {};
-    const failed = [];
-    let done = 0;
-    const total = draft.offers.length + 1; // + the cover (n = -1)
-    const one = async (n) => {
-      try {
-        const dataUri = n === -1 ? await generateCover() : await generatePhoto(draft.offers[n]);
-        if (n >= 0) sources.use(draft.offers[n], null, dataUri);
-        fs.writeFileSync(slotPath(draft, n), dataUri);
-        if (n >= 0 && draft.photoPos) draft.photoPos[n] = null;
-      } catch (err) { console.error('studio bundle ai:', err.message); failed.push(n === -1 ? 'Cover' : draft.offers[n].to.name); }
-      report(++done, total);
-    };
-    const queue = [-1, ...draft.offers.map((_, n) => n)];
-    await Promise.all([0, 1].map(async () => { while (queue.length) await one(queue.shift()); }));
-    if (failed.length === total) throw new Error('KI-Fotos fehlgeschlagen – bitte später erneut versuchen.');
-    draft.warning = failed.length ? `Kein KI-Foto für: ${failed.join(', ')} – bitte einzeln mit 🤖 KI erneut versuchen.` : '';
+    const failed = await aiPhotos(draft, typeof value === 'function' ? value : () => {});
+    if (failed.length === draft.offers.length + 1) throw new Error('KI-Fotos fehlgeschlagen – bitte später erneut versuchen.');
+    draft.warning = failed.length ? `Kein KI-Foto für: ${failed.map((n) => (n === -1 ? 'Cover' : draft.offers[n].to.name)).join(', ')} – bitte einzeln mit 🤖 KI erneut versuchen.` : '';
     draft.bundlePick = null;
   } else if (what === 'style') {
     if (!PACKAGE_STYLES.includes(value)) throw new Error('Für Sammel-Beiträge: Glas, Magazin oder Schlicht.');

@@ -117,7 +117,8 @@
   </details>
   <div id="bundleBox" class="manual" hidden>
     <h3>Mehrere Angebote in einem Beitrag <small>(2 bis 6 wählen, Reihenfolge = Reihenfolge der Auswahl)</small></h3>
-    <div class="row"><label>Art <select id="bundleKind"><option value="flight">✈️ Flugangebote</option><option value="package">🏨 Pauschalreisen</option></select></label></div>
+    <div class="row"><label>Art <select id="bundleKind"><option value="flight">✈️ Flugangebote</option><option value="package">🏨 Pauschalreisen</option></select></label>
+      <label>Vorlage <select id="bundleStyle"><option value="flight-simple">◻ Schlicht</option><option value="flight-cover">★ Magazin</option><option value="flight">1 Glas</option></select></label></div>
     <div id="bundleList" class="pick" style="max-height:340px;overflow:auto"></div>
     <div class="row"><button class="primary" id="bundleGo">Sammel-Beitrag erstellen</button><span id="bundleCount"></span></div>
   </div>
@@ -390,7 +391,7 @@ $('#bundleGo').onclick = async () => {
   if (bundlePick.length < 2) { $('#msg').textContent = 'Bitte mindestens 2 Angebote wählen.'; return; }
   $('#bundleGo').disabled = true; $('#msg').textContent = 'Sammel-Beitrag wird erstellt …';
   try {
-    await api('/api/studio/drafts/bundle', { method: 'POST', body: JSON.stringify({ kind: $('#bundleKind').value, keys: bundlePick, ...(defLangs().length ? { langs: defLangs() } : {}) }) });
+    await api('/api/studio/drafts/bundle', { method: 'POST', body: JSON.stringify({ kind: $('#bundleKind').value, style: $('#bundleStyle').value, keys: bundlePick, ...(defLangs().length ? { langs: defLangs() } : {}) }) });
     const t0 = Date.now();
     for (;;) {
       await new Promise((r) => setTimeout(r, 5000));

@@ -97,7 +97,7 @@ function choosePhoto(offer) {
 }
 
 // AI set → picture: slide 1 photo plus different photos for slides 2 and 3 (client: never one photo for all slides).
-const aiPicture = ([a, b, c]) => ({ file: null, pexelsId: null, ai: true, dataUri: a, slides: { 2: b, 3: c } }); // only via the 🤖 KI button
+const aiPicture = ([a, b, c]) => ({ file: null, pexelsId: null, ai: true, dataUri: a, slides: { 2: b, 3: c } });
 
 const AUTO_MIN = 8; // strict: only magazine-level real photos are used automatically
 const AUTO_FILL = 7; // slides 2/3 may use a slightly lower score rather than repeating slide 1
@@ -234,7 +234,7 @@ async function renderDraft(draft) {
   const versions = [];
   for (const lang of draft.langs) {
     const t = draft.texts[lang];
-    const local = (p) => (lang === 'de' ? p.name : cityName(p, lang));
+    const local = (p) => cityName(p, lang);
     const post = {
       style: draft.style, lang, photo, destination: local(draft.offer.to), hook: t.hook,
       from: draft.offer.from ? { city: local(draft.offer.from), code: draft.offer.from.code || '' } : { city: '', code: '' },
@@ -277,7 +277,13 @@ async function writeTexts(draft, langs = draft.langs) {
 
 async function buildDraft({ offer, style, date, source, photo = null, langs = null, warning = '' }) {
   const id = crypto.randomBytes(6).toString('hex');
-  const auto = photo ? { picture: { file: null, pexelsId: null, dataUri: photo }, ranked: [] } : await autoPicture(offer, usedIds());
+  // AI photos first (client decision 2026-10-30); real photos only when the AI fails or on request.
+  let auto = null;
+  if (photo) auto = { picture: { file: null, pexelsId: null, dataUri: photo }, ranked: [] };
+  else {
+    try { auto = { picture: aiPicture(await generateSet(offer)), ranked: [] }; }
+    catch (err) { console.error('studio ai photo:', err.message); auto = await autoPicture(offer, usedIds()); }
+  }
   const picture = auto.picture;
   const draft = {
     id, createdAt: new Date().toISOString(), forDate: date.toISOString().slice(0, 10),
@@ -416,8 +422,8 @@ function deleteDraft(draft) {
 }
 
 /** "Mehrere Angebote": one post with 2-6 offers (studio/bundle.js). */
-async function createBundleDraft({ kind, keys, date = new Date(), langs = null }) {
-  return buildBundle({ kind, keys, langs: langs || defaultLangs(date), date, liveOffers, queriesFor, choosePhoto });
+async function createBundleDraft({ kind, keys, style, date = new Date(), langs = null }) {
+  return buildBundle({ kind, keys, style, langs: langs || defaultLangs(date), date, liveOffers, queriesFor, choosePhoto });
 }
 
 module.exports = { createBundleDraft, offerChoices, createPackageDraft, saveToLibrary, deleteDraft, createDailyDraft, createManualDraft, regenerate, pickOffer };

@@ -43,7 +43,7 @@ const CITY = {
   BCN: { de: 'Barcelona', ar: 'برشلونة', ckb: 'بارسێلۆنا' },
   ROM: { de: 'Rom', ar: 'روما', ckb: 'ڕۆما' },
   FCO: { de: 'Rom', ar: 'روما', ckb: 'ڕۆما' },
-  HER: { de: 'Heraklion (Kreta)', ar: 'هيراكليون (كريت)', ckb: 'هێراکلیۆن (کریت)' },
+  HER: { de: 'Kreta', ar: 'كريت', ckb: 'کریت' },
   PAR: { de: 'Paris', ar: 'باريس', ckb: 'پاریس' },
   AMS: { de: 'Amsterdam', ar: 'أمستردام', ckb: 'ئەمستردام' },
   TBS: { de: 'Tiflis', ar: 'تبليسي', ckb: 'تبلیسی' },
@@ -60,7 +60,8 @@ const BASE_TAGS = {
 };
 const tagWord = (s) => '#' + String(s).replace(/[^\p{L}]/gu, '');
 
-const cityName = (place, lang) => (place.code && CITY[place.code] && CITY[place.code][lang]) || place.name;
+// City, never the airport name (client): 'Köln/Bonn' -> 'Köln', 'Heraklion, Kreta' -> mapped or 'Heraklion'.
+const cityName = (place, lang) => (place.code && CITY[place.code] && CITY[place.code][lang]) || String(place.name || '').split(/\s*[/,(]\s*/)[0];
 
 const LANG_NAME = { de: 'German', ar: 'Arabic (Modern Standard, warm tone)', ckb: 'Kurdish Badini (Behdînî, Northern Kurdish of Duhok, written in Arabic script)' };
 

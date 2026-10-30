@@ -22,6 +22,8 @@
     background: linear-gradient(170deg, #1d3d78 0%, #0f2350 45%, #070f26 100%); }
   .rtl .post, .rtl .post * { font-family: "IBM Plex Sans Arabic", sans-serif; }
   .bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  /* Square and 4:5 from a 9:16 photo: keep the sky band under the price instead of a centre crop */
+  .square .bg, .portrait .bg { object-position: 50% 30% !important; }
   /* Soft shade only behind the text (top) and the logo (bottom); the scene stays clear */
   .shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(4,10,28,.5) 0%, rgba(4,10,28,.18) 26%, rgba(4,10,28,0) 40%, rgba(4,10,28,0) 76%, rgba(4,10,28,.55) 100%); }
 

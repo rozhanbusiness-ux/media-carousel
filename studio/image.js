@@ -33,12 +33,12 @@ function buildPrompt(city, variant, kind) {
     `Photorealistic travel poster photograph of ${city}. Scene: ${variant}.`,
     KIND_RULES[kind] || KIND_RULES.flight,
     'REALISM: must look like a real photo by a top travel photographer (full-frame camera, 24-35mm lens, f/8, RAW, natural colour grading); real materials, real proportions, architecturally accurate; ONE real viewpoint: only landmarks that are really visible together from one place, no collage of distant landmarks; no CGI, no illustration, no painted or plastic AI look, no HDR glow, no oversaturation.',
-    'POSTER COMPOSITION (vertical 9:16): the top 35% is open, clean sky only (soft gradient, a few light clouds), with no buildings, birds or objects, because text is placed there;',
-    'the middle (35% to 80% from the top) holds the hero scene, horizontally centred, tack-sharp and instantly recognisable;',
-    'the bottom 20% is calm, simple and darker (shaded ground, calm water or a plaza in soft shadow, low detail), because a light logo is placed there.',
+    'POSTER COMPOSITION (vertical 9:16) — STRICT, the layout depends on it: the top 40% of the frame is ONLY clear light-blue sky (soft gradient, at most a few thin clouds); nothing may reach into it: no tower, spire, dome, roof, tree, mountain top, bird or object; shoot from far enough away and with a low enough camera so the whole subject sits below that line;',
+    'the middle (40% to 78% from the top) holds the hero scene, horizontally centred, tack-sharp and instantly recognisable;',
+    'the bottom 22% is noticeably darker and calm: the foreground in shadow (shaded plaza, dark water, shaded trees or ground), little detail, no bright surfaces, because a light logo is placed there.',
     'LIGHT: golden hour or early blue hour, warm sun from the side, glowing highlights on the main subject, deep clean sky, crystal-clear air, no haze.',
     'MOOD: aspirational, premium and inviting; tidy scene, no traffic, no cranes, no construction, no rubbish, at most a few small distant people, none facing the camera.',
-    'FORBIDDEN: any mosque or minaret anywhere in the frame; any text, letters, signs with words, logos, flags with writing, watermarks, borders or frames.',
+    'FORBIDDEN: any mosque or minaret anywhere in the frame; any readable text anywhere: no brand names or logos on buildings, rooftops or billboards (e.g. hotel or company signs), no shop signs, no letters, no flags with writing, no watermarks, borders or frames.',
   ].join(' ');
 }
 
@@ -137,7 +137,7 @@ function buildCoverPrompt() {
   return [
     `Photorealistic photograph taken from a passenger airplane window above the clouds: ${pick(COVER_SCENES)}; ${pick(COVER_FRAMES)}.`,
     'REALISM: looks like a real photo taken with a good camera through the window; natural colours, no CGI, no illustration, no HDR glow, no oversaturation.',
-    'COMPOSITION (vertical 9:16): the top 35% is open, clean sky (text is placed there); the bottom 20% is darker and calm (shaded clouds or the shaded window frame), because a light logo is placed there.',
+    'COMPOSITION (vertical 9:16) — STRICT: the top 40% is only clear light-blue sky (text is placed there); the bottom 22% is noticeably darker and calm (shaded clouds or the shaded window frame), because a light logo is placed there.',
     'FORBIDDEN: any airline name, logo, livery or text; any people; any cabin interior apart from the window frame; any mosque or minaret; any watermark, border or frame added to the image.',
   ].join(' ');
 }
