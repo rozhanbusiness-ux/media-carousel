@@ -4,11 +4,29 @@ Decisions and state of the marketing studio. The rest of Carousel is documented 
 `PROJECT-MEMORY.md` (not edited from the studio work).
 
 ## Languages
-- Posts are written in German (`de`), Arabic (`ar`) and Kurdish **Kurmanji in Latin letters**
-  (`kmr`, client decision 2026-10-20; was Badini in Arabic script, `ckb`). Kurmanji is
-  left-to-right; city names match the website (Hewlêr, Silêmanî, Bexda, Stenbol …).
-- Old drafts saved with `ckb` are migrated to `kmr` when loaded (`store.js`).
-- The script title font is used for German only (not verified for ê, î, ş).
+- Posts are written in German (`de`), Arabic (`ar`) and Kurdish **Badini in Arabic script**
+  (`ckb`, right-to-left). Client decision 2026-10-30, for offers and ideas alike: the switch to
+  Kurmanji in Latin letters (`kmr`, 2026-10-20) was reverted; the audience (Badini Kurds) and
+  the competitor both use Arabic script.
+- Offer drafts saved with `kmr` are migrated to `ckb` when loaded (`store.js`). Old ideas with
+  `kmr` texts stay as they are.
+- Badini template words (Magazin labels, "چوون و هاتن") still need a native speaker's review.
+- The script title font is used for German only.
+
+## Offer posts for WhatsApp status / stories (decisions 2026-10-30)
+- Strategy: online target 10-20 bookings a month within 6 months; Google Ads for flights first,
+  then Meta ads for packages. WhatsApp status is the strongest channel today.
+- Template "◻ Schlicht" (`templates/flight-simple.html`), modelled on the competitor's stories
+  but different on purpose: full-screen 9:16, navy price plate with a gold underline
+  ("189 EUR", same order in every language), one route line, "round trip" tag only for round
+  trips, logo + slogan at the bottom. No dates, no frame, no glass card. Rejected on the way:
+  round gold seal, framed trip tag, bookmark ribbon.
+- AI photos (`image.js`): realistic poster photos with open sky in the top 35 % and a calm
+  bottom; one real viewpoint (no landmark collages); generate the DESTINATION only, never the
+  product (no invented hotel, room, pool, ship interior, house, no aircraft). Real photos stay
+  allowed; approved photos go to the library and are reused.
+- Bundle posts are generated in the background; the page polls `/drafts/bundle/status`
+  (a 6-offer bundle took longer than the Nginx timeout of 180 s -> 504).
 
 ## "Ideen des Tages" (news-ideas.js, editorial.js, news-photos.js)
 - Client rules: joyful only; no food, restaurants or drinks; no mosques or minarets (temples and
