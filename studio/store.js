@@ -22,8 +22,9 @@ function save(data) {
 
 function listDrafts() { return load().drafts.sort((a, b) => b.createdAt.localeCompare(a.createdAt)); }
 
-// Drafts made before the switch to Kurmanji (2026-10-20) used 'ckb' (Badini): new renders use 'kmr'.
-const migrate = (d) => (d && Array.isArray(d.langs) ? { ...d, langs: [...new Set(d.langs.map((l) => (l === 'ckb' ? 'kmr' : l)))] } : d);
+// Offer drafts made while offers used Kurmanji (2026-10-20 to 2026-10-30) carry 'kmr':
+// offers are Badini in Arabic script again (client decision), so new renders use 'ckb'.
+const migrate = (d) => (d && Array.isArray(d.langs) ? { ...d, langs: [...new Set(d.langs.map((l) => (l === 'kmr' ? 'ckb' : l)))] } : d);
 
 function getDraft(id) { return migrate(load().drafts.find((d) => d.id === id) || null); }
 

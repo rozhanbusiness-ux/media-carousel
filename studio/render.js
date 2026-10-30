@@ -10,7 +10,7 @@ const path = require('path');
 const { renderToJpeg } = require('./browser');
 
 const DIR = __dirname;
-const STYLES = ['flight', 'flight-cover', 'flight-ticket', 'flight-split', 'flight-diagonal', 'flight-postcard', 'flight-ribbon', 'flight-band'];
+const STYLES = ['flight', 'flight-cover', 'flight-ticket', 'flight-split', 'flight-diagonal', 'flight-postcard', 'flight-ribbon', 'flight-band', 'flight-simple'];
 const SIZES = ['story', 'portrait', 'square'];
 
 // Monday..Sunday -> style (client decision 2026-10-08).
@@ -21,7 +21,7 @@ const STYLE_BY_WEEKDAY = { 1: 'flight', 2: 'flight', 3: 'flight', 4: 'flight', 5
 const PACKAGE_LABELS = {
   de: { kicker: 'Pauschalreise', detailsTitle: 'Dein Urlaub' },
   ar: { kicker: 'باقة سياحية', detailsTitle: 'عطلتك' },
-  kmr: { kicker: 'Rêwîtiya pakêt', detailsTitle: 'Betlaneya te' },
+  ckb: { kicker: 'پاکێجا گەشتێ', detailsTitle: 'بێهنڤەدانا تە' },
 };
 
 const LABELS = {
@@ -31,9 +31,9 @@ const LABELS = {
   ar: { kicker: 'عرض طيران', swipe: '← اسحب للتفاصيل', detailsTitle: 'رحلتك', priceLabel: 'ابتداءً من', perPerson: 'للشخص',
     fromLabel: 'من', toLabel: 'إلى', datesLabel: 'موعد السفر', airlineLabel: 'شركة الطيران',
     ctaTitle: 'احجز الآن', ctaText: 'راسلنا على واتساب – المقاعد محدودة بهذا السعر.', ctaButton: '', notice: 'الأسعار تتغير باستمرار، ومن يحجز أولاً يسافر بسعر أفضل.' },
-  kmr: { kicker: 'Pêşniyara firînê', swipe: 'Ji bo hûrguliyan bikişîne →', detailsTitle: 'Firîna te', priceLabel: 'ji', perPerson: 'bo her kesî',
-    fromLabel: 'Ji', toLabel: 'Bo', datesLabel: 'Dema rêwîtiyê', airlineLabel: 'Şîrketa firînê',
-    ctaTitle: 'Niha rezerv bike', ctaText: 'Li ser WhatsAppê ji me re binivîse – cih bi vê bihayê kêm in.', ctaButton: '', notice: 'Biha her roj diguherin – yê zû rezerv bike, erzantir digere.' },
+  ckb: { kicker: 'پێشنیارا فرۆکێ', swipe: '← بکێشە بۆ وردەکاریان', detailsTitle: 'گەشتا تە', priceLabel: 'ژ', perPerson: 'بۆ هەر کەسەکی',
+    fromLabel: 'ژ', toLabel: 'بۆ', datesLabel: 'دەمێ گەشتێ', airlineLabel: 'کۆمپانیا فرۆکێ',
+    ctaTitle: 'نوکە بوک بکە', ctaText: 'ل سەر واتسئاپێ نامەیەکێ بۆ مە بنێرە – جهێن ب ڤی نرخی کێمن.', ctaButton: '', notice: 'نرخ بەردەوام دگوهۆڕن، ئەوێ زوی بوک بکەت ب نرخەکێ باشتر گەشتێ دکەت.' },
 };
 
 // Slide 3 button: the business WhatsApp number from the server .env (STUDIO_WHATSAPP,
@@ -96,12 +96,14 @@ function buildPriceHtml(price) {
  * Render one slide. `post` = { style, lang, destination, hook, from, to, dates, airline, price, photo (data URI) }.
  * Returns a JPEG buffer.
  */
+const TRIP = { de: 'Hin & zurück', ar: 'ذهاب وعودة', ckb: 'چوون و هاتن' };
+
 async function renderSlide(post, size, slide) {
   if (!STYLES.includes(post.style)) throw new Error('unknown style');
   if (!SIZES.includes(size)) throw new Error('unknown size');
   if (![1, 2, 3].includes(slide)) throw new Error('unknown slide');
   const L = LABELS[post.lang] || LABELS.de;
-  const rtl = post.lang === 'ar' || post.lang === 'ckb'; // Kurmanji (kmr) is written with Latin letters
+  const rtl = post.lang === 'ar' || post.lang === 'ckb';
   const values = {
     ...L, ctaButton: ctaButton(), lang: post.lang, dir: rtl ? 'rtl' : 'ltr', size, slide,
     // The script title font is only proven for German letters.
@@ -112,6 +114,8 @@ async function renderSlide(post, size, slide) {
     dates: '\u2066' + post.dates + '\u2069', price: '%%PRICE%%',
     kind: post.card ? 'package' : 'flight', // every non-flight offer uses the hotel-style card
     country: post.country || '', hotel: '', stars: '', pkgLine: '', place: '',
+    // Short trip tag under the route (flight-simple): only for round trips, nothing for one-way.
+    trip: post.roundTrip ? (TRIP[post.lang] || TRIP.de) : '',
   };
   if (post.labels) Object.assign(values, post.labels); // bundle cover: own kicker / swipe text
   if (post.card) {
@@ -138,6 +142,6 @@ async function renderSlide(post, size, slide) {
 }
 
 // Templates that also have the hotel card (package, cruise, holiday home posts).
-const PACKAGE_STYLES = ['flight', 'flight-cover'];
+const PACKAGE_STYLES = ['flight', 'flight-cover', 'flight-simple'];
 
 module.exports = { fontCss, LOGO, SLOGAN_HTML, SLOGAN_CSS, esc, PACKAGE_STYLES, renderSlide, buildPriceHtml, STYLES, SIZES, STYLE_BY_WEEKDAY, LABELS };

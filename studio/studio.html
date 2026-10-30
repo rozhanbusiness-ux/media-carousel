@@ -56,7 +56,7 @@
     <span style="font-size:14px;color:#cfd6e6">Sprachen:</span>
     <label class="chk"><input type="checkbox" name="deflang" value="de"> Deutsch</label>
     <label class="chk"><input type="checkbox" name="deflang" value="ar"> العربية</label>
-    <label class="chk"><input type="checkbox" name="deflang" value="kmr"> Kurdî</label>
+    <label class="chk"><input type="checkbox" name="deflang" value="ckb"> کوردی</label>
     <span style="font-size:12px;color:#8e98b3">(leer = automatisch)</span>
   </div>
   <details class="manual">
@@ -177,9 +177,9 @@
 <script>
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const LANG = { de: 'Deutsch', ar: 'العربية', kmr: 'Kurdî (Kurmancî)', ckb: 'کوردی (بادینی)' };
+const LANG = { de: 'Deutsch', ar: 'العربية', ckb: 'کوردی (بادینی)', kmr: 'Kurdî (Kurmancî)' };
 const STYLE_NAMES = [['flight', '1 Glas'], ['flight-cover', '★ Magazin'], ['flight-ticket', '2 Bordkarte'], ['flight-split', '3 Geteilt'], ['flight-diagonal', '4 Diagonal'],
-  ['flight-postcard', '5 Postkarte'], ['flight-ribbon', '6 Schleife'], ['flight-band', '7 Goldband']];
+  ['flight-postcard', '5 Postkarte'], ['flight-ribbon', '6 Schleife'], ['flight-band', '7 Goldband'], ['flight-simple', '◻ Schlicht']];
 const defLangs = () => [...document.querySelectorAll('input[name=deflang]:checked')].map((i) => i.value);
 try { const saved = JSON.parse(localStorage.getItem('studioLangs') || '[]'); document.querySelectorAll('input[name=deflang]').forEach((i) => { i.checked = saved.includes(i.value); }); } catch {}
 document.querySelectorAll('input[name=deflang]').forEach((i) => i.onchange = () => { try { localStorage.setItem('studioLangs', JSON.stringify(defLangs())); } catch {} });
@@ -215,8 +215,8 @@ function render(drafts) {
           <div class="cands">${d.photoCandidates.map((c) => `<button class="cand" data-act="photo-pick" data-pid="${esc(String(c.id))}"><img src="${esc(c.thumb)}" alt="" loading="lazy" referrerpolicy="no-referrer"><span>${c.score == null ? '–' : Number(c.score) + '/10'}</span>${c.why ? `<em>${esc(c.why)}</em>` : ''}</button>`).join('')}</div>
         </div>` : (d.needsPhoto ? '<p class="warn">⚠ Kein passendes echtes Foto gefunden. Bitte eigenes Foto hochladen (⬆) oder im Notfall 🤖 KI-Foto.</p>' : '')}
       <div class="tools">
-        ${d.bundle ? `<select data-act="style">${STYLE_NAMES.filter(([v]) => ['flight', 'flight-cover'].includes(v)).map(([v, n]) => `<option value="${v}" ${v === d.style ? 'selected' : ''}>${n}</option>`).join('')}</select>` : `<select data-act="style">${STYLE_NAMES.map(([v, n]) => `<option value="${v}" ${v === d.style ? 'selected' : ''}>${n}</option>`).join('')}</select>`}
-        ${['de', 'ar', 'kmr'].map((l) => `<label class="chk"><input type="checkbox" data-lang-box value="${l}" ${(d.langs || []).includes(l) ? 'checked' : ''}> ${LANG[l]}</label>`).join('')}
+        ${d.bundle ? `<select data-act="style">${STYLE_NAMES.filter(([v]) => ['flight', 'flight-cover', 'flight-simple'].includes(v)).map(([v, n]) => `<option value="${v}" ${v === d.style ? 'selected' : ''}>${n}</option>`).join('')}</select>` : `<select data-act="style">${STYLE_NAMES.map(([v, n]) => `<option value="${v}" ${v === d.style ? 'selected' : ''}>${n}</option>`).join('')}</select>`}
+        ${['de', 'ar', 'ckb'].map((l) => `<label class="chk"><input type="checkbox" data-lang-box value="${l}" ${(d.langs || []).includes(l) ? 'checked' : ''}> ${LANG[l]}</label>`).join('')}
         <button class="ghost" data-act="langs">Sprachen übernehmen</button>
       </div>
       ${d.bundle ? '<div class="row"><button class="ghost" data-act="all">↻ Neue Fotos</button></div>' : `<div class="row">
@@ -388,9 +388,17 @@ $('#bundleList').onchange = (e) => {
 function updateBundleCount() { $('#bundleCount').textContent = `${bundlePick.length} / 6 gewählt`; }
 $('#bundleGo').onclick = async () => {
   if (bundlePick.length < 2) { $('#msg').textContent = 'Bitte mindestens 2 Angebote wählen.'; return; }
-  $('#bundleGo').disabled = true; $('#msg').textContent = 'Sammel-Beitrag wird erstellt … (ca. 1 Minute)';
+  $('#bundleGo').disabled = true; $('#msg').textContent = 'Sammel-Beitrag wird erstellt …';
   try {
     await api('/api/studio/drafts/bundle', { method: 'POST', body: JSON.stringify({ kind: $('#bundleKind').value, keys: bundlePick, ...(defLangs().length ? { langs: defLangs() } : {}) }) });
+    const t0 = Date.now();
+    for (;;) {
+      await new Promise((r) => setTimeout(r, 5000));
+      const job = await api('/api/studio/drafts/bundle/status');
+      if (!job.running) { if (job.error) throw new Error(job.error); break; }
+      if (Date.now() - t0 > 15 * 60000) throw new Error('dauert zu lange, bitte später die Liste neu laden');
+      $('#msg').textContent = `Sammel-Beitrag wird erstellt … (${Math.round((Date.now() - t0) / 1000)} s)`;
+    }
     $('#msg').textContent = 'Fertig.'; $('#bundleBox').hidden = true; await load();
   } catch (err) { $('#msg').textContent = 'Fehler: ' + err.message; }
   $('#bundleGo').disabled = false;

@@ -13,22 +13,22 @@ const { renderToJpeg } = require('./browser');
 const { fontCss, LOGO, SLOGAN_HTML, SLOGAN_CSS, esc } = require('./render');
 
 const KICKER = {
-  german_city: { de: 'Deutschland', ar: 'ألمانيا', kmr: 'Almanya' },
-  lake: { de: 'Seen', ar: 'بحيرات', kmr: 'Gol' },
-  mountain: { de: 'Berge', ar: 'جبال', kmr: 'Çiya' },
-  coast: { de: 'Küste', ar: 'سواحل', kmr: 'Perav' },
-  island: { de: 'Inseln', ar: 'جزر', kmr: 'Girav' },
-  village: { de: 'Dörfer', ar: 'قرى', kmr: 'Gund' },
-  capital: { de: 'Hauptstädte', ar: 'عواصم', kmr: 'Paytext' },
-  kurdistan: { de: 'Kurdistan', ar: 'كردستان', kmr: 'Kurdistan' },
-  uae: { de: 'Emirate', ar: 'الإمارات', kmr: 'Mîrnişîn' },
-  world: { de: 'Welt', ar: 'حول العالم', kmr: 'Cîhan' },
-  tip: { de: 'Reisetipp', ar: 'نصيحة سفر', kmr: 'Şîreta rêwîtiyê' },
+  german_city: { de: 'Deutschland', ar: 'ألمانيا', ckb: 'ئەلمانیا' },
+  lake: { de: 'Seen', ar: 'بحيرات', ckb: 'گۆل' },
+  mountain: { de: 'Berge', ar: 'جبال', ckb: 'چیا' },
+  coast: { de: 'Küste', ar: 'سواحل', ckb: 'پەراڤ' },
+  island: { de: 'Inseln', ar: 'جزر', ckb: 'گراڤ' },
+  village: { de: 'Dörfer', ar: 'قرى', ckb: 'گوند' },
+  capital: { de: 'Hauptstädte', ar: 'عواصم', ckb: 'پایتەخت' },
+  kurdistan: { de: 'Kurdistan', ar: 'كردستان', ckb: 'کوردستان' },
+  uae: { de: 'Emirate', ar: 'الإمارات', ckb: 'میرنشین' },
+  world: { de: 'Welt', ar: 'حول العالم', ckb: 'جیهان' },
+  tip: { de: 'Reisetipp', ar: 'نصيحة سفر', ckb: 'شیرەتا گەشتێ' },
 };
 const UI = {
   de: { swipe: 'Wischen →', story: 'Erlebnis', source: 'Quelle', photo: 'Foto' },
   ar: { swipe: '← اسحب', story: 'تجربة', source: 'المصدر', photo: 'صورة' },
-  kmr: { swipe: 'Bikişîne →', story: 'Serpêhatî', source: 'Çavkanî', photo: 'Wêne' },
+  ckb: { swipe: '← بکێشە', story: 'سەرهاتی', source: 'ژێدەر', photo: 'وێنە' },
 };
 
 /** Story text → { middle, last }: the last sentence closes the post on slide 3. */
@@ -111,7 +111,7 @@ function slideValues(idea, lang, photo) {
   ].filter(Boolean).join(' · ');
   const x = idea.photo && Number.isInteger(idea.photo.x) ? idea.photo.x : 50;
   return {
-    lang, dir: lang === 'ar' ? 'rtl' : 'ltr', ui, photo, pos: `${x}% 50%`,
+    lang, dir: lang === 'ar' || lang === 'ckb' ? 'rtl' : 'ltr', ui, photo, pos: `${x}% 50%`,
     kicker: (KICKER[idea.kind === 'tip' ? 'tip' : idea.type] || KICKER.world)[lang] || '',
     place: idea.kind === 'tip' ? '' : idea.place || '', hook: t.hook, middle: middle || t.body, last, credit,
   };

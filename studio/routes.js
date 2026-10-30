@@ -18,9 +18,10 @@ const { STYLES } = require('./render');
 const { getFlightOffers } = require('./offers');
 
 const ID = /^[a-f0-9]{12}$/;
-const LANG_SET = ['de', 'ar', 'kmr'];
+const LANG_SET = ['de', 'ar', 'ckb'];
 const cleanLangs = (v) => (Array.isArray(v) && v.length && v.length <= 3 && v.every((l) => LANG_SET.includes(l)) ? [...new Set(v)] : null);
 let generating = false;
+let bundleJob = { running: false, error: null, id: null };
 
 module.exports = function mountStudio(app) {
   const router = express.Router();
@@ -46,11 +47,18 @@ module.exports = function mountStudio(app) {
       return res.status(400).json({ error: 'Bitte 2 bis 6 verschiedene Angebote wählen.' });
     }
     if (generating) return res.status(429).json({ error: 'already generating' });
+    // Runs in the background: 6 offers can take longer than the Nginx
+    // timeout (180 s), so the page polls /drafts/bundle/status instead.
     generating = true;
-    try { res.json(await createBundleDraft({ kind, keys, langs: cleanLangs(langs) })); }
-    catch (err) { console.error('studio bundle:', err.message); res.status(500).json({ error: err.message }); }
-    finally { generating = false; }
+    bundleJob = { running: true, error: null, id: null };
+    createBundleDraft({ kind, keys, langs: cleanLangs(langs) })
+      .then((draft) => { bundleJob = { running: false, error: null, id: draft && draft.id }; })
+      .catch((err) => { console.error('studio bundle:', err.message); bundleJob = { running: false, error: err.message, id: null }; })
+      .finally(() => { generating = false; });
+    res.status(202).json({ started: true });
   });
+
+  router.get('/drafts/bundle/status', (req, res) => res.json(bundleJob));
 
   // Package draft (hotel + flight), on demand.
   router.post('/drafts/package', async (req, res) => {

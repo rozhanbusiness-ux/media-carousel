@@ -29,7 +29,7 @@ const LIBRARY = path.join(CACHE, 'studio-library'); // approved photos, kept acr
 const REPEAT_DAYS = 14; // no destination (packages: no country) again within 14 days (client plan)
 const KURDISH_DAYS = new Set([1, 3, 5]);
 
-const defaultLangs = (date) => ['de', KURDISH_DAYS.has(date.getDay()) ? 'kmr' : 'ar'];
+const defaultLangs = (date) => ['de', KURDISH_DAYS.has(date.getDay()) ? 'ckb' : 'ar'];
 const photoPath = (id) => path.join(CACHE, `studio-photo-${id}.txt`);
 const slidePath = (id, slide) => path.join(CACHE, `studio-photo-${id}-s${slide}.txt`); // own photo for slide 2/3 (AI sets)
 
@@ -222,7 +222,7 @@ function datesText(offer, lang) {
   if (!offer.returnDate) return out;
   const back = formatDate(offer.returnDate);
   if (lang === 'de') return `${out} – ${back}`;
-  return lang === 'ar' ? `من ${out} إلى ${back}` : `${out} – ${back}`;
+  return lang === 'ar' ? `من ${out} إلى ${back}` : `ژ ${out} بۆ ${back}`;
 }
 
 /** Render all slides of a draft from its stored photo and texts. */
@@ -239,7 +239,7 @@ async function renderDraft(draft) {
       style: draft.style, lang, photo, destination: local(draft.offer.to), hook: t.hook,
       from: draft.offer.from ? { city: local(draft.offer.from), code: draft.offer.from.code || '' } : { city: '', code: '' },
       to: { city: local(draft.offer.to), code: draft.offer.to.code || '' },
-      dates: datesText(draft.offer, lang), airline: draft.offer.airline,
+      dates: datesText(draft.offer, lang), roundTrip: !!draft.offer.returnDate, airline: draft.offer.airline,
       price: draft.offer.price,
       kind: draft.offer.kind, card: draft.offer.kind === 'flight' || !draft.offer.kind ? null : cardFor(draft.offer, lang, formatPrice),
       country: draft.offer.kind && draft.offer.kind !== 'flight' && draft.offer.country ? countryName(draft.offer.country, lang) : '',
@@ -391,7 +391,7 @@ async function regenerate(draft, what, value) {
   }
   if (what === 'style') {
     if (!STYLES.includes(value)) throw new Error('unknown style');
-    if (draft.offer.kind && draft.offer.kind !== 'flight' && !PACKAGE_STYLES.includes(value)) throw new Error('Für dieses Angebot: Glas oder Magazin.');
+    if (draft.offer.kind && draft.offer.kind !== 'flight' && !PACKAGE_STYLES.includes(value)) throw new Error('Für dieses Angebot: Glas, Magazin oder Schlicht.');
     draft.style = value;
   }
   if (what === 'langs') {

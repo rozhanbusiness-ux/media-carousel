@@ -29,24 +29,24 @@ const photoPath = (id, n) => path.join(CACHE, `studio-photo-${id}-${n}.txt`);
 const COVER = {
   de: { kicker: 'Unsere Auswahl', swipe: 'Wischen für alle Angebote →' },
   ar: { kicker: 'اختيارنا لك', swipe: '← اسحب لكل العروض' },
-  kmr: { kicker: 'Bijartina me', swipe: 'Ji bo hemû pêşniyaran bikişîne →' },
+  ckb: { kicker: 'هەلبژارتنا مە', swipe: '← بکێشە بۆ هەمی پێشنیاران' },
 };
 // Cover titles per offer kind (client approved all; one is picked at random per post).
 const TITLES = {
   flight: [
-    { de: 'Ziele, die auf dich warten', ar: 'وجهات تنتظرك', kmr: 'Cihên ku li benda te ne' },
-    { de: 'Handverlesene Flüge', ar: 'رحلات مختارة بعناية', kmr: 'Firînên bi baldarî hatine bijartin' },
-    { de: 'Abheben nach …', ar: 'حلّق إلى…', kmr: 'Bifire bo …' },
+    { de: 'Ziele, die auf dich warten', ar: 'وجهات تنتظرك', ckb: 'جهێن چاڤەڕێیا تە دکەن' },
+    { de: 'Handverlesene Flüge', ar: 'رحلات مختارة بعناية', ckb: 'گەشتێن ب هویری هاتینە هەلبژارتن' },
+    { de: 'Abheben nach …', ar: 'حلّق إلى…', ckb: 'بفڕە بۆ…' },
   ],
   package: [
-    { de: 'Urlaub, den du verdienst', ar: 'عطلات تستحقها', kmr: 'Betlaneya ku tu hêjayî wê yî' },
-    { de: 'Handverlesene Auszeiten', ar: 'إقامات مختارة بعناية', kmr: 'Betlaneyên bi baldarî hatine bijartin' },
-    { de: 'Momente, die bleiben', ar: 'لحظات لا تُنسى', kmr: 'Demên ku dimînin' },
+    { de: 'Urlaub, den du verdienst', ar: 'عطلات تستحقها', ckb: 'بێهنڤەدانا تو هێژایی' },
+    { de: 'Handverlesene Auszeiten', ar: 'إقامات مختارة بعناية', ckb: 'مانێن ب هویری هاتینە هەلبژارتن' },
+    { de: 'Momente, die bleiben', ar: 'لحظات لا تُنسى', ckb: 'ساتێن ناهێنە ژبیرکرن' },
   ],
 };
 const KINDS = Object.keys(TITLES);
 const titleOf = (draft, lang) => TITLES[draft.bundleKind || 'flight'][draft.titleIndex || 0][lang];
-const CAPTION_HEAD = { de: 'Wähle dein nächstes Ziel:', ar: 'اختر وجهتك القادمة:', kmr: 'Cihê xwe yê din hilbijêre:' };
+const CAPTION_HEAD = { de: 'Wähle dein nächstes Ziel:', ar: 'اختر وجهتك القادمة:', ckb: 'جهێ خۆ یێ دی هەلبژێرە:' };
 
 const local = (p, lang) => (lang === 'de' ? p.name : cityName(p, lang));
 
@@ -123,6 +123,7 @@ function postFor(o, lang, photo, style = 'flight') {
     from: o.from ? { city: local(o.from, lang), code: o.from.code || '' } : { city: '', code: '' },
     to: { city: local(o.to, lang), code: o.to.code || '' },
     dates: o.kind === 'package' ? '' : formatDate(o.departureDate) + (o.returnDate ? ' – ' + formatDate(o.returnDate) : ''),
+    roundTrip: o.kind !== 'package' && !!o.returnDate,
     price: o.price, kind: o.kind, card, country: card && o.country ? countryName(o.country, lang) : '',
   };
 }
@@ -230,7 +231,7 @@ async function regenerateBundle(draft, what, value, queriesFor, choosePhoto, LAN
     if (n >= 0 && draft.photoPos) draft.photoPos[n] = null; // new photo: centred
     draft.bundlePick = null;
   } else if (what === 'style') {
-    if (!PACKAGE_STYLES.includes(value)) throw new Error('Für Sammel-Beiträge: Glas oder Magazin.');
+    if (!PACKAGE_STYLES.includes(value)) throw new Error('Für Sammel-Beiträge: Glas, Magazin oder Schlicht.');
     draft.style = value;
   } else if (what === 'langs') {
     if (!Array.isArray(value) || !value.length || value.length > 3 || !value.every((l) => LANGS.includes(l))) throw new Error('bad languages');

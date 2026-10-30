@@ -16,22 +16,29 @@ const VARIANTS = [
   'a local market or harbour scene with soft natural light',
 ];
 
-// Detailed prompt (client decision: AI images first). Layout matches the templates: logo at the top,
-// the landmark in the upper-middle, a calm lower third where the glass price card sits; the square
-// version is a centre crop, so the subject stays centred horizontally.
-function buildPrompt(city, variant) {
+// Poster-style prompt (client decision 2026-10-30): realistic travel photo laid out for the
+// "Schlicht" story template: open sky in the top 35% (price and route), the scene in the middle,
+// a calm bottom for the logo. One real viewpoint, no impossible collages (client: realism first).
+// Rule for every offer kind: generate the DESTINATION, never the product itself (no invented
+// hotel, room, pool, ship interior or holiday home: that would mislead the customer).
+const KIND_RULES = {
+  flight: 'Show the destination itself; no aircraft.',
+  package: 'Show the holiday destination (coast, bay, old town or landscape); NO hotel building, hotel pool, room, restaurant or resort facility that could be mistaken for the offered hotel.',
+  cruise: 'Show the sea and coastline of the destination at sunset; at most one large plain white cruise ship far away, without any name, logo or company colours; never a ship interior.',
+  home: 'Show the natural surroundings (lake, mountains, countryside or coast); no specific house, cabin or villa.',
+};
+
+function buildPrompt(city, variant, kind) {
   return [
-    `Ultra-realistic luxury travel photograph of ${city}. Scene: ${variant}.`,
-    'REALISM FIRST: it must be indistinguishable from an unretouched photo taken on a real camera (Sony A7 IV, RAW, natural colour grading), with natural imperfections; ONE viewpoint and ONE main subject, as a photographer standing there could really see it; do not combine several landmarks in one frame; no exaggerated turquoise water, no glossy plastic textures, no perfect symmetry, no typical AI look.',
-    'STYLE: editorial cover photo for a high-end travel magazine (Condé Nast Traveler, Travel + Leisure); aspirational, elegant, calm, inviting.',
-    'CAMERA: full-frame camera, 24mm or 35mm lens, f/8, tripod, perfectly level horizon, vertical lines straight, tack-sharp from foreground to background, no blur, no bokeh.',
-    'LIGHT: warm golden hour or a clear bright morning, soft directional sunlight, clean blue sky with a few soft clouds, gentle natural contrast, rich but true-to-life colours, crystal-clear air, no haze, no fog.',
-    'ACCURACY: the place must be instantly recognisable and architecturally accurate to reality; real materials, real proportions, real surroundings; no invented buildings.',
-    'COMPOSITION (vertical 9:16): the main subject stands in the upper-middle of the frame (between 15% and 60% from the top) and horizontally centred, so a centre square crop still shows it whole;',
-    'the top 12% is calm sky (space for a logo); the lower third is calm and simple (water, sand, lawn, a plaza or a promenade) with no important detail, because a price card covers it.',
-    'Clean, uncluttered, tidy and well-kept scene; no traffic, no cranes, no rubbish, no construction, no wires; at most a few small distant people, none facing the camera.',
-    'FORBIDDEN: any mosque or minaret anywhere in the frame;',
-    'no text, letters, signs with words, logos, watermarks, borders or frames; no HDR look, no oversaturation, no glow, no fantasy or painted look, no CGI or illustration style.',
+    `Photorealistic travel poster photograph of ${city}. Scene: ${variant}.`,
+    KIND_RULES[kind] || KIND_RULES.flight,
+    'REALISM: must look like a real photo by a top travel photographer (full-frame camera, 24-35mm lens, f/8, RAW, natural colour grading); real materials, real proportions, architecturally accurate; ONE real viewpoint: only landmarks that are really visible together from one place, no collage of distant landmarks; no CGI, no illustration, no painted or plastic AI look, no HDR glow, no oversaturation.',
+    'POSTER COMPOSITION (vertical 9:16): the top 35% is open, clean sky only (soft gradient, a few light clouds), with no buildings, birds or objects, because text is placed there;',
+    'the middle (35% to 80% from the top) holds the hero scene, horizontally centred, tack-sharp and instantly recognisable;',
+    'the bottom 15% is calm and simple (water, plaza, promenade or soft shadow), because a logo is placed there.',
+    'LIGHT: golden hour or early blue hour, warm sun from the side, glowing highlights on the main subject, deep clean sky, crystal-clear air, no haze.',
+    'MOOD: aspirational, premium and inviting; tidy scene, no traffic, no cranes, no construction, no rubbish, at most a few small distant people, none facing the camera.',
+    'FORBIDDEN: any mosque or minaret anywhere in the frame; any text, letters, signs with words, logos, flags with writing, watermarks, borders or frames.',
   ].join(' ');
 }
 
@@ -55,7 +62,7 @@ async function generatePhoto(offerOrCity, scene) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': config.GEMINI_API_KEY },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: buildPrompt(city, variant) }] }],
+      contents: [{ parts: [{ text: buildPrompt(city, variant, offer.kind) }] }],
       generationConfig: { responseModalities: ['Image'], imageConfig: { imageSize: config.GEMINI_IMAGE_SIZE || '2K', aspectRatio: '9:16' } },
     }),
     signal: AbortSignal.timeout(120000),
