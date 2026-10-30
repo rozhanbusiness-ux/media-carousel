@@ -208,7 +208,7 @@ async function createBundleDraft({ kind, keys, style, langs, date, liveOffers, q
   if (new Set(offers.map(place)).size !== offers.length) throw new Error(kind === 'package' ? 'Jedes Land nur einmal pro Beitrag.' : 'Jede Destination nur einmal pro Beitrag.');
   const draft = {
     id: crypto.randomBytes(6).toString('hex'), createdAt: new Date().toISOString(), forDate: date.toISOString().slice(0, 10),
-    status: 'pending', style: PACKAGE_STYLES.includes(style) ? style : 'flight', source: 'specials', // template chosen before the photos (client) bundle: true, bundleKind: kind,
+    status: 'pending', style: PACKAGE_STYLES.includes(style) ? style : 'flight', source: 'specials', bundle: true, bundleKind: kind, // style: template chosen before the photos (client)
     titleIndex: Math.floor(Math.random() * TITLES[kind].length), offers, offer: offers[0], langs, texts: {}, versions: [],
   };
   for (const l of langs) draft.texts[l] = { caption: bundleCaption(offers, l, titleOf(draft, l)) };

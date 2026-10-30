@@ -15,3 +15,13 @@ test('bundle caption lists every offer with its full price once', () => {
   assert.doesNotMatch(de, /€\S*\s*€/);
   assert.match(bundleCaption(offers, 'ar'), /تركيا/);
 });
+
+// Regression (2026-10-30): a trailing comment swallowed `bundle: true, bundleKind` in the draft
+// literal, so new bundles were treated as single posts.
+test('bundle draft literal keeps bundle and bundleKind outside comments', () => {
+  const src = require('fs').readFileSync(require('path').join(__dirname, 'bundle.js'), 'utf8');
+  const line = src.split('\n').find((l) => l.includes('bundleKind: kind'));
+  assert.ok(line, 'draft literal not found');
+  const code = line.split('//')[0];
+  assert.ok(code.includes('bundle: true') && code.includes('bundleKind: kind'));
+});

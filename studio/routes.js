@@ -372,7 +372,8 @@ module.exports = function mountStudio(app) {
   });
 
   app.use('/api/studio', express.json({ limit: '15mb' }), router);
-  app.get('/studio', (req, res) => res.sendFile(path.join(__dirname, 'studio.html')));
+  // no-cache: after an update the browser must load the new page, not an old copy
+  app.get('/studio', (req, res) => res.set('Cache-Control', 'no-cache').sendFile(path.join(__dirname, 'studio.html')));
   // Vendored MP4 muxer for the in-browser Reel (studio/vendor, MIT).
   app.get('/studio/mp4-muxer.js', (req, res) => res.type('application/javascript').sendFile(path.join(__dirname, 'vendor', 'mp4-muxer.js')));
 };
