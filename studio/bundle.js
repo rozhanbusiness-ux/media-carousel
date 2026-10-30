@@ -98,19 +98,19 @@ async function coverPhoto(kind, used) {
 /** AI photos for the cover (n = -1) and every offer, two at a time (client: AI first, one go).
  *  Writes each photo that succeeds; returns the slots that failed. */
 async function aiPhotos(draft, report = () => {}) {
-  const total = draft.offers.length + 1;
+  const total = draft.offers.length + 2; // + cover (-1) and closing slide (-2)
   const failed = [];
   let done = 0;
   const one = async (n) => {
     try {
-      const dataUri = n === -1 ? await generateCover() : await generatePhoto(draft.offers[n]);
+      const dataUri = n < 0 ? await generateCover() : await generatePhoto(draft.offers[n]);
       if (n >= 0) sources.use(draft.offers[n], null, dataUri);
       fs.writeFileSync(slotPath(draft, n), dataUri);
       if (n >= 0 && draft.photoPos) draft.photoPos[n] = null;
     } catch (err) { console.error('studio bundle ai:', err.message); failed.push(n); }
     report(++done, total);
   };
-  const queue = [-1, ...draft.offers.map((_, n) => n)];
+  const queue = [-1, -2, ...draft.offers.map((_, n) => n)];
   await Promise.all([0, 1].map(async () => { while (queue.length) await one(queue.shift()); }));
   return failed;
 }
@@ -121,7 +121,7 @@ async function pickPhotosAiFirst(draft, queriesFor, choosePhoto) {
   const failed = await aiPhotos(draft);
   if (!failed.length) return;
   const used = new Set(store.listDrafts().flatMap((d) => [d.pexelsId, ...(d.pexelsIds || []), d.photoFile]).filter(Boolean));
-  for (const n of failed) {
+  for (const n of failed.filter((x) => x !== -2)) { // no closing photo: the cover photo is used
     const p = n === -1 ? await coverPhoto(draft.bundleKind || 'flight', used) : await photoFor(draft.offers[n], used, queriesFor, choosePhoto);
     if (!p) throw new Error(n === -1 ? 'Kein Cover-Foto (KI fehlgeschlagen) – bitte erneut versuchen.' : `Kein Foto für ${draft.offers[n].to.name} – bitte erneut versuchen.`);
     fs.writeFileSync(slotPath(draft, n), p.dataUri);
@@ -166,6 +166,8 @@ async function renderBundle(draft) {
   const photos = draft.offers.map((_, n) => fs.readFileSync(photoPath(draft.id, n), 'utf8'));
   let coverImg = '';
   try { coverImg = fs.readFileSync(photoPath(draft.id, 'cover'), 'utf8'); } catch { /* older draft */ }
+  let endImg = '';
+  try { endImg = fs.readFileSync(photoPath(draft.id, 'end'), 'utf8'); } catch { /* none: the cover photo is used */ }
   const stamp = Date.now().toString(36);
   const versions = [];
   for (const lang of draft.langs) {
@@ -174,7 +176,7 @@ async function renderBundle(draft) {
     // Never a destination photo on the cover (client rule).
     const cover = { ...posts[0], isCover: true, photo: coverImg, photoPosition: '', kind: 'flight', card: null, country: '', destination: title,
       hook: draft.offers.map((o) => local(o.to, lang)).join(' · '), labels: { kicker: COVER[lang].kicker, swipe: COVER[lang].swipe } };
-    const slides = [[cover, 1], ...posts.map((p) => [p, 2]), [{ ...posts[0], photo: coverImg || posts[0].photo, photoPosition: coverImg ? '' : posts[0].photoPosition }, 3]]; // last slide: cover photo, not a repeat of slide 2
+    const slides = [[cover, 1], ...posts.map((p) => [p, 2]), [{ ...posts[0], photo: endImg || coverImg || posts[0].photo, photoPosition: endImg || coverImg ? '' : posts[0].photoPosition }, 3]]; // last slide: cover photo, not a repeat of slide 2
     const files = [];
     for (const size of require('./format').sizes()) {
       for (let i = 0; i < slides.length; i++) {
@@ -217,8 +219,10 @@ async function createBundleDraft({ kind, keys, style, langs, date, liveOffers, q
 }
 
 // Photo of one slide: n = offer index (0..), or -1 for the cover.
-const slotPath = (draft, n) => photoPath(draft.id, n === -1 ? 'cover' : n);
+// n = offer index, -1 = cover, -2 = closing slide (its own AI photo, client: never the cover again)
+const slotPath = (draft, n) => photoPath(draft.id, n === -1 ? 'cover' : n === -2 ? 'end' : n);
 const validSlot = (draft, n) => Number.isInteger(n) && n >= -1 && n < draft.offers.length;
+const validAiSlot = (draft, n) => n === -2 || validSlot(draft, n);
 
 /** Ranked photo suggestions for one slide; kept on the draft so only suggested photos can be picked. */
 async function slotCandidates(draft, n, queriesFor) {
@@ -247,10 +251,10 @@ async function regenerateBundle(draft, what, value, queriesFor, choosePhoto, LAN
   }
   if (what === 'bundle-photo-pick' || what === 'bundle-photo-upload' || what === 'bundle-photo-ai') {
     const n = what === 'bundle-photo-ai' ? value : value && value.n;
-    if (!validSlot(draft, n)) throw new Error('bad slide');
+    if (!(what === 'bundle-photo-ai' ? validAiSlot(draft, n) : validSlot(draft, n))) throw new Error('bad slide');
     let dataUri;
     if (what === 'bundle-photo-ai') {
-      dataUri = n === -1 ? await generateCover() : await generatePhoto(draft.offers[n]);
+      dataUri = n < 0 ? await generateCover() : await generatePhoto(draft.offers[n]);
     } else if (what === 'bundle-photo-upload') dataUri = value.data;
     else {
       const c = draft.bundlePick && draft.bundlePick.n === n && draft.bundlePick.list.find((x) => x.id === value.id);
@@ -266,8 +270,8 @@ async function regenerateBundle(draft, what, value, queriesFor, choosePhoto, LAN
     draft.bundlePick = null;
   } else if (what === 'bundle-photo-ai-all') {
     const failed = await aiPhotos(draft, typeof value === 'function' ? value : () => {});
-    if (failed.length === draft.offers.length + 1) throw new Error('KI-Fotos fehlgeschlagen – bitte später erneut versuchen.');
-    draft.warning = failed.length ? `Kein KI-Foto für: ${failed.map((n) => (n === -1 ? 'Cover' : draft.offers[n].to.name)).join(', ')} – bitte einzeln mit 🤖 KI erneut versuchen.` : '';
+    if (failed.length === draft.offers.length + 2) throw new Error('KI-Fotos fehlgeschlagen – bitte später erneut versuchen.');
+    draft.warning = failed.length ? `Kein KI-Foto für: ${failed.map((n) => (n === -1 ? 'Cover' : n === -2 ? 'Schluss' : draft.offers[n].to.name)).join(', ')} – bitte einzeln mit 🤖 KI erneut versuchen.` : '';
     draft.bundlePick = null;
   } else if (what === 'style') {
     if (!PACKAGE_STYLES.includes(value)) throw new Error('Für Sammel-Beiträge: Glas, Magazin oder Schlicht.');
@@ -288,7 +292,9 @@ function deleteBundlePhotos(draft) {
   for (let n = 0; n < (draft.offers || []).length; n++) {
     try { fs.unlinkSync(photoPath(draft.id, n)); } catch { /* none */ }
   }
-  try { fs.unlinkSync(photoPath(draft.id, 'cover')); } catch { /* none */ }
+  for (const slot of ['cover', 'end']) {
+    try { fs.unlinkSync(photoPath(draft.id, slot)); } catch { /* none */ }
+  }
 }
 
 module.exports = { KINDS, TITLES, MIN, MAX, bundleCaption, offerLine, createBundleDraft, regenerateBundle, deleteBundlePhotos };

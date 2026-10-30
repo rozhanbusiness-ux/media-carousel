@@ -176,7 +176,7 @@ module.exports = function mountStudio(app) {
     if (what === 'photo-pick' && !pid(value)) return res.status(400).json({ error: 'bad photo' });
     const slot = (n) => Number.isInteger(n) && n >= -1 && n < 6;
     if (what === 'bundle-photos' && !slot(value)) return res.status(400).json({ error: 'bad slide' });
-    if (what === 'bundle-photo-ai' && !slot(value)) return res.status(400).json({ error: 'bad slide' });
+    if (what === 'bundle-photo-ai' && !(slot(value) || value === -2)) return res.status(400).json({ error: 'bad slide' });
     if (what === 'bundle-photo-pick' && !(value && slot(value.n) && pid(value.id))) return res.status(400).json({ error: 'bad photo' });
     if (what === 'bundle-photo-upload' && !(value && slot(value.n) && typeof value.data === 'string' && value.data.length < 12000000
       && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(value.data))) return res.status(400).json({ error: 'bad image' });
@@ -185,7 +185,7 @@ module.exports = function mountStudio(app) {
     if (what === 'bundle-photo-ai-all') {
       if (!draft.bundle) { generating = false; return res.status(400).json({ error: 'bad request' }); }
       // Background job (6 AI photos take minutes, longer than the Nginx timeout); the page polls.
-      aiJob = { running: true, error: null, done: 0, total: draft.offers.length + 1, id: draft.id };
+      aiJob = { running: true, error: null, done: 0, total: draft.offers.length + 2, id: draft.id };
       regenerate(draft, what, (done, total) => { aiJob = { ...aiJob, done, total }; })
         .then(() => { aiJob = { ...aiJob, running: false }; })
         .catch((err) => { console.error('studio bundle ai:', err.message); aiJob = { ...aiJob, running: false, error: err.message }; })

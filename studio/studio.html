@@ -207,7 +207,7 @@ function render(drafts) {
       ${d.warning ? `<p class="warn">⚠ ${esc(d.warning)}</p>` : ''}
       ${d.aiPhoto ? '<p class="warn">🤖 KI-Foto – bitte genau prüfen (Ort, Details), sonst 🤖 KI neu oder 🖼 Fotos zeigen.</p>' : ''}
       ${d.bundle ? `<div class="row"><button data-act="bundle-ai-all">🤖 KI-Fotos für alle Angebote</button></div><div class="row"><span>🖼 Foto ändern:</span>
-        <button class="ghost" data-act="bundle-photos" data-n="-1">Cover</button><button class="ghost" data-act="bundle-photo-ai" data-n="-1" title="KI-Cover (Blick aus dem Flugzeugfenster) – jedes Mal anders">🤖 KI</button>
+        <button class="ghost" data-act="bundle-photos" data-n="-1">Cover</button><button class="ghost" data-act="bundle-photo-ai" data-n="-1" title="KI-Cover (Blick aus dem Flugzeugfenster) – jedes Mal anders">🤖 KI</button><button class="ghost" data-act="bundle-photo-ai" data-n="-2" title="Eigenes KI-Foto für die letzte Folie">Schluss 🤖 KI</button>
         ${d.offers.map((o, n) => `<button class="ghost" data-act="bundle-photos" data-n="${n}">${n + 1}. ${esc(o.to.name)}</button><button class="ghost" data-act="bundle-photo-ai" data-n="${n}" title="KI-Foto für ${esc(o.to.name)} – bitte genau prüfen">🤖 KI</button>`).join('')}</div>` : ''}
       ${d.bundle && d.bundlePick ? `
         <div class="photo-pick"><h3>Foto für ${d.bundlePick.n === -1 ? 'Cover' : esc(d.offers[d.bundlePick.n].to.name)} wählen <small>(beste zuerst)</small></h3>
