@@ -245,7 +245,7 @@ async function renderDraft(draft) {
       country: draft.offer.kind && draft.offer.kind !== 'flight' && draft.offer.country ? countryName(draft.offer.country, lang) : '',
     };
     const files = [];
-    for (const size of ['story', 'square']) { // story first: it is posted first
+    for (const size of require('./format').sizes()) { // story first: it is posted first
       for (const slide of [1, 2, 3]) {
         const name = `studio_${draft.id}_${stamp}_${lang}_${size}_${slide}.jpg`;
         const own = !!slidePhotos[slide];

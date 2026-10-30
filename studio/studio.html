@@ -58,6 +58,8 @@
     <label class="chk"><input type="checkbox" name="deflang" value="ar"> العربية</label>
     <label class="chk"><input type="checkbox" name="deflang" value="ckb"> کوردی</label>
     <span style="font-size:12px;color:#8e98b3">(leer = automatisch)</span>
+    <label style="font-size:14px;color:#cfd6e6;margin-inline-start:16px">Format:
+      <select id="studioFormat"><option value="story">📱 Story / Status</option><option value="feed">📱 Story + ▢ Feed</option></select></label>
   </div>
   <details class="manual">
     <summary>+ Flusskreuzfahrt oder Ferienhaus (manuell)</summary>
@@ -181,6 +183,10 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 const LANG = { de: 'Deutsch', ar: 'العربية', ckb: 'کوردی (بادینی)', kmr: 'Kurdî (Kurmancî)' };
 const STYLE_NAMES = [['flight', '1 Glas'], ['flight-cover', '★ Magazin'], ['flight-ticket', '2 Bordkarte'], ['flight-split', '3 Geteilt'], ['flight-diagonal', '4 Diagonal'],
   ['flight-postcard', '5 Postkarte'], ['flight-ribbon', '6 Schleife'], ['flight-band', '7 Goldband'], ['flight-simple', '◻ Schlicht']];
+// Output format (server setting): new posts render only these sizes.
+api('/api/studio/format').then((r) => { $('#studioFormat').value = r.format; }).catch(() => {});
+$('#studioFormat').onchange = (e) => api('/api/studio/format', { method: 'PUT', body: JSON.stringify({ format: e.target.value }) })
+  .then(() => { $('#msg').textContent = 'Format gespeichert – gilt für neue Beiträge.'; }).catch((err) => { $('#msg').textContent = 'Fehler: ' + err.message; });
 const defLangs = () => [...document.querySelectorAll('input[name=deflang]:checked')].map((i) => i.value);
 try { const saved = JSON.parse(localStorage.getItem('studioLangs') || '[]'); document.querySelectorAll('input[name=deflang]').forEach((i) => { i.checked = saved.includes(i.value); }); } catch {}
 document.querySelectorAll('input[name=deflang]').forEach((i) => i.onchange = () => { try { localStorage.setItem('studioLangs', JSON.stringify(defLangs())); } catch {} });
@@ -237,7 +243,7 @@ function render(drafts) {
         <div class="row"><button class="ghost" data-act="save" data-lang="${esc(v.lang)}">Text speichern</button>
           <button class="ghost" data-act="copy" data-lang="${esc(v.lang)}">Text kopieren</button></div>
         <div class="row">
-          ${[['📷 Instagram-Beitrag'], ['🎵 TikTok-Beitrag'], ['👍 Facebook-Beitrag']].map(([label]) => `<button class="ok" data-act="share" data-kind="${v.files.some((f) => f.size === 'square') ? 'square' : 'portrait'}" data-lang="${esc(v.lang)}">${label}</button>`).join('')}
+          ${v.files.some((f) => f.size !== 'story') ? [['📷 Instagram-Beitrag'], ['🎵 TikTok-Beitrag'], ['👍 Facebook-Beitrag']].map(([label]) => `<button class="ok" data-act="share" data-kind="${v.files.some((f) => f.size === 'square') ? 'square' : 'portrait'}" data-lang="${esc(v.lang)}">${label}</button>`).join('') : ''}
           <button class="ok" data-act="share" data-kind="story" data-lang="${esc(v.lang)}">📲 Story</button>
           <button class="ok" data-act="share" data-kind="reel" data-lang="${esc(v.lang)}">🎬 Reel</button>
         </div>`).join('')}

@@ -29,6 +29,12 @@ module.exports = function mountStudio(app) {
 
   router.get('/drafts', (req, res) => res.json(store.listDrafts().slice(0, 30)));
   router.get('/ai-status', (req, res) => res.json(require('./ai-status').get()));
+  // Output format for the whole studio: 'story' (status/stories only) or 'feed' (+ square post).
+  router.get('/format', (req, res) => res.json({ format: require('./format').get() }));
+  router.put('/format', (req, res) => {
+    try { res.json({ format: require('./format').set((req.body || {}).format) }); }
+    catch { res.status(400).json({ error: 'bad format' }); }
+  });
 
   router.get('/offers', async (req, res) => {
     try { res.json(await getFlightOffers()); } catch { res.status(502).json({ error: 'offers unavailable' }); }

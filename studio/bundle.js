@@ -176,7 +176,7 @@ async function renderBundle(draft) {
       hook: draft.offers.map((o) => local(o.to, lang)).join(' · '), labels: { kicker: COVER[lang].kicker, swipe: COVER[lang].swipe } };
     const slides = [[cover, 1], ...posts.map((p) => [p, 2]), [{ ...posts[0], photo: coverImg || posts[0].photo, photoPosition: coverImg ? '' : posts[0].photoPosition }, 3]]; // last slide: cover photo, not a repeat of slide 2
     const files = [];
-    for (const size of ['story', 'square']) {
+    for (const size of require('./format').sizes()) {
       for (let i = 0; i < slides.length; i++) {
         const name = `studio_${draft.id}_${stamp}_${lang}_${size}_${i + 1}.jpg`;
         fs.writeFileSync(path.join(OUTPUT, name), await renderSlide(slides[i][0], size, slides[i][1]));
