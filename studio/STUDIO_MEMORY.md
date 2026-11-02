@@ -51,6 +51,18 @@ Decisions and state of the marketing studio. The rest of Carousel is documented 
 - Preview without saving: `docker exec media-carousel-app node studio/editorial-preview.js 6`.
 - Wikivoyage API: one request about every 1.1 s, retry on 429, contact User-Agent.
 
+## State after 2026-11-02
+- AI photos first in every post (bundles: cover, closing slide and every offer; single posts:
+  three photos); real photos only as fallback or on request. Closing slide has its own AI photo.
+- Bundle dialog: kind -> template -> offers -> start. Format setting for the whole studio:
+  "Story / Status" (default) or "Story + Feed".
+- Posts show the city, not the airport (CGN -> Köln, HER -> Kreta).
+- Client verdict 2026-11-02: the studio still has **many errors**; next agreed topic is a full
+  design review of the studio (and the design in general) before more features.
+- Known open points: AI photos do not always keep the layout (towers into the sky band,
+  occasional seams); square crop is the weakest size; Badini template words need a native
+  speaker; build context large (no .dockerignore); port 3010 published on 0.0.0.0 (check).
+
 ## Next
 - "Magazin" slide template for ideas (approved mock: cover with photo + serif title, story
   slide, closing slide with slogan and logo). Client changes: darker title area on the cover;
