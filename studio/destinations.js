@@ -45,12 +45,39 @@ const D = {
   'lloret de mar': { q: ['Lloret de Mar beach', 'Costa Brava cove', 'Lloret de Mar castle'], ai: ['the golden beach of Lloret de Mar on the Costa Brava with a small castle on the cliffs'] },
 };
 
+// Flights home to Iraq/Kurdistan (client decision 2026-11-04): most offers go to the same city
+// (Erbil) from many German airports, so the photo shows the DEPARTURE city instead; expats see
+// their own city and every slide of a multi-city post looks different.
+const HOME = new Set(['EBL', 'ISU', 'BGW', 'BSR', 'NJF', 'OSM', 'KIK']);
+const GERMAN = {
+  DUS: ['the Rheinturm and the Media Harbour in Düsseldorf at golden hour, seen across the Rhine', 'the Rhine promenade of Düsseldorf old town with the Rheinturm in the distance on a clear evening'],
+  CGN: ['Cologne Cathedral and the Hohenzollern Bridge over the Rhine at golden hour', 'the colourful old town houses on the Rhine bank in Cologne on a clear evening'],
+  FRA: ['the Frankfurt skyline over the Main river at blue hour, seen from a bridge', 'the Römerberg square in Frankfurt with its half-timbered houses on a bright morning'],
+  MUC: ['the Munich skyline with the Frauenkirche towers and the Alps far behind on a clear day', 'Marienplatz in Munich with the New Town Hall in warm late-afternoon light'],
+  STR: ['the Schlossplatz in Stuttgart with the New Palace and fountains on a sunny evening', 'a view over Stuttgart city between green vineyard hills at golden hour'],
+  HAM: ['the Elbphilharmonie and the Hamburg harbour at golden hour seen across the water', 'the Speicherstadt brick warehouses in Hamburg reflected in the canals at blue hour'],
+  HAJ: ['the New Town Hall of Hanover reflected in the Maschteich lake on a clear evening', 'the Herrenhausen Gardens in Hanover with fountains and hedges in soft sunlight'],
+  BER: ['the Brandenburg Gate in Berlin at golden hour under a clear sky', 'the Berlin Cathedral and the Spree river at blue hour'],
+  NUE: ['the old town of Nuremberg with the castle above the rooftops at golden hour'],
+  LEJ: ['the Augustusplatz in Leipzig with the Gewandhaus and the City-Hochhaus on a clear evening'],
+  BRE: ['the market square of Bremen with the town hall and the Roland statue in warm light'],
+  DTM: ['the Phoenix lake in Dortmund with the city skyline at golden hour'],
+};
+
+/** What the photo of a flight should show: the departure city for flights home, else the destination. */
+function photoSubject(offer) {
+  const from = offer && offer.from;
+  if (!(offer && offer.to && HOME.has(offer.to.code) && from && (from.code || from.name))) return offer;
+  return { kind: 'flight', to: { code: from.code || '', name: from.name }, country: 'Germany', ai: GERMAN[from.code] || null };
+}
+
 /** Entry for an offer's destination: by airport code, then by place name; aliases resolved. */
 function find(offer) {
+  if (offer && offer.ai) return { ai: offer.ai }; // departure-city subject (photoSubject)
   const name = String((offer.to && offer.to.name) || '').trim().toLowerCase();
   let e = D[offer.to && offer.to.code] || D[name] || D[name.split(/[ ,(]/)[0]];
   for (let i = 0; e && e.alias && i < 3; i++) e = D[e.alias];
   return e || null;
 }
 
-module.exports = { find };
+module.exports = { find, photoSubject, HOME };

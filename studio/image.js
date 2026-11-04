@@ -54,7 +54,7 @@ function scenesFor(offer, n) {
 /** Returns a data URI (image) or throws. `scene` is optional (else a random one). */
 async function generatePhoto(offerOrCity, scene) {
   if (!config.GEMINI_API_KEY) throw new Error('GEMINI_API_KEY is not set');
-  const offer = toOffer(offerOrCity);
+  const offer = destinations.photoSubject(toOffer(offerOrCity));
   const city = [offer.to.name, offer.country].filter(Boolean).join(', ');
   const variant = scene || scenesFor(offer, 1)[0];
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${config.GEMINI_IMAGE_MODEL}:generateContent`;
@@ -79,7 +79,7 @@ async function generatePhoto(offerOrCity, scene) {
 /** Three different AI photos (one per slide), generated in parallel. Fails when the first one fails;
  *  a missing slide 2/3 photo is null (that slide then uses the first photo). */
 async function generateSet(offerOrCity) {
-  const offer = toOffer(offerOrCity);
+  const offer = destinations.photoSubject(toOffer(offerOrCity));
   const scenes = scenesFor(offer, 3);
   const [a, b, c] = await Promise.allSettled(scenes.map((sc) => generatePhoto(offer, sc)));
   if (a.status !== 'fulfilled') throw a.reason;

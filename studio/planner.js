@@ -13,6 +13,7 @@ const { toDraftOffer, offerKey, countryName, cardFor } = require('./packages');
 const { buildCaption, formatDate, formatPrice, cityName, LANGS } = require('./captions');
 const { renderSlide, STYLE_BY_WEEKDAY, STYLES, PACKAGE_STYLES } = require('./render');
 const { generateSet, enhancePhoto } = require('./image');
+const { HOME } = require('./destinations');
 const sources = require('./photo-sources');
 const bank = require('./bank');
 const registry = require('./photo-registry');
@@ -359,7 +360,9 @@ async function changeOffer(draft, key) {
 /** Today's offers of the draft's kind, for the "choose offer" list. */
 async function offerChoices(kind) {
   return (await liveOffers(kind === 'package' ? 'package' : 'flight')).map((o) => ({
-    key: offerKey(o), price: o.price, dest: o.kind === 'package' ? (o.country || destKey(o)) : destKey(o),
+    key: offerKey(o), price: o.price,
+    // Flights home may repeat the destination from another departure city (same rule as bundle.js).
+    dest: o.kind === 'package' ? (o.country || destKey(o)) : HOME.has(o.to.code) ? `${(o.from && (o.from.code || o.from.name)) || ''}-${o.to.code}` : destKey(o),
     label: (o.own ? '⭐ ' : '') + (o.kind === 'package' ? `${o.to.name} – ${o.hotel}` : `${o.from.name} → ${o.to.name} (${o.departureDate})`),
   }));
 }

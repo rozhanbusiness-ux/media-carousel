@@ -15,6 +15,7 @@ const { renderSlide, PACKAGE_STYLES } = require('./render');
 const sources = require('./photo-sources');
 const bank = require('./bank');
 const { generatePhoto, generateCover, enhancePhoto } = require('./image');
+const { HOME } = require('./destinations');
 const { rankPhotos } = require('./photo-rank');
 const store = require('./store');
 const covers = require('./covers');
@@ -206,7 +207,9 @@ async function createBundleDraft({ kind, keys, style, langs, date, liveOffers, q
   const offers = keys.map((k) => all.find((o) => offerKey(o) === k));
   if (offers.some((o) => !o || (o.kind || 'flight') !== kind)) throw new Error('Ein Angebot ist nicht mehr verfügbar – bitte Liste neu laden.');
   // Each destination once; packages: each COUNTRY once (client rule).
-  const place = (o) => (kind === 'package' ? o.country || o.to.name : o.to.code || o.to.name);
+  // Flights home (Erbil from several German cities, client 2026-11-04): unique per route, not per destination.
+  const place = (o) => (kind === 'package' ? o.country || o.to.name
+    : HOME.has(o.to.code) ? `${o.from.code || o.from.name}-${o.to.code}` : o.to.code || o.to.name);
   if (new Set(offers.map(place)).size !== offers.length) throw new Error(kind === 'package' ? 'Jedes Land nur einmal pro Beitrag.' : 'Jede Destination nur einmal pro Beitrag.');
   const draft = {
     id: crypto.randomBytes(6).toString('hex'), createdAt: new Date().toISOString(), forDate: date.toISOString().slice(0, 10),
