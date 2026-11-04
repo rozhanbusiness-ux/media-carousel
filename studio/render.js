@@ -15,7 +15,8 @@ const SIZES = ['story', 'portrait', 'square'];
 
 // Monday..Sunday -> style (client decision 2026-10-08).
 // Client decision: the full-photo glass template is the default every day; others stay selectable per draft.
-const STYLE_BY_WEEKDAY = { 1: 'flight', 2: 'flight', 3: 'flight', 4: 'flight', 5: 'flight', 6: 'flight', 0: 'flight' };
+// One template for new posts (client decision 2026-11-04): Schlicht every day.
+const STYLE_BY_WEEKDAY = { 1: 'flight-simple', 2: 'flight-simple', 3: 'flight-simple', 4: 'flight-simple', 5: 'flight-simple', 6: 'flight-simple', 0: 'flight-simple' };
 
 // Package posts (hotel + flight) override a few labels.
 const PACKAGE_LABELS = {

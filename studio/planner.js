@@ -99,6 +99,12 @@ function choosePhoto(offer) {
 // AI set → picture: slide 1 photo plus different photos for slides 2 and 3 (client: never one photo for all slides).
 const aiPicture = ([a, b, c]) => ({ file: null, pexelsId: null, ai: true, dataUri: a, slides: { 2: b, 3: c } });
 
+/** AI photos first (client decision 2026-10-30); real photos only when the AI fails. */
+async function aiFirstPicture(offer, used = usedIds()) {
+  try { return { picture: aiPicture(await generateSet(offer)), ranked: [] }; }
+  catch (err) { console.error('studio ai photo:', err.message); return autoPicture(offer, used); }
+}
+
 const AUTO_MIN = 8; // strict: only magazine-level real photos are used automatically
 const AUTO_FILL = 7; // slides 2/3 may use a slightly lower score rather than repeating slide 1
 const pos = (c) => `${Number.isInteger(c.x) ? c.x : 50}% 50%`;
@@ -277,13 +283,7 @@ async function writeTexts(draft, langs = draft.langs) {
 
 async function buildDraft({ offer, style, date, source, photo = null, langs = null, warning = '' }) {
   const id = crypto.randomBytes(6).toString('hex');
-  // AI photos first (client decision 2026-10-30); real photos only when the AI fails or on request.
-  let auto = null;
-  if (photo) auto = { picture: { file: null, pexelsId: null, dataUri: photo }, ranked: [] };
-  else {
-    try { auto = { picture: aiPicture(await generateSet(offer)), ranked: [] }; }
-    catch (err) { console.error('studio ai photo:', err.message); auto = await autoPicture(offer, usedIds()); }
-  }
+  const auto = photo ? { picture: { file: null, pexelsId: null, dataUri: photo }, ranked: [] } : await aiFirstPicture(offer);
   const picture = auto.picture;
   const draft = {
     id, createdAt: new Date().toISOString(), forDate: date.toISOString().slice(0, 10),
@@ -334,7 +334,7 @@ async function createPackageDraft({ date = new Date(), offers = null, langs = nu
   const list = offers || (await liveOffers('package'));
   const { offer, warning } = pickFresh(list);
   if (!offer) throw new Error('Heute keine Pauschalreisen verfügbar.');
-  return buildDraft({ offer, style: 'flight', date, source: 'specials', langs, warning });
+  return buildDraft({ offer, style: 'flight-simple', date, source: 'specials', langs, warning });
 }
 
 /** Replace the offer of a draft (another destination); keeps style and languages. */
@@ -351,7 +351,7 @@ async function changeOffer(draft, key) {
   draft.warning = picked.warning || '';
   draft.texts = {};
   await writeTexts(draft);
-  const auto = await autoPicture(offer, usedIds());
+  const auto = await aiFirstPicture(offer);
   setPhoto(draft, auto.picture);
   if (!auto.picture) draft.photoCandidates = asCandidates(auto.ranked);
 }
@@ -391,7 +391,7 @@ async function regenerate(draft, what, value) {
   if (what === 'all') { // new automatic photos (other ones than now)
     const used = usedIds();
     for (const c of draft.photoCandidates || []) used.add(c.id);
-    const auto = await autoPicture(draft.offer, used);
+    const auto = await aiFirstPicture(draft.offer, used);
     if (auto.picture) setPhoto(draft, auto.picture);
     else draft.photoCandidates = asCandidates(auto.ranked);
   }

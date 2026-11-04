@@ -50,8 +50,8 @@
 <header><b>MEDIA STUDIO</b><a href="/">← Carousel</a></header>
 <main>
   <div class="row" style="align-items:center">
-    <button class="primary" id="gen">Heutigen Entwurf erstellen</button>
-    <button class="primary" id="genPkg">Paket-Entwurf erstellen</button>
+    <button class="primary" id="gen">Ein Angebot</button>
+    <button class="primary" id="genPkg" hidden>Paket-Entwurf erstellen</button>
     <button class="primary" id="bundleOpen">🗂 Mehrere Angebote</button>
     <span style="font-size:14px;color:#cfd6e6">Sprachen:</span>
     <label class="chk"><input type="checkbox" name="deflang" value="de"> Deutsch</label>
@@ -61,7 +61,8 @@
     <label style="font-size:14px;color:#cfd6e6;margin-inline-start:16px">Format:
       <select id="studioFormat"><option value="story">📱 Story / Status</option><option value="feed">📱 Story + ▢ Feed</option></select></label>
   </div>
-  <details class="manual">
+  <!-- Frozen 2026-11-04 (sales strategy): hidden, not deleted. -->
+  <details class="manual" hidden>
     <summary>+ Flusskreuzfahrt oder Ferienhaus (manuell)</summary>
     <div class="row"><label>Art <select id="xKind"><option value="cruise">🚢 Flusskreuzfahrt</option><option value="home">🏡 Ferienhaus</option></select></label></div>
     <div class="form" data-x="cruise">
@@ -94,7 +95,7 @@
     </div>
   </details>
 
-  <details class="manual">
+  <details class="manual" hidden>
     <summary>+ Eigenes Angebot (manuell, Screenshot oder PDF)</summary>
     <div class="row">
       <label class="ghost" style="padding:10px 16px;border-radius:999px;cursor:pointer">📷 Screenshot<input id="shot" type="file" accept="image/*" hidden></label>
@@ -120,7 +121,7 @@
   <div id="bundleBox" class="manual" hidden>
     <h3>Mehrere Angebote in einem Beitrag <small>(2 bis 6 wählen, Reihenfolge = Reihenfolge der Auswahl)</small></h3>
     <div class="row"><label>Art <select id="bundleKind"><option value="flight">✈️ Flugangebote</option><option value="package">🏨 Pauschalreisen</option></select></label>
-      <label>Vorlage <select id="bundleStyle"><option value="flight-simple">◻ Schlicht</option><option value="flight-cover">★ Magazin</option><option value="flight">1 Glas</option></select></label></div>
+      <label hidden>Vorlage <select id="bundleStyle"><option value="flight-simple">◻ Schlicht</option></select></label></div>
     <div id="bundleList" class="pick" style="max-height:340px;overflow:auto"></div>
     <div class="row"><button class="primary" id="bundleGo">Sammel-Beitrag erstellen</button><span id="bundleCount"></span></div>
   </div>
@@ -151,7 +152,7 @@
     </div>
     <div id="ownList"></div>
   </details>
-  <details class="manual" id="covers">
+  <details class="manual" id="covers" hidden>
     <summary>📸 Cover-Fotos für Sammel-Beiträge (max. 5 pro Art)</summary>
     <div class="row"><label>Art <select id="cKind"><option value="flight">✈️ Flugangebote</option><option value="package">🏨 Pauschalreisen</option></select></label>
       <button class="ghost" id="cSuggest">Vorschläge zeigen</button></div>
@@ -167,7 +168,7 @@
     </div>
     <div id="tracks"></div>
   </details>
-  <details class="manual" id="news">
+  <details class="manual" id="news" hidden>
     <summary>📰 Ideen des Tages (ein Ort, ein besonderer Blick · Ratgeber)</summary>
     <p style="font-size:13px;color:#cfd6e6">Drei Beiträge pro Tag aus Wikivoyage: ein Ort und ein besonderer Blick darauf, manchmal ein Ratgeber. Der Beleg-Satz zeigt, worauf der Text beruht. Nichts wird automatisch veröffentlicht.</p>
     <div class="row"><button class="ghost" id="newsRefresh">🔄 Neue Ideen</button></div>
@@ -205,10 +206,9 @@ function render(drafts) {
         <span>${esc(d.forDate)}</span>${d.bundle ? `<span>🗂 ${d.offers.length} Angebote: ${d.offers.map((o) => esc(o.to.name)).join(' · ')}</span>` : `<span>${d.offer.kind && d.offer.kind !== 'flight' ? ({ package: '🏨 ', cruise: '🚢 ', home: '🏡 ' })[d.offer.kind] + esc(d.offer.to.name) + (d.offer.country ? ', ' + esc(d.offer.country) : '') + ' – ' + esc(d.offer.hotel || d.offer.ship || d.offer.home) : esc(d.offer.from.name) + ' → ' + esc(d.offer.to.name)}</span>
         <span>${esc(d.offer.price)} €</span>`}</div>
       ${d.warning ? `<p class="warn">⚠ ${esc(d.warning)}</p>` : ''}
-      ${d.aiPhoto ? '<p class="warn">🤖 KI-Foto – bitte genau prüfen (Ort, Details), sonst 🤖 KI neu oder 🖼 Fotos zeigen.</p>' : ''}
-      ${d.bundle ? `<div class="row"><button data-act="bundle-ai-all">🤖 KI-Fotos für alle Angebote</button></div><div class="row"><span>🖼 Foto ändern:</span>
-        <button class="ghost" data-act="bundle-photos" data-n="-1">Cover</button><button class="ghost" data-act="bundle-photo-ai" data-n="-1" title="KI-Cover (Blick aus dem Flugzeugfenster) – jedes Mal anders">🤖 KI</button><button class="ghost" data-act="bundle-photo-ai" data-n="-2" title="Eigenes KI-Foto für die letzte Folie">Schluss 🤖 KI</button>
-        ${d.offers.map((o, n) => `<button class="ghost" data-act="bundle-photos" data-n="${n}">${n + 1}. ${esc(o.to.name)}</button><button class="ghost" data-act="bundle-photo-ai" data-n="${n}" title="KI-Foto für ${esc(o.to.name)} – bitte genau prüfen">🤖 KI</button>`).join('')}</div>` : ''}
+      ${d.bundle ? `<div class="row"><button data-act="bundle-ai-all">🤖 KI-Fotos für alle Angebote</button></div><div class="row"><span>🤖 Neues KI-Foto für:</span>
+        <button class="ghost" data-act="bundle-photo-ai" data-n="-1">Cover</button><button class="ghost" data-act="bundle-photo-ai" data-n="-2">Schluss</button>
+        ${d.offers.map((o, n) => `<button class="ghost" data-act="bundle-photo-ai" data-n="${n}">${n + 1}. ${esc(o.to.name)}</button>`).join('')}</div>` : ''}
       ${d.bundle && d.bundlePick ? `
         <div class="photo-pick"><h3>Foto für ${d.bundlePick.n === -1 ? 'Cover' : esc(d.offers[d.bundlePick.n].to.name)} wählen <small>(beste zuerst)</small></h3>
           <div class="row"><button class="ghost" data-act="bundle-photos" data-n="${d.bundlePick.n}">Mehr Fotos</button>
@@ -222,19 +222,18 @@ function render(drafts) {
           <div class="cands">${d.photoCandidates.map((c) => `<button class="cand" data-act="photo-pick" data-pid="${esc(String(c.id))}"><img src="${esc(c.thumb)}" alt="" loading="lazy" referrerpolicy="no-referrer"><span>${c.score == null ? '–' : Number(c.score) + '/10'}</span>${c.why ? `<em>${esc(c.why)}</em>` : ''}</button>`).join('')}</div>
         </div>` : (d.needsPhoto ? '<p class="warn">⚠ Kein passendes echtes Foto gefunden. Bitte eigenes Foto hochladen (⬆) oder im Notfall 🤖 KI-Foto.</p>' : '')}
       <div class="tools">
-        ${d.bundle ? `<select data-act="style">${STYLE_NAMES.filter(([v]) => ['flight', 'flight-cover', 'flight-simple'].includes(v)).map(([v, n]) => `<option value="${v}" ${v === d.style ? 'selected' : ''}>${n}</option>`).join('')}</select>` : `<select data-act="style">${STYLE_NAMES.map(([v, n]) => `<option value="${v}" ${v === d.style ? 'selected' : ''}>${n}</option>`).join('')}</select>`}
+        ${d.style === 'flight-simple' ? '' : `<button class="ghost" data-act="to-simple">◻ Auf Schlicht umstellen</button>`}
         ${['de', 'ar', 'ckb'].map((l) => `<label class="chk"><input type="checkbox" data-lang-box value="${l}" ${(d.langs || []).includes(l) ? 'checked' : ''}> ${LANG[l]}</label>`).join('')}
         <button class="ghost" data-act="langs">Sprachen übernehmen</button>
       </div>
-      ${d.bundle ? '<div class="row"><button class="ghost" data-act="all">↻ Neue Fotos</button></div>' : `<div class="row">
+      ${d.bundle ? '' : `<div class="row">
         <button class="ghost" data-act="offer-next">🔀 Andere Destination</button>
         <button class="ghost" data-act="offer-list">📋 Angebot wählen</button>
         <select data-act="offer-pick" hidden></select>
-        <button class="ghost" data-act="photo">🖼 Fotos zeigen</button>
         <label class="ghost" style="padding:10px 18px;border-radius:999px;cursor:pointer;font-weight:700">⬆ Eigenes Foto<input type="file" accept="image/jpeg,image/png,image/webp" data-act="upload" hidden></label>
         <button class="ghost" data-act="text">✍ Neuer Text</button>
         <button class="ghost" data-act="all">↻ Alles neu</button>
-        <button class="ghost" data-act="photo-ai" title="Nur wenn kein echtes Foto passt">🤖 KI-Foto</button>
+        <button class="ghost" data-act="photo-ai">🤖 Neue KI-Fotos</button>
       </div>`}
       ${d.versions.map((v) => `
         <h3>${esc(LANG[v.lang] || v.lang)} ${v.aiWritten ? '' : '(Standardtext)'}</h3>
@@ -536,11 +535,11 @@ $('#list').onchange = async (e) => {
 $('#list').onclick = async (e) => {
   const b = e.target.closest('button'); if (!b) return;
   const box = b.closest('.draft'); const id = box.dataset.id; const act = b.dataset.act;
-  if (act === 'photo-ai' && !confirm('KI-Foto nur im Notfall verwenden. Fortfahren?')) return;
   if (act === 'photo-pick') return regen(box, 'photo-pick', pidOf(b.dataset.pid));
   if (act === 'bundle-photos') return regen(box, 'bundle-photos', Number(b.dataset.n));
   if (act === 'bundle-ai-all') return confirm('KI-Fotos für alle Angebote erzeugen (einige Minuten)? Bitte danach genau prüfen.') && aiAll(box);
-  if (act === 'bundle-photo-ai') return confirm('KI-Foto erzeugen? Bitte danach genau prüfen.') && regen(box, 'bundle-photo-ai', Number(b.dataset.n));
+  if (act === 'bundle-photo-ai') return regen(box, 'bundle-photo-ai', Number(b.dataset.n));
+  if (act === 'to-simple') return regen(box, 'style', 'flight-simple');
   if (act === 'bundle-photo-pick') return regen(box, 'bundle-photo-pick', { n: Number(b.dataset.n), id: pidOf(b.dataset.pid) });
   if (['photo', 'photo-auto', 'photo-ai', 'text', 'all'].includes(act)) return regen(box, act);
   if (act === 'langs') return regen(box, 'langs', [...box.querySelectorAll('[data-lang-box]:checked')].map((i) => i.value));
