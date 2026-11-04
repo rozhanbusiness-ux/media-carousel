@@ -364,6 +364,13 @@ async function offerChoices(kind) {
   }));
 }
 
+/** One chosen offer (from the list shown before generating), so the AI photos are made once. */
+async function createPickedDraft({ kind, key, date = new Date(), langs = null }) {
+  const offer = (await liveOffers(kind === 'package' ? 'package' : 'flight')).find((o) => offerKey(o) === key);
+  if (!offer) throw new Error('Angebot nicht mehr verfügbar – bitte Liste neu laden.');
+  return buildDraft({ offer, style: 'flight-simple', date, source: offer.own ? 'own' : 'specials', langs });
+}
+
 async function createManualDraft({ offer, style, photo = null, date = new Date(), langs = null }) {
   return buildDraft({ offer, style: style || STYLE_BY_WEEKDAY[date.getDay()], date, source: 'manual', photo, langs });
 }
@@ -426,4 +433,4 @@ async function createBundleDraft({ kind, keys, style, date = new Date(), langs =
   return buildBundle({ kind, keys, style, langs: langs || defaultLangs(date), date, liveOffers, queriesFor, choosePhoto });
 }
 
-module.exports = { createBundleDraft, offerChoices, createPackageDraft, saveToLibrary, deleteDraft, createDailyDraft, createManualDraft, regenerate, pickOffer };
+module.exports = { createBundleDraft, createPickedDraft, offerChoices, createPackageDraft, saveToLibrary, deleteDraft, createDailyDraft, createManualDraft, regenerate, pickOffer };

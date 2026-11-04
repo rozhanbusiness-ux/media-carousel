@@ -118,6 +118,13 @@
       <div class="full"><button class="primary" id="manualGo">Entwurf erstellen</button></div>
     </div>
   </details>
+  <!-- One offer: choose the kind and the offer (or automatic) BEFORE the AI photos are generated. -->
+  <div id="oneBox" class="manual" hidden>
+    <h3>Ein Angebot <small>(erst wählen, dann wird einmal generiert)</small></h3>
+    <div class="row"><label>Art <select id="oneKind"><option value="flight">✈️ Flug</option><option value="package">🏨 Paket</option></select></label></div>
+    <div id="oneList" class="pick" style="max-height:340px;overflow:auto"></div>
+    <div class="row"><button class="primary" id="oneGo">Beitrag erstellen</button></div>
+  </div>
   <div id="bundleBox" class="manual" hidden>
     <h3>Mehrere Angebote in einem Beitrag <small>(2 bis 6 wählen, Reihenfolge = Reihenfolge der Auswahl)</small></h3>
     <div class="row"><label>Art <select id="bundleKind"><option value="flight">✈️ Flugangebote</option><option value="package">🏨 Pauschalreisen</option></select></label>
@@ -492,16 +499,32 @@ $('#genPkg').onclick = async () => {
   $('#genPkg').disabled = false;
 };
 
-$('#gen').onclick = async () => {
-  $('#gen').disabled = true; $('#msg').textContent = 'Erstelle Entwurf … (ca. 1 Minute)';
+$('#gen').onclick = () => {
+  const box = $('#oneBox');
+  box.hidden = !box.hidden;
+  if (!box.hidden) loadOneList();
+};
+$('#oneKind').onchange = loadOneList;
+async function loadOneList() {
+  const kind = $('#oneKind').value, icon = kind === 'package' ? '🏨' : '✈️';
+  $('#oneList').textContent = 'Angebote werden geladen …';
   try {
-    await api('/api/studio/drafts', { method: 'POST', body: JSON.stringify(defLangs().length ? { langs: defLangs() } : {}) });
-    // Weekly plan: Tuesday river cruise, Friday holiday home (entered by hand).
-    const extra = { 2: ' Heute zusätzlich: Flusskreuzfahrt manuell anlegen.', 5: ' Heute zusätzlich: Ferienhaus manuell anlegen.' }[new Date().getDay()] || '';
-    $('#msg').textContent = 'Fertig.' + extra; await load();
+    const list = await api('/api/studio/offer-choices?kind=' + kind);
+    $('#oneList').innerHTML = `<label style="display:block;margin:4px 0"><input type="radio" name="onePick" value="" checked> ⚡ Automatisch (bestes neues Angebot)</label>`
+      + list.map((o) => `<label style="display:block;margin:4px 0"><input type="radio" name="onePick" value="${esc(o.key)}"> ${icon} ${esc(o.label)} – ${esc(o.price)} €</label>`).join('');
+  } catch (err) { $('#oneList').textContent = 'Fehler: ' + err.message; }
+}
+$('#oneGo').onclick = async () => {
+  const kind = $('#oneKind').value, key = (document.querySelector('input[name=onePick]:checked') || {}).value || '';
+  const langs = defLangs().length ? { langs: defLangs() } : {};
+  $('#oneGo').disabled = true; $('#msg').textContent = 'Erstelle Entwurf … (ca. 1 Minute)';
+  try {
+    if (key) await api('/api/studio/drafts/pick', { method: 'POST', body: JSON.stringify({ kind, key, ...langs }) });
+    else await api(kind === 'package' ? '/api/studio/drafts/package' : '/api/studio/drafts', { method: 'POST', body: JSON.stringify(langs) });
+    $('#msg').textContent = 'Fertig.'; $('#oneBox').hidden = true; await load();
   }
   catch (e) { $('#msg').textContent = 'Fehler: ' + e.message; }
-  $('#gen').disabled = false;
+  $('#oneGo').disabled = false;
 };
 
 // All AI photos of a bundle: runs in the background on the server, the page polls the progress.

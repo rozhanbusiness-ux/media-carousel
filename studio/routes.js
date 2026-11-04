@@ -13,7 +13,7 @@ const ownOffers = require('./own-offers');
 const covers = require('./covers');
 const bank = require('./bank');
 const { FEATURES, BOARD_KEYS } = require('./packages');
-const { createBundleDraft, offerChoices, createPackageDraft, saveToLibrary, deleteDraft, createDailyDraft, createManualDraft, regenerate } = require('./planner');
+const { createBundleDraft, createPickedDraft, offerChoices, createPackageDraft, saveToLibrary, deleteDraft, createDailyDraft, createManualDraft, regenerate } = require('./planner');
 const { STYLES } = require('./render');
 const { getFlightOffers } = require('./offers');
 
@@ -68,6 +68,17 @@ module.exports = function mountStudio(app) {
   router.get('/drafts/bundle/status', (req, res) => res.json(bundleJob));
   router.get('/drafts/ai-photos/status', (req, res) => res.json(aiJob));
 
+  // One chosen offer of one kind (key from /offer-choices).
+  router.post('/drafts/pick', async (req, res) => {
+    const { kind, key, langs } = req.body || {};
+    if (!['flight', 'package'].includes(kind) || typeof key !== 'string' || !/^[A-Za-z0-9-]{3,40}$/.test(key)) return res.status(400).json({ error: 'bad request' });
+    if (generating) return res.status(429).json({ error: 'already generating' });
+    generating = true;
+    try { res.json(await createPickedDraft({ kind, key, langs: cleanLangs(langs) })); }
+    catch (err) { console.error('studio pick draft:', err.message); res.status(500).json({ error: err.message }); }
+    finally { generating = false; }
+  });
+
   // Package draft (hotel + flight), on demand.
   router.post('/drafts/package', async (req, res) => {
     if (generating) return res.status(429).json({ error: 'already generating' });
@@ -84,12 +95,8 @@ module.exports = function mountStudio(app) {
     generating = true;
     try {
       const langs = cleanLangs(req.body.langs);
-      const flight = await createDailyDraft({ date: day, langs });
-      // Weekly plan (client): Monday and Thursday also get a package post.
-      if ([1, 4].includes(day.getDay())) {
-        try { await createPackageDraft({ date: day, langs }); } catch (err) { console.error('studio package draft:', err.message); }
-      }
-      res.json(flight);
+      // Only the flight draft: packages are chosen explicitly ("Art: Paket"), and every draft costs AI photos.
+      res.json(await createDailyDraft({ date: day, langs }));
     } catch (err) {
       console.error('studio draft:', err.message);
       res.status(500).json({ error: err.message });
