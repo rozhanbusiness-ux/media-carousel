@@ -51,6 +51,18 @@ Decisions and state of the marketing studio. The rest of Carousel is documented 
 - Preview without saving: `docker exec media-carousel-app node studio/editorial-preview.js 6`.
 - Wikivoyage API: one request about every 1.1 s, retry on 429, contact User-Agent.
 
+## Purpose of the studio (agreed 2026-11-04)
+Part of the sales strategy (website repo, `docs/PROJECT_MEMORY.md`, section 11b). The studio
+turns today's offers into ready story posts for WhatsApp status/Channel and a short video for
+TikTok, so the client posts daily and more customers write on WhatsApp. Every change must make
+that flow faster, better or cheaper. Rules: Badini first; one 9:16 format; no airline names
+(the visitor should message us); today's prices are typed in by the client each morning (the
+airline agent portal is never connected); a tracking word per post; AI photo library reused
+before generating. To do first: Gemini 2.5 Flash -> 3.5 Flash-Lite before 2026-12-01
+(`thinkingBudget` -> `thinkingLevel`, drop `temperature`), then fix errors and freeze what does
+not serve the purpose. `src/extract-offer.js` (outside `studio/`) also uses 2.5 Flash: client
+decision needed.
+
 ## State after 2026-11-02
 - AI photos first in every post (bundles: cover, closing slide and every offer; single posts:
   three photos); real photos only as fallback or on request. Closing slide has its own AI photo.
