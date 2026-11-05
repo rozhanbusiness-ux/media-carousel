@@ -8,13 +8,23 @@
 const config = require('../config');
 const destinations = require('./destinations');
 
+// Generic scenes: elevated panoramas first (client 2026-11-04: the panorama matters most).
 const VARIANTS = [
-  'a quiet seaside or riverside promenade in the late afternoon',
-  'a characteristic old-town street with cafés, seen at eye level',
-  'a wide landscape view of the coast, hills or water around the city',
-  'a modern skyline or bridge at blue hour',
-  'a local market or harbour scene with soft natural light',
+  'an elevated panoramic view over the whole city with its main landmarks',
+  'a wide panoramic view of the skyline across the river, sea or lake',
+  'a wide landscape panorama of the coast, hills or water around the city',
 ];
+
+// Season from the date (client 2026-11-04): the photo should look like it was taken this week.
+const SEASONS = ['winter', 'winter', 'spring', 'spring', 'spring', 'summer', 'summer', 'summer', 'autumn', 'autumn', 'autumn', 'winter'];
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+function seasonLine(date = new Date()) {
+  const m = date.getMonth();
+  return `SEASON: ${SEASONS[m]} (${MONTHS[m]}); show the real look of this place in this month: e.g. autumn colours where the trees really change colour, a light dusting of snow or Christmas lights only where that is realistic; never snow, autumn leaves or blossoms where they would be untrue for this place and month.`;
+}
+
+// The scene lists name times of day ("at golden hour"); the light is now always bright daylight.
+const stripTimeOfDay = (s) => String(s).replace(/,?\s*(at|in)\s+(golden|blue)\s+hour|,?\s*at\s+(sunset|sunrise|dusk|dawn)|,?\s*in\s+(soft|warm)\s+[a-z -]*light|,?\s*on a clear evening/gi, '').trim();
 
 // Poster-style prompt (client decision 2026-10-30): realistic travel photo laid out for the
 // "Schlicht" story template: open sky in the top 35% (price and route), the scene in the middle,
@@ -22,7 +32,7 @@ const VARIANTS = [
 // Rule for every offer kind: generate the DESTINATION, never the product itself (no invented
 // hotel, room, pool, ship interior or holiday home: that would mislead the customer).
 const KIND_RULES = {
-  flight: 'Show the destination itself; no aircraft.',
+  flight: 'Show the place itself; no aircraft.',
   package: 'Show the holiday destination (coast, bay, old town or landscape); NO hotel building, hotel pool, room, restaurant or resort facility that could be mistaken for the offered hotel.',
   cruise: 'Show the sea and coastline of the destination at sunset; at most one large plain white cruise ship far away, without any name, logo or company colours; never a ship interior.',
   home: 'Show the natural surroundings (lake, mountains, countryside or coast); no specific house, cabin or villa.',
@@ -30,13 +40,15 @@ const KIND_RULES = {
 
 function buildPrompt(city, variant, kind) {
   return [
-    `Photorealistic travel poster photograph of ${city}. Scene: ${variant}.`,
+    `Photorealistic travel poster photograph of ${city}. Scene: ${stripTimeOfDay(variant)}.`,
+    'MOST IMPORTANT: a wide PANORAMIC view from an elevated viewpoint (a hill, tower or rooftop), showing the city or place as a whole with its main landmarks, exactly as they are really visible together from that one spot.',
     KIND_RULES[kind] || KIND_RULES.flight,
-    'REALISM: must look like a real photo by a top travel photographer (full-frame camera, 24-35mm lens, f/8, RAW, natural colour grading); real materials, real proportions, architecturally accurate; ONE real viewpoint: only landmarks that are really visible together from one place, no collage of distant landmarks; no CGI, no illustration, no painted or plastic AI look, no HDR glow, no oversaturation.',
+    seasonLine(),
+    'REALISM: must look like a real photo by a top travel photographer (full-frame camera, 24-35mm lens, f/8, RAW, natural colour grading); real materials, real proportions, architecturally accurate; ONE real viewpoint: only landmarks that are really visible together from one place, no collage of distant landmarks; no CGI, no illustration, no painted or plastic AI look, no HDR glow. COLOURS: vivid and saturated but believable, as on a perfect clear day; never neon or cartoonish.',
     'POSTER COMPOSITION (vertical 9:16) — STRICT, the layout depends on it: the top 40% of the frame is ONLY clear light-blue sky (soft gradient, at most a few thin clouds); nothing may reach into it: no tower, spire, dome, roof, tree, mountain top, bird or object; shoot from far enough away and with a low enough camera so the whole subject sits below that line;',
     'the middle (40% to 78% from the top) holds the hero scene, horizontally centred, tack-sharp and instantly recognisable;',
     'the bottom 22% is noticeably darker and calm: the foreground in shadow (shaded plaza, dark water, shaded trees or ground), little detail, no bright surfaces, because a light logo is placed there.',
-    'LIGHT: golden hour or early blue hour, warm sun from the side, glowing highlights on the main subject, deep clean sky, crystal-clear air, no haze.',
+    'LIGHT: bright, clean daylight on a sunny day (late morning to afternoon), clear blue sky, crisp detail everywhere, crystal-clear air, no haze, no dusk or night.',
     'MOOD: aspirational, premium and inviting; tidy scene, no traffic, no cranes, no construction, no rubbish, at most a few small distant people, none facing the camera.',
     'FORBIDDEN: any mosque or minaret anywhere in the frame; any readable text anywhere: no brand names or logos on buildings, rooftops or billboards (e.g. hotel or company signs), no shop signs, no letters, no flags with writing, no watermarks, borders or frames.',
   ].join(' ');
@@ -116,40 +128,46 @@ async function enhancePhoto(dataUri) {
   return `data:${inline.mimeType || inline.mime_type || 'image/png'};base64,${inline.data}`;
 }
 
-// Cover of multi-offer posts (client decision 2026-10-30): never a destination; a realistic view
-// from an airplane window above the clouds, different every time (random light, clouds, framing).
-const COVER_SCENES = [
-  'golden sunset light, a soft sea of clouds far below, the sun low on the horizon',
-  'early sunrise with pink and orange light over towering cumulus clouds',
-  'bright midday, deep blue sky, white cloud layer with gaps showing a distant coastline far below',
-  'blue hour just after sunset, last warm glow on the horizon, calm clouds below',
-  'late afternoon, warm light, scattered clouds with soft shadows, hazy mountains far below',
-  'sunrise above a flat cloud blanket, rays of light, crisp clear air',
-];
-const COVER_FRAMES = [
-  'the oval window frame visible at the edges, slightly out of focus',
-  'a clean part of a plain white wing (no logo, no text) in the lower part of the view',
-  'looking through the window, no wing visible, only sky and clouds',
-];
+// Magazine cover of multi-offer posts (client decision 2026-11-04): a THEME photo (season, summer
+// holiday, families ...), never one of the destinations. Kept in a small library per theme and
+// season and reused, so a cover costs one generation only now and then.
+const fs = require('fs');
+const path = require('path');
+const THEME_DIR = path.join(__dirname, '..', 'cache', 'studio-themes');
+const THEME_SCENES = {
+  autumn: ['a sunny autumn panorama over a European old town with trees in red and golden colours', 'a wide autumn landscape of hills and a lake with colourful trees in bright sunshine'],
+  winter: ['a bright winter panorama of a snowy alpine valley with a small village under a clear blue sky', 'a sunny winter panorama of a European old town with a light dusting of snow on the roofs'],
+  spring: ['a panorama of a European city with blossoming trees in the foreground in bright spring sunshine', 'green spring hills with wild flowers and a lake under a clear blue sky'],
+  summer: ['a wide panorama of a turquoise Mediterranean bay with a white beach and clear water', 'a sunny summer coastline with cliffs and a calm blue sea seen from above'],
+  holidays: ['a wide sunny beach panorama with a few families far away, seen from behind, no faces', 'a bright seaside promenade panorama in summer with palm trees and the sea'],
+  families: ['a family of four walking along a bright sandy beach far away, seen from behind, no faces', 'a sunny lakeside meadow with a family having a picnic far in the distance, no faces'],
+  city: ['a panoramic European river city skyline with bridges in bright daylight', 'an elevated panorama over the rooftops of a historic European capital on a clear day'],
+  eid: ['a festive bright city square decorated with warm lanterns and string lights, no religious buildings', 'golden festive lanterns hanging over a lively street in daylight, no religious buildings'],
+  newroz: ['the green spring mountains of Kurdistan with people in colourful Kurdish clothes dancing far away, bright spring day, no faces', 'a wide panorama of green Kurdish mountains with wild flowers in spring sunshine'],
+  lastminute: ['a dramatic panoramic coastline with turquoise sea seen from above in bright sunshine', 'a wide panorama of a sunny island bay with boats on clear blue water'],
+};
+const THEMES = Object.keys(THEME_SCENES);
+const SEASON_OF = ['winter', 'winter', 'spring', 'spring', 'spring', 'summer', 'summer', 'summer', 'autumn', 'autumn', 'autumn', 'winter'];
+const themeOf = (theme, date = new Date()) => (THEMES.includes(theme) ? theme : SEASON_OF[date.getMonth()]); // 'auto' -> season
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
 
-function buildCoverPrompt() {
+function buildThemePrompt(theme) {
   return [
-    `Photorealistic photograph taken from a passenger airplane window above the clouds: ${pick(COVER_SCENES)}; ${pick(COVER_FRAMES)}.`,
-    'REALISM: looks like a real photo taken with a good camera through the window; natural colours, no CGI, no illustration, no HDR glow, no oversaturation.',
-    'COMPOSITION (vertical 9:16) — STRICT: the top 40% is only clear light-blue sky (text is placed there); the bottom 22% is noticeably darker and calm (shaded clouds or the shaded window frame), because a light logo is placed there.',
-    'FORBIDDEN: any airline name, logo, livery or text; any people; any cabin interior apart from the window frame; any mosque or minaret; any watermark, border or frame added to the image.',
+    `Photorealistic travel magazine cover photograph: ${pick(THEME_SCENES[theme])}.`,
+    'MOST IMPORTANT: a wide panoramic view in bright, clean daylight with a clear blue sky; vivid but believable colours; looks like a real photo, no CGI, no illustration, no painted look.',
+    'COMPOSITION (vertical 9:16) — STRICT: the top 30% is calm sky (a magazine title is placed there); the bottom 30% is calm and a little darker (the headline is placed there).',
+    'People only small and far away, seen from behind, never recognisable faces.',
+    'FORBIDDEN: any mosque, minaret or other religious building; any readable text, signs, logos, flags with writing, watermarks, borders or frames.',
   ].join(' ');
 }
 
-/** AI cover photo (data URI), a different scene every call. */
-async function generateCover() {
+async function geminiImage(prompt) {
   if (!config.GEMINI_API_KEY) throw new Error('GEMINI_API_KEY is not set');
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${config.GEMINI_IMAGE_MODEL}:generateContent`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': config.GEMINI_API_KEY },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: buildCoverPrompt() }] }],
+      contents: [{ parts: [{ text: prompt }] }],
       generationConfig: { responseModalities: ['Image'], imageConfig: { imageSize: config.GEMINI_IMAGE_SIZE || '2K', aspectRatio: '9:16' } },
     }),
     signal: AbortSignal.timeout(120000),
@@ -163,4 +181,17 @@ async function generateCover() {
   return `data:${inline.mimeType || inline.mime_type || 'image/png'};base64,${inline.data}`;
 }
 
-module.exports = { generateCover, buildCoverPrompt, generatePhoto, generateSet, enhancePhoto, buildPrompt, scenesFor };
+const LIBRARY_SIZE = 3; // per theme: generate until three exist, then reuse them at random
+/** Cover photo for a theme ('auto' = season of today). `fresh` forces a new generation. */
+async function generateThemeCover(theme, fresh = false) {
+  const t = themeOf(theme);
+  let saved = [];
+  try { saved = fs.readdirSync(THEME_DIR).filter((f) => new RegExp(`^${t}-[a-f0-9]{8}\\.txt$`).test(f)); } catch { /* none yet */ }
+  if (!fresh && saved.length >= LIBRARY_SIZE) return fs.readFileSync(path.join(THEME_DIR, pick(saved)), 'utf8');
+  const dataUri = await geminiImage(buildThemePrompt(t));
+  fs.mkdirSync(THEME_DIR, { recursive: true });
+  fs.writeFileSync(path.join(THEME_DIR, `${t}-${require('crypto').randomBytes(4).toString('hex')}.txt`), dataUri);
+  return dataUri;
+}
+
+module.exports = { THEMES, themeOf, generateThemeCover, buildThemePrompt, generatePhoto, generateSet, enhancePhoto, buildPrompt, scenesFor };
