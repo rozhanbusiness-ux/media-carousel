@@ -14,7 +14,7 @@ const { formatDate, formatPrice, cityName, BASE_TAGS, FIXED } = require('./capti
 const { renderSlide, PACKAGE_STYLES } = require('./render');
 const sources = require('./photo-sources');
 const bank = require('./bank');
-const { generatePhoto, generateCover, enhancePhoto } = require('./image');
+const { generatePhoto, generateThemeCover, THEMES, enhancePhoto } = require('./image');
 const { HOME } = require('./destinations');
 const { rankPhotos } = require('./photo-rank');
 const store = require('./store');
@@ -46,6 +46,51 @@ const TITLES = {
   ],
 };
 const KINDS = Object.keys(TITLES);
+
+// Magazine cover texts (client decision 2026-11-04). Badini words need a native speaker's review.
+const MONTHS = {
+  de: ['JANUAR', 'FEBRUAR', 'MÄRZ', 'APRIL', 'MAI', 'JUNI', 'JULI', 'AUGUST', 'SEPTEMBER', 'OKTOBER', 'NOVEMBER', 'DEZEMBER'],
+  ar: ['كانون الثاني', 'شباط', 'آذار', 'نيسان', 'أيار', 'حزيران', 'تموز', 'آب', 'أيلول', 'تشرين الأول', 'تشرين الثاني', 'كانون الأول'],
+  ckb: ['کانوونا پاشین', 'شوبات', 'ئادار', 'نیسان', 'گولان', 'حەزیران', 'تیرمەه', 'تەباخ', 'ئیلۆن', 'چریا پێشین', 'چریا پاشین', 'کانوونا پێشین'],
+};
+const THEME_TITLES = {
+  autumn: { de: 'Herbst-Angebote', ar: 'عروض الخريف', ckb: 'ئۆفەرێن پاییزێ' },
+  winter: { de: 'Winter-Angebote', ar: 'عروض الشتاء', ckb: 'ئۆفەرێن زڤستانێ' },
+  spring: { de: 'Frühlings-Angebote', ar: 'عروض الربيع', ckb: 'ئۆفەرێن بهارێ' },
+  summer: { de: 'Sommer-Angebote', ar: 'عروض الصيف', ckb: 'ئۆفەرێن هاڤینێ' },
+  holidays: { de: 'Ferien-Angebote', ar: 'عروض العطلة', ckb: 'ئۆفەرێن پشوویێ' },
+  families: { de: 'Familien-Angebote', ar: 'عروض العائلات', ckb: 'ئۆفەرێن خێزانان' },
+  city: { de: 'Städtereisen', ar: 'رحلات المدن', ckb: 'گەشتێن باژێران' },
+  eid: { de: 'Angebote zum Fest', ar: 'عروض العيد', ckb: 'ئۆفەرێن جەژنێ' },
+  newroz: { de: 'Newroz-Angebote', ar: 'عروض نوروز', ckb: 'ئۆفەرێن نەورۆزێ' },
+  lastminute: { de: 'Last Minute', ar: 'عروض اللحظة الأخيرة', ckb: 'لاست مینیت' },
+};
+const COVER_WORDS = {
+  de: { issue: 'DIE AUSGABE DES MONATS', flights: 'FLUGANGEBOTE', packages: 'REISEANGEBOTE', from: 'ab', offers: 'Angebote' },
+  ar: { issue: 'عدد هذا الشهر', flights: 'عروض الطيران', packages: 'عروض السفر', from: 'ابتداءً من', offers: 'عروض' },
+  ckb: { issue: 'ژمارا ڤێ هەیڤێ', flights: 'ئۆفەرێن فرینێ', packages: 'ئۆفەرێن گەشتێ', from: '', offers: 'ئۆفەر' },
+};
+const TRIP_WORD = { de: 'Hin & zurück', ar: 'ذهاب وعودة', ckb: 'چوون و هاتن' };
+
+/** Texts of the magazine cover: one destination (its name, departure cities) or a theme. */
+function coverTexts(draft, lang, date = new Date()) {
+  const w = COVER_WORDS[lang] || COVER_WORDS.de;
+  const price = (p) => (w.from ? `${w.from} ` : '') + formatPrice(p);
+  const min = Math.min(...draft.offers.map((o) => o.price));
+  const one = singleDest(draft);
+  const pkg = draft.bundleKind === 'package';
+  const lines = one
+    ? draft.offers.slice(0, 4).map((o) => [pkg ? o.hotel || local(o.to, lang) : local(o.from, lang), price(o.price)])
+    : draft.offers.slice(0, 4).map((o) => [local(o.to, lang), price(o.price)]);
+  const theme = require('./image').themeOf(draft.theme || 'auto', date);
+  return {
+    issueL: 'TRAVEL & TOURISM', issueR: `${(MONTHS[lang] || MONTHS.de)[date.getMonth()]} ${date.getFullYear()}`,
+    kick: one ? (pkg ? w.packages : w.flights) : w.issue,
+    title: one ? local(one.to, lang) : (THEME_TITLES[theme] || THEME_TITLES.autumn)[lang],
+    sub: one ? price(min) + (!pkg && one.returnDate ? ' · ' + TRIP_WORD[lang] : '') : `${draft.offers.length} ${w.offers} · ${price(min)}`,
+    lines,
+  };
+}
 const titleOf = (draft, lang) => TITLES[draft.bundleKind || 'flight'][draft.titleIndex || 0][lang];
 const CAPTION_HEAD = { de: 'Wähle dein nächstes Ziel:', ar: 'اختر وجهتك القادمة:', ckb: 'جهێ خۆ یێ دی هەلبژێرە:' };
 
@@ -96,22 +141,34 @@ async function coverPhoto(kind, used) {
   return covers.next(kind) || (await covers.auto(kind, used));
 }
 
+// One destination in the whole post (e.g. Erbil from several cities): the cover shows that place.
+const singleDest = (draft) => {
+  const keys = new Set(draft.offers.map((o) => (draft.bundleKind === 'package' ? o.country || o.to.name : o.to.code || o.to.name)));
+  return keys.size === 1 ? draft.offers[0] : null;
+};
+/** Cover photo: panorama of the single destination (never the departure city), else the theme photo. */
+async function aiCover(draft, fresh = false) {
+  const one = singleDest(draft);
+  if (one) return generatePhoto({ kind: one.kind || 'flight', to: one.to, country: one.country || '' });
+  return generateThemeCover(draft.theme || 'auto', fresh);
+}
+
 /** AI photos for the cover (n = -1) and every offer, two at a time (client: AI first, one go).
  *  Writes each photo that succeeds; returns the slots that failed. */
 async function aiPhotos(draft, report = () => {}) {
-  const total = draft.offers.length + 2; // + cover (-1) and closing slide (-2)
+  const total = draft.offers.length + 1; // + cover (-1); the closing slide is a fixed design
   const failed = [];
   let done = 0;
   const one = async (n) => {
     try {
-      const dataUri = n < 0 ? await generateCover() : await generatePhoto(draft.offers[n]);
+      const dataUri = n < 0 ? await aiCover(draft) : await generatePhoto(draft.offers[n]);
       if (n >= 0) sources.use(draft.offers[n], null, dataUri);
       fs.writeFileSync(slotPath(draft, n), dataUri);
       if (n >= 0 && draft.photoPos) draft.photoPos[n] = null;
     } catch (err) { console.error('studio bundle ai:', err.message); failed.push(n); }
     report(++done, total);
   };
-  const queue = [-1, -2, ...draft.offers.map((_, n) => n)];
+  const queue = [-1, ...draft.offers.map((_, n) => n)];
   await Promise.all([0, 1].map(async () => { while (queue.length) await one(queue.shift()); }));
   return failed;
 }
@@ -122,7 +179,7 @@ async function pickPhotosAiFirst(draft, queriesFor, choosePhoto) {
   const failed = await aiPhotos(draft);
   if (!failed.length) return;
   const used = new Set(store.listDrafts().flatMap((d) => [d.pexelsId, ...(d.pexelsIds || []), d.photoFile]).filter(Boolean));
-  for (const n of failed.filter((x) => x !== -2)) { // no closing photo: the cover photo is used
+  for (const n of failed) {
     const p = n === -1 ? await coverPhoto(draft.bundleKind || 'flight', used) : await photoFor(draft.offers[n], used, queriesFor, choosePhoto);
     if (!p) throw new Error(n === -1 ? 'Kein Cover-Foto (KI fehlgeschlagen) – bitte erneut versuchen.' : `Kein Foto für ${draft.offers[n].to.name} – bitte erneut versuchen.`);
     fs.writeFileSync(slotPath(draft, n), p.dataUri);
@@ -167,8 +224,6 @@ async function renderBundle(draft) {
   const photos = draft.offers.map((_, n) => fs.readFileSync(photoPath(draft.id, n), 'utf8'));
   let coverImg = '';
   try { coverImg = fs.readFileSync(photoPath(draft.id, 'cover'), 'utf8'); } catch { /* older draft */ }
-  let endImg = '';
-  try { endImg = fs.readFileSync(photoPath(draft.id, 'end'), 'utf8'); } catch { /* none: the cover photo is used */ }
   const stamp = Date.now().toString(36);
   const versions = [];
   for (const lang of draft.langs) {
@@ -176,8 +231,9 @@ async function renderBundle(draft) {
     const title = titleOf(draft, lang);
     // Never a destination photo on the cover (client rule).
     const cover = { ...posts[0], isCover: true, photo: coverImg, photoPosition: '', kind: 'flight', card: null, country: '', destination: title,
-      hook: draft.offers.map((o) => local(o.to, lang)).join(' · '), labels: { kicker: COVER[lang].kicker, swipe: COVER[lang].swipe } };
-    const slides = [[cover, 1], ...posts.map((p) => [p, 2]), [{ ...posts[0], photo: endImg || coverImg || posts[0].photo, photoPosition: endImg || coverImg ? '' : posts[0].photoPosition }, 3]]; // last slide: cover photo, not a repeat of slide 2
+      cover: coverTexts(draft, lang), labels: { kicker: COVER[lang].kicker, swipe: COVER[lang].swipe } };
+    // Last slide: the fixed brand slide (no photo, client decision 2026-11-04).
+    const slides = [[cover, 1], ...posts.map((p) => [p, 2]), [{ ...posts[0], photo: '' }, 3]];
     const files = [];
     for (const size of require('./format').sizes()) {
       for (let i = 0; i < slides.length; i++) {
@@ -199,7 +255,7 @@ async function renderBundle(draft) {
 }
 
 /** Bundle draft from offer keys of ONE kind (client rule: never mix flights, packages, cruises, ...). */
-async function createBundleDraft({ kind, keys, style, langs, date, liveOffers, queriesFor, choosePhoto }) {
+async function createBundleDraft({ kind, keys, style, theme, langs, date, liveOffers, queriesFor, choosePhoto }) {
   if (!KINDS.includes(kind)) throw new Error('unknown kind');
   if (!Array.isArray(keys) || keys.length < MIN || keys.length > MAX) throw new Error(`Bitte ${MIN} bis ${MAX} Angebote wählen.`);
   const all = await liveOffers(kind);
@@ -213,7 +269,7 @@ async function createBundleDraft({ kind, keys, style, langs, date, liveOffers, q
   if (new Set(offers.map(place)).size !== offers.length) throw new Error(kind === 'package' ? 'Jedes Land nur einmal pro Beitrag.' : 'Jede Destination nur einmal pro Beitrag.');
   const draft = {
     id: crypto.randomBytes(6).toString('hex'), createdAt: new Date().toISOString(), forDate: date.toISOString().slice(0, 10),
-    status: 'pending', style: PACKAGE_STYLES.includes(style) ? style : 'flight', source: 'specials', bundle: true, bundleKind: kind, // style: template chosen before the photos (client)
+    status: 'pending', style: PACKAGE_STYLES.includes(style) ? style : 'flight', source: 'specials', bundle: true, bundleKind: kind, theme: THEMES.includes(theme) ? theme : 'auto', // style/theme chosen before the photos (client)
     titleIndex: Math.floor(Math.random() * TITLES[kind].length), offers, offer: offers[0], langs, texts: {}, versions: [],
   };
   for (const l of langs) draft.texts[l] = { caption: bundleCaption(offers, l, titleOf(draft, l)) };
@@ -225,7 +281,7 @@ async function createBundleDraft({ kind, keys, style, langs, date, liveOffers, q
 // n = offer index, -1 = cover, -2 = closing slide (its own AI photo, client: never the cover again)
 const slotPath = (draft, n) => photoPath(draft.id, n === -1 ? 'cover' : n === -2 ? 'end' : n);
 const validSlot = (draft, n) => Number.isInteger(n) && n >= -1 && n < draft.offers.length;
-const validAiSlot = (draft, n) => n === -2 || validSlot(draft, n);
+const validAiSlot = validSlot;
 
 /** Ranked photo suggestions for one slide; kept on the draft so only suggested photos can be picked. */
 async function slotCandidates(draft, n, queriesFor) {
@@ -257,7 +313,7 @@ async function regenerateBundle(draft, what, value, queriesFor, choosePhoto, LAN
     if (!(what === 'bundle-photo-ai' ? validAiSlot(draft, n) : validSlot(draft, n))) throw new Error('bad slide');
     let dataUri;
     if (what === 'bundle-photo-ai') {
-      dataUri = n < 0 ? await generateCover() : await generatePhoto(draft.offers[n]);
+      dataUri = n < 0 ? await aiCover(draft, true) : await generatePhoto(draft.offers[n]);
     } else if (what === 'bundle-photo-upload') dataUri = value.data;
     else {
       const c = draft.bundlePick && draft.bundlePick.n === n && draft.bundlePick.list.find((x) => x.id === value.id);
@@ -273,8 +329,8 @@ async function regenerateBundle(draft, what, value, queriesFor, choosePhoto, LAN
     draft.bundlePick = null;
   } else if (what === 'bundle-photo-ai-all') {
     const failed = await aiPhotos(draft, typeof value === 'function' ? value : () => {});
-    if (failed.length === draft.offers.length + 2) throw new Error('KI-Fotos fehlgeschlagen – bitte später erneut versuchen.');
-    draft.warning = failed.length ? `Kein KI-Foto für: ${failed.map((n) => (n === -1 ? 'Cover' : n === -2 ? 'Schluss' : draft.offers[n].to.name)).join(', ')} – bitte einzeln mit 🤖 KI erneut versuchen.` : '';
+    if (failed.length === draft.offers.length + 1) throw new Error('KI-Fotos fehlgeschlagen – bitte später erneut versuchen.');
+    draft.warning = failed.length ? `Kein KI-Foto für: ${failed.map((n) => (n === -1 ? 'Cover' : draft.offers[n].to.name)).join(', ')} – bitte einzeln mit 🤖 KI erneut versuchen.` : '';
     draft.bundlePick = null;
   } else if (what === 'style') {
     if (!PACKAGE_STYLES.includes(value)) throw new Error('Für Sammel-Beiträge: Glas, Magazin oder Schlicht.');
@@ -300,4 +356,4 @@ function deleteBundlePhotos(draft) {
   }
 }
 
-module.exports = { KINDS, TITLES, MIN, MAX, bundleCaption, offerLine, createBundleDraft, regenerateBundle, deleteBundlePhotos };
+module.exports = { KINDS, TITLES, MIN, MAX, bundleCaption, offerLine, coverTexts, createBundleDraft, regenerateBundle, deleteBundlePhotos };

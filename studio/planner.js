@@ -432,8 +432,8 @@ function deleteDraft(draft) {
 }
 
 /** "Mehrere Angebote": one post with 2-6 offers (studio/bundle.js). */
-async function createBundleDraft({ kind, keys, style, date = new Date(), langs = null }) {
-  return buildBundle({ kind, keys, style, langs: langs || defaultLangs(date), date, liveOffers, queriesFor, choosePhoto });
+async function createBundleDraft({ kind, keys, style, theme, date = new Date(), langs = null }) {
+  return buildBundle({ kind, keys, style, theme, langs: langs || defaultLangs(date), date, liveOffers, queriesFor, choosePhoto });
 }
 
 module.exports = { createBundleDraft, createPickedDraft, offerChoices, createPackageDraft, saveToLibrary, deleteDraft, createDailyDraft, createManualDraft, regenerate, pickOffer };

@@ -128,7 +128,9 @@
   <div id="bundleBox" class="manual" hidden>
     <h3>Mehrere Angebote in einem Beitrag <small>(2 bis 6 wählen, Reihenfolge = Reihenfolge der Auswahl)</small></h3>
     <div class="row"><label>Art <select id="bundleKind"><option value="flight">✈️ Flugangebote</option><option value="package">🏨 Pauschalreisen</option></select></label>
-      <label hidden>Vorlage <select id="bundleStyle"><option value="flight-simple">◻ Schlicht</option></select></label></div>
+      <label hidden>Vorlage <select id="bundleStyle"><option value="flight-simple">◻ Schlicht</option></select></label>
+      <label>Thema (Cover) <select id="bundleTheme"><option value="auto">Automatisch (Jahreszeit)</option><option value="summer">Sommer</option><option value="holidays">Ferien</option><option value="families">Familien</option><option value="city">Städtereisen</option><option value="eid">Fest (Eid)</option><option value="newroz">Newroz</option><option value="lastminute">Last Minute</option><option value="autumn">Herbst</option><option value="winter">Winter</option><option value="spring">Frühling</option></select></label>
+      <small style="color:#8e98b3">Nur ein Ziel (z. B. Erbil): Cover zeigt dieses Ziel.</small></div>
     <div id="bundleList" class="pick" style="max-height:340px;overflow:auto"></div>
     <div class="row"><button class="primary" id="bundleGo">Sammel-Beitrag erstellen</button><span id="bundleCount"></span></div>
   </div>
@@ -214,7 +216,7 @@ function render(drafts) {
         <span>${esc(d.offer.price)} €</span>`}</div>
       ${d.warning ? `<p class="warn">⚠ ${esc(d.warning)}</p>` : ''}
       ${d.bundle ? `<div class="row"><button data-act="bundle-ai-all">🤖 KI-Fotos für alle Angebote</button></div><div class="row"><span>🤖 Neues KI-Foto für:</span>
-        <button class="ghost" data-act="bundle-photo-ai" data-n="-1">Cover</button><button class="ghost" data-act="bundle-photo-ai" data-n="-2">Schluss</button>
+        <button class="ghost" data-act="bundle-photo-ai" data-n="-1">Cover</button>
         ${d.offers.map((o, n) => `<button class="ghost" data-act="bundle-photo-ai" data-n="${n}">${n + 1}. ${esc(o.to.name)}</button>`).join('')}</div>` : ''}
       ${d.bundle && d.bundlePick ? `
         <div class="photo-pick"><h3>Foto für ${d.bundlePick.n === -1 ? 'Cover' : esc(d.offers[d.bundlePick.n].to.name)} wählen <small>(beste zuerst)</small></h3>
@@ -403,7 +405,7 @@ $('#bundleGo').onclick = async () => {
   if (bundlePick.length < 2) { $('#msg').textContent = 'Bitte mindestens 2 Angebote wählen.'; return; }
   $('#bundleGo').disabled = true; $('#msg').textContent = 'Sammel-Beitrag wird erstellt …';
   try {
-    await api('/api/studio/drafts/bundle', { method: 'POST', body: JSON.stringify({ kind: $('#bundleKind').value, style: $('#bundleStyle').value, keys: bundlePick, ...(defLangs().length ? { langs: defLangs() } : {}) }) });
+    await api('/api/studio/drafts/bundle', { method: 'POST', body: JSON.stringify({ kind: $('#bundleKind').value, style: $('#bundleStyle').value, theme: $('#bundleTheme').value, keys: bundlePick, ...(defLangs().length ? { langs: defLangs() } : {}) }) });
     const t0 = Date.now();
     for (;;) {
       await new Promise((r) => setTimeout(r, 5000));

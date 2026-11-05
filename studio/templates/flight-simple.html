@@ -53,12 +53,54 @@
   .foot .slogan { margin-top: calc(6 * var(--u)) !important; }
   .foot .slogan span { font-size: calc(54 * var(--u)) !important; }
 
-  /* Slide 3 (carousels only): closing words */
-  .end { position: absolute; left: 80px; right: 80px; top: 42%; transform: translateY(-50%); text-align: center; }
-  .end .big { font-size: calc(86 * var(--u)); font-weight: 800; line-height: 1.12; text-wrap: balance; }
-  .end .sub { margin-top: calc(22 * var(--u)); font-size: calc(34 * var(--u)); font-weight: 600; line-height: 1.35; text-wrap: balance; }
-  .end .cta { display: inline-block; margin-top: calc(36 * var(--u)); padding: calc(22 * var(--u)) calc(52 * var(--u)); border-radius: 999px;
-    background: linear-gradient(135deg, #f7e7a8, #c9a227); color: var(--navy); font-size: calc(32 * var(--u)); font-weight: 800; white-space: nowrap; }
+  /* Price notice on the offer slides (prices change every day) */
+  .pnote { position: absolute; left: 60px; right: 60px; bottom: calc(36 * var(--u)); text-align: center; font-size: calc(19 * var(--u)); color: rgba(255,255,255,.8); text-shadow: 0 1px 6px rgba(0,0,0,.6); }
+  .story .pnote { bottom: 150px; }
+
+  /* Magazine cover (client decision 2026-11-04): masthead, issue line, cover lines, headline */
+  .mag-mast { position: absolute; top: calc(110 * var(--u)); left: 60px; right: 60px; text-align: center; }
+  .story .mag-mast { top: 170px; }
+  .mag-mast img { width: calc(380 * var(--u)); filter: drop-shadow(0 6px 20px rgba(0,0,0,.45)); }
+  .issue { display: flex; justify-content: space-between; margin-top: calc(14 * var(--u)); padding-top: calc(12 * var(--u)); border-top: 2px solid rgba(246,227,161,.8); font-size: calc(24 * var(--u)); font-weight: 700; letter-spacing: .22em; color: #fff6d4; text-shadow: 0 2px 10px rgba(0,0,0,.5); }
+  .rtl .issue { letter-spacing: 0; }
+  .clines { position: absolute; top: calc(420 * var(--u)); left: 60px; width: 460px; }
+  .story .clines { top: 640px; }
+  .rtl .clines { left: auto; right: 60px; }
+  .cl { margin-bottom: calc(30 * var(--u)); text-shadow: 0 2px 14px rgba(0,0,0,.6); }
+  .cl i { display: block; width: 70px; height: 4px; background: var(--gold); margin-bottom: 12px; }
+  .cl b { display: block; font-size: calc(44 * var(--u)); font-weight: 800; letter-spacing: .04em; line-height: 1.05; text-transform: uppercase; }
+  .rtl .cl b { letter-spacing: 0; }
+  .cl span { font-size: calc(30 * var(--u)); font-weight: 700; color: #f6e3a1; text-shadow: 0 2px 10px rgba(0,0,0,.85), 0 0 2px rgba(0,0,0,.9); }
+  .main { position: absolute; left: 60px; right: 60px; bottom: calc(150 * var(--u)); }
+  .story .main { bottom: 250px; }
+  .kick { display: inline-block; padding: 10px 22px; background: var(--gold); color: var(--navy); font-size: calc(28 * var(--u)); font-weight: 800; letter-spacing: .12em; margin-bottom: 22px; }
+  .rtl .kick { letter-spacing: 0; }
+  .h { font-family: "DM Serif Display", "IBM Plex Sans Arabic", serif; font-weight: 400; font-size: calc(150 * var(--u)); line-height: .98; text-shadow: 0 8px 34px rgba(0,0,0,.5); text-wrap: balance; }
+  .rtl .h { font-weight: 700; font-size: calc(118 * var(--u)); line-height: 1.15; }
+  .msub { margin-top: 18px; font-size: calc(44 * var(--u)); font-weight: 700; text-shadow: 0 2px 12px rgba(0,0,0,.5); }
+  .k-cover .shade { background: linear-gradient(180deg, rgba(4,10,28,.55) 0%, rgba(4,10,28,0) 22%, rgba(4,10,28,0) 52%, rgba(4,10,28,.85) 100%); }
+
+  /* Slide 3: the fixed brand slide, gold foil on deep navy, no photo (client decision 2026-11-04) */
+  .s3 { background: radial-gradient(90% 60% at 50% 42%, #14213f 0%, #0a1328 50%, #05080f 100%); }
+  .s3 .bg, .s3 .shade, .s3 .foot, .s3 .pnote { display: none; }
+  .foil { background: linear-gradient(100deg, #8a6516 0%, #d4af37 20%, #fff1b8 38%, #c9a227 55%, #f3dc93 72%, #9c7618 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .wm { position: absolute; left: 50%; top: 44%; width: 1500px; height: 540px; transform: translate(-50%, -50%) rotate(-8deg); opacity: .06;
+    background: linear-gradient(100deg, #8a6516, #d4af37, #fff1b8, #c9a227); -webkit-mask: url({{logo}}) center/contain no-repeat; mask: url({{logo}}) center/contain no-repeat; }
+  .cr { position: absolute; width: 120px; height: 120px; border-color: #c9a227; border-style: solid; opacity: .9; }
+  .cr.tl { top: 70px; left: 70px; border-width: 2px 0 0 2px; } .cr.tr { top: 70px; right: 70px; border-width: 2px 2px 0 0; }
+  .cr.bl { bottom: 70px; left: 70px; border-width: 0 0 2px 2px; } .cr.br { bottom: 70px; right: 70px; border-width: 0 2px 2px 0; }
+  .endc { position: absolute; left: 100px; right: 100px; top: 50%; transform: translateY(-55%); text-align: center; }
+  .elogo { width: calc(460 * var(--u)); height: calc(160 * var(--u)); margin: 0 auto; background: linear-gradient(100deg, #8a6516, #d4af37 20%, #fff1b8 38%, #c9a227 55%, #f3dc93 72%, #9c7618);
+    -webkit-mask: url({{logo}}) center/contain no-repeat; mask: url({{logo}}) center/contain no-repeat; }
+  .esl { margin-top: calc(60 * var(--u)); font-family: "Allura", cursive !important; font-size: calc(118 * var(--u)); line-height: 1.1; direction: ltr; }
+  .esl b { font-weight: 400; font-size: 1.25em; font-family: "Allura", cursive !important; }
+  .erule { width: 220px; height: 1px; margin: calc(70 * var(--u)) auto; background: linear-gradient(90deg, transparent, #c9a227, transparent); }
+  .ewa small { display: block; font-size: calc(24 * var(--u)); font-weight: 600; letter-spacing: .5em; color: #c9a227; }
+  .ewa span { display: block; margin-top: 14px; font-family: "DM Serif Display", serif !important; font-size: calc(72 * var(--u)); direction: ltr; unicode-bidi: isolate; }
+  .eft { position: absolute; left: 0; right: 0; bottom: calc(110 * var(--u)); text-align: center; }
+  .story .eft { bottom: 150px; }
+  .eft b { display: block; font-size: calc(22 * var(--u)); letter-spacing: .45em; color: #c9a227; font-weight: 600; font-family: "Plus Jakarta Sans", sans-serif !important; }
+  .eft small { display: block; margin-top: 12px; font-size: calc(21 * var(--u)); color: rgba(255,241,184,.6); }
 </style>
 </head>
 <body class="{{size}} {{dir}} k-{{kind}}">
@@ -75,27 +117,30 @@
       <div class="hotel pkg">{{hotel}}</div>
     </div>
 
-    <!-- bundle cover (slide 1 of a multi-offer post): title and destinations, no price -->
-    <div class="top cov" data-only="1">
-      <div class="covtitle">{{destination}}</div>
-      <div class="covlist">{{hook}}</div>
-      <div class="trip">{{swipe}}</div>
+    <!-- bundle cover (slide 1 of a multi-offer post): magazine cover -->
+    <div class="cov" data-only="1">
+      <div class="mag-mast"><img src="{{logo}}" alt="MEDIA" /><div class="issue"><span>{{issueL}}</span><span>{{issueR}}</span></div></div>
+      <div class="clines">%%COVERLINES%%</div>
+      <div class="main"><div class="kick">{{coverKick}}</div><div class="h">{{coverTitle}}</div><div class="msub">{{coverSub}}</div></div>
     </div>
 
-    <!-- slide 3 -->
-    <div class="end" data-only="3">
-      <div class="big">{{ctaTitle}}</div>
-      <div class="sub">{{ctaText}}</div>
-      <div class="cta">{{ctaButton}}</div>
+    <!-- slide 3: fixed brand slide -->
+    <div data-only="3">
+      <div class="wm"></div><div class="cr tl"></div><div class="cr tr"></div><div class="cr bl"></div><div class="cr br"></div>
+      <div class="endc"><div class="elogo"></div><div class="esl foil">find your next <b>YOU</b></div><div class="erule"></div>
+        <div class="ewa"><small>WHATSAPP</small><span class="foil">{{waNumber}}</span></div></div>
+      <div class="eft"><b>MEDIA-TRAVELS.COM</b><small>{{endNote}}</small></div>
     </div>
 
     <div class="foot"><img src="{{logo}}" alt="MEDIA" />%%SLOGAN%%</div>
+    <div class="pnote" data-only="12">{{priceNote}}</div>
   </div>
   <style>
     [data-only] { display: none; }
     .s1 [data-only="12"], .s2 [data-only="12"], .s1 [data-only="1"], .s3 [data-only="3"] { display: block; }
     .k-flight .pkg, .k-package .flt { display: none !important; }
-    .k-cover .s1 [data-only="12"], .k-flight .cov, .k-package .cov { display: none !important; }
+    .k-cover .s1 [data-only="12"], .k-flight .cov, .k-package .cov, .k-cover .s1 .foot { display: none !important; }
+    .ewa:has(span:empty) { display: none; }
   </style>
 </body>
 </html>

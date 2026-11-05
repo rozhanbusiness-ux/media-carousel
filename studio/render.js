@@ -98,6 +98,10 @@ function buildPriceHtml(price) {
  * Returns a JPEG buffer.
  */
 const TRIP = { de: 'Hin & zurück', ar: 'ذهاب وعودة', ckb: 'چوون و هاتن' };
+// Prices change every day (client 2026-11-04): a short notice on the offer slides and the end slide.
+const PRICE_NOTE = { de: 'Preise tagesaktuell und freibleibend – sie ändern sich täglich.', ar: 'الأسعار تتغير يوميًا وهي غير ملزمة.', ckb: 'نرخ هەر ڕۆژ دگوهۆڕن.' };
+const END_NOTE = { de: 'Preise ändern sich täglich – frag nach dem Tagespreis.', ar: 'الأسعار تتغير يوميًا – اسأل عن سعر اليوم.', ckb: 'نرخ هەر ڕۆژ دگوهۆڕن – پسیارا نرخێ ئەڤرۆ بکە.' };
+const waNumber = () => { const n = (process.env.STUDIO_WHATSAPP || '').trim(); return /^\+?[0-9 ]{6,20}$/.test(n) ? n : ''; };
 
 async function renderSlide(post, size, slide) {
   if (!STYLES.includes(post.style)) throw new Error('unknown style');
@@ -117,8 +121,11 @@ async function renderSlide(post, size, slide) {
     country: post.country || '', hotel: '', stars: '', pkgLine: '', place: '',
     // Short trip tag under the route (flight-simple): only for round trips, nothing for one-way.
     trip: post.roundTrip ? (TRIP[post.lang] || TRIP.de) : '',
+    priceNote: PRICE_NOTE[post.lang] || PRICE_NOTE.de, endNote: END_NOTE[post.lang] || END_NOTE.de, waNumber: waNumber(),
+    issueL: '', issueR: '', coverKick: '', coverTitle: '', coverSub: '',
   };
   if (post.labels) Object.assign(values, post.labels); // bundle cover: own kicker / swipe text
+  if (post.cover) Object.assign(values, { issueL: post.cover.issueL, issueR: post.cover.issueR, coverKick: post.cover.kick, coverTitle: post.cover.title, coverSub: post.cover.sub });
   if (post.card) {
     const c = post.card;
     Object.assign(values, PACKAGE_LABELS[post.lang] || PACKAGE_LABELS.de);
@@ -136,6 +143,8 @@ async function renderSlide(post, size, slide) {
   html = html.replace('<link rel="stylesheet" href="{{fontCss}}" />', `<style>${fontCss()}${shadow}</style>`)
     .replace(/%%PRICE%%/g, priceHtml)
     .replace(/%%SLOGAN%%/g, SLOGAN_HTML)
+    // Magazine cover lines: escaped text in fixed markup.
+    .replace(/%%COVERLINES%%/g, ((post.cover && post.cover.lines) || []).map(([a, b]) => `<div class="cl"><i></i><b>${esc(a)}</b><span>${esc(b)}</span></div>`).join(''))
     .replace(/\{\{photo\}\}/g, validPhoto(post.photo) ? post.photo : '');
   // Stars as drawn icons: the server has no font with the "★" glyph (it rendered as boxes).
   html = html.replace(/★/g, STAR_SVG);

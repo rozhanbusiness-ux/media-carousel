@@ -48,7 +48,7 @@ module.exports = function mountStudio(app) {
 
   // "Mehrere Angebote": 2-6 offers of ONE kind (flight or package) in one post.
   router.post('/drafts/bundle', async (req, res) => {
-    const { kind, keys, langs, style } = req.body || {};
+    const { kind, keys, langs, style, theme } = req.body || {};
     if (!['flight', 'package'].includes(kind)) return res.status(400).json({ error: 'bad kind' });
     if (!Array.isArray(keys) || keys.length < 2 || keys.length > 6 || !keys.every((k) => typeof k === 'string' && /^[A-Za-z0-9-]{3,40}$/.test(k)) || new Set(keys).size !== keys.length) {
       return res.status(400).json({ error: 'Bitte 2 bis 6 verschiedene Angebote wählen.' });
@@ -58,7 +58,7 @@ module.exports = function mountStudio(app) {
     // timeout (180 s), so the page polls /drafts/bundle/status instead.
     generating = true;
     bundleJob = { running: true, error: null, id: null };
-    createBundleDraft({ kind, keys, style: typeof style === 'string' ? style : undefined, langs: cleanLangs(langs) })
+    createBundleDraft({ kind, keys, style: typeof style === 'string' ? style : undefined, theme: typeof theme === 'string' ? theme : undefined, langs: cleanLangs(langs) })
       .then((draft) => { bundleJob = { running: false, error: null, id: draft && draft.id }; })
       .catch((err) => { console.error('studio bundle:', err.message); bundleJob = { running: false, error: err.message, id: null }; })
       .finally(() => { generating = false; });
@@ -183,7 +183,7 @@ module.exports = function mountStudio(app) {
     if (what === 'photo-pick' && !pid(value)) return res.status(400).json({ error: 'bad photo' });
     const slot = (n) => Number.isInteger(n) && n >= -1 && n < 6;
     if (what === 'bundle-photos' && !slot(value)) return res.status(400).json({ error: 'bad slide' });
-    if (what === 'bundle-photo-ai' && !(slot(value) || value === -2)) return res.status(400).json({ error: 'bad slide' });
+    if (what === 'bundle-photo-ai' && !slot(value)) return res.status(400).json({ error: 'bad slide' });
     if (what === 'bundle-photo-pick' && !(value && slot(value.n) && pid(value.id))) return res.status(400).json({ error: 'bad photo' });
     if (what === 'bundle-photo-upload' && !(value && slot(value.n) && typeof value.data === 'string' && value.data.length < 12000000
       && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(value.data))) return res.status(400).json({ error: 'bad image' });
@@ -192,7 +192,7 @@ module.exports = function mountStudio(app) {
     if (what === 'bundle-photo-ai-all') {
       if (!draft.bundle) { generating = false; return res.status(400).json({ error: 'bad request' }); }
       // Background job (6 AI photos take minutes, longer than the Nginx timeout); the page polls.
-      aiJob = { running: true, error: null, done: 0, total: draft.offers.length + 2, id: draft.id };
+      aiJob = { running: true, error: null, done: 0, total: draft.offers.length + 1, id: draft.id };
       regenerate(draft, what, (done, total) => { aiJob = { ...aiJob, done, total }; })
         .then(() => { aiJob = { ...aiJob, running: false }; })
         .catch((err) => { console.error('studio bundle ai:', err.message); aiJob = { ...aiJob, running: false, error: err.message }; })
