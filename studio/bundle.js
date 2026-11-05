@@ -81,8 +81,8 @@ function coverTexts(draft, lang, date = new Date()) {
   const one = singleDest(draft);
   const pkg = draft.bundleKind === 'package';
   const lines = one
-    ? draft.offers.slice(0, 4).map((o) => [pkg ? o.hotel || local(o.to, lang) : local(o.from, lang), price(o.price)])
-    : draft.offers.slice(0, 4).map((o) => [local(o.to, lang), price(o.price)]);
+    ? draft.offers.slice(0, 6).map((o) => [pkg ? o.hotel || local(o.to, lang) : local(o.from, lang), price(o.price)])
+    : draft.offers.slice(0, 6).map((o) => [local(o.to, lang), price(o.price)]);
   const theme = require('./image').themeOf(draft.theme || 'auto', date);
   return {
     issueL: 'TRAVEL & TOURISM', issueR: `${(MONTHS[lang] || MONTHS.de)[date.getMonth()]} ${date.getFullYear()}`,

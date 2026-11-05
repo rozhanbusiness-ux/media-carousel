@@ -144,7 +144,9 @@ async function renderSlide(post, size, slide) {
     .replace(/%%PRICE%%/g, priceHtml)
     .replace(/%%SLOGAN%%/g, SLOGAN_HTML)
     // Magazine cover lines: escaped text in fixed markup.
+    // Up to six cover lines (client); five or six get the compact size so they never reach the headline.
     .replace(/%%COVERLINES%%/g, ((post.cover && post.cover.lines) || []).map(([a, b]) => `<div class="cl"><i></i><b>${esc(a)}</b><span>${esc(b)}</span></div>`).join(''))
+    .replace('class="clines"', ((post.cover && post.cover.lines) || []).length > 4 ? 'class="clines many"' : 'class="clines"')
     .replace(/\{\{photo\}\}/g, validPhoto(post.photo) ? post.photo : '');
   // Stars as drawn icons: the server has no font with the "★" glyph (it rendered as boxes).
   html = html.replace(/★/g, STAR_SVG);
