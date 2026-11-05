@@ -50,7 +50,8 @@ const D = {
 // their own city and every slide of a multi-city post looks different.
 const HOME = new Set(['EBL', 'ISU', 'BGW', 'BSR', 'NJF', 'OSM', 'KIK']);
 const GERMAN = {
-  DUS: ['the Rheinturm and the Media Harbour in Düsseldorf at golden hour, seen across the Rhine', 'the Rhine promenade of Düsseldorf old town with the Rheinturm in the distance on a clear evening'],
+  // Kept low on purpose: the tall Rheinturm made the model paste a separate sky band above it.
+  DUS: ['a wide view across the Rhine to the Düsseldorf skyline, the Rheinturm small in the far distance', 'the Rhine promenade of Düsseldorf old town seen from the river bank, the city low on the horizon'],
   CGN: ['Cologne Cathedral and the Hohenzollern Bridge over the Rhine at golden hour', 'the colourful old town houses on the Rhine bank in Cologne on a clear evening'],
   FRA: ['the Frankfurt skyline over the Main river at blue hour, seen from a bridge', 'the Römerberg square in Frankfurt with its half-timbered houses on a bright morning'],
   MUC: ['the Munich skyline with the Frauenkirche towers and the Alps far behind on a clear day', 'Marienplatz in Munich with the New Town Hall in warm late-afternoon light'],
