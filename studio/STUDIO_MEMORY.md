@@ -51,6 +51,35 @@ Decisions and state of the marketing studio. The rest of Carousel is documented 
 - Preview without saving: `docker exec media-carousel-app node studio/editorial-preview.js 6`.
 - Wikivoyage API: one request about every 1.1 s, retry on 429, contact User-Agent.
 
+## State after 2026-11-05 (studio rebuilt; now: post daily and measure)
+- One simple screen: "Ein Angebot" (kind flight/package, travel month, offer list or automatic,
+  generated once) and "Mehrere Angebote" (kind, travel month, theme, 2-6 offers). Frozen and
+  hidden (not deleted): cruise/holiday home, screenshot/PDF entry, real cover photos, ideas of
+  the day, other templates, real-photo buttons. Template: Schlicht only.
+- Travel month: flights filtered to departures in the chosen month (cheapest date per route
+  inside it); the cover shows that month. Packages are not filtered (no reliable date).
+- Photos: AI first everywhere. Prompt: elevated panorama, bright daylight, the season of the
+  month, vivid but believable colours, open sky at the top, darker bottom; no readable text,
+  logos, mosques or minarets. Flights home (EBL, ISU, BGW, ...) show the German DEPARTURE city
+  (scene list per airport); bundles may repeat Erbil from different cities.
+- Bundle cover = magazine cover: masthead, issue line, up to six cover lines (destination or
+  departure city + price), kicker and headline. One destination: its panorama and name; several:
+  a theme photo (auto = season of the travel month, or summer, holidays, families, city trips,
+  Eid, Newroz, last minute), kept in a small library per theme and reused.
+- Last slide: fixed brand slide, gold foil on deep navy, WhatsApp number (STUDIO_WHATSAPP), no
+  photo, no AI cost. Offer slides and last slide carry a daily-price notice.
+- Photo library (cache/studio-ailib): save a slide photo, pick saved photos per place or theme.
+- Erbil daily prices form: one row per airport (date required, return optional, price), saved
+  together as own offers valid until today; the client can add departure cities.
+- Text model: gemini-3.5-flash-lite (studio/gemini-text.js), before the 2.5 retirement on
+  2026-12-01. src/extract-offer.js stays on 2.5 (plain requests, redirected automatically).
+- Security: the app port is 127.0.0.1:3010 only (it was public without the login before
+  2026-11-05; watch the Gemini bill). .dockerignore keeps .env, cache and output out of the image.
+- Fly Erbil: the public schedule on flyebl.com is readable; prices only in the booking engine
+  (Avileague, encrypted requests) - not automated (would bypass a protection). Ask Fly Erbil for
+  an agent fare feed/API, or specials/Ypsilon whether UD fares are available to partners.
+- Costs: Gemini ~ EUR 41 for Aug-Oct for ALL apps; studio ~ EUR 9/month, mostly images.
+
 ## Purpose of the studio (agreed 2026-11-04)
 Part of the sales strategy (website repo, `docs/PROJECT_MEMORY.md`, section 11b). The studio
 turns today's offers into ready story posts for WhatsApp status/Channel and a short video for
