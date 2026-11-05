@@ -79,6 +79,14 @@ Decisions and state of the marketing studio. The rest of Carousel is documented 
   (Avileague, encrypted requests) - not automated (would bypass a protection). Ask Fly Erbil for
   an agent fare feed/API, or specials/Ypsilon whether UD fares are available to partners.
 - Costs: Gemini ~ EUR 41 for Aug-Oct for ALL apps; studio ~ EUR 9/month, mostly images.
+- Library first (2026-11-05): new posts take a saved library photo of the place when there is
+  one and generate only the rest; the AI buttons always generate new ones. Save good photos.
+- Seamless photos: the prompt forbids pasted sky bands (seen with tall landmarks: Rheinturm,
+  domes); Düsseldorf scenes keep the Rheinturm small and far away.
+- Logout button ("Abmelden") for the Nginx Basic Auth (realm "Restricted"); password unchanged.
+  Works in Chrome/Edge/Firefox; Safari may keep the login until the browser is closed.
+- 2026-11-05: client verified logout and the Düsseldorf photo; daily WhatsApp status posting
+  starts today. Rule: no design changes for three weeks, collect numbers first.
 
 ## Purpose of the studio (agreed 2026-11-04)
 Part of the sales strategy (website repo, `docs/PROJECT_MEMORY.md`, section 11b). The studio
