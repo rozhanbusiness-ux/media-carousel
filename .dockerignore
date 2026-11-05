@@ -1,0 +1,10 @@
+# Never copy secrets, runtime data or local tooling into the image.
+# cache/ and output/ are mounted as volumes at runtime (docker-compose.yml).
+.env
+.env.*
+!.env.example
+.git
+node_modules
+cache
+output
+*.log

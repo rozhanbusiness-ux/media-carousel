@@ -4,7 +4,7 @@ services:
     container_name: media-carousel-app
     restart: unless-stopped
     ports:
-      - "3010:3000"
+      - "127.0.0.1:3010:3000" # local only: Nginx (with the login) is the only way in
     env_file:
       - .env
     environment:
