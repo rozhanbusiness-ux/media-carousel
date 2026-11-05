@@ -23,7 +23,7 @@ async function suggestQueries(offer, fetchImpl = fetch) {
   try {
     const prompt = `Give 4 short stock-photo search phrases (2-5 English words each) for iconic, bright travel photos of ${place}. `
       + 'Each phrase must name the place or a specific landmark, beach or view of it. No mosques or minarets. Answer as a JSON array of strings only.';
-    const res = await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${config.GEMINI_MODEL || 'gemini-2.5-flash'}:generateContent`, {
+    const res = await fetchImpl(require('./gemini-text').endpoint(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': config.GEMINI_API_KEY },
       body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json' } }),

@@ -21,8 +21,8 @@ const { criteria } = require('./photo-rank');
   }
   for (const withSchema of [true, false]) {
     const { SCHEMA } = require('./photo-rank');
-    const gen = { responseMimeType: 'application/json', temperature: 0.2, maxOutputTokens: 2048, thinkingConfig: { thinkingBudget: 0 }, ...(withSchema && SCHEMA ? { responseSchema: SCHEMA } : {}) };
-    const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent', {
+    const gen = { ...require('./gemini-text').jsonConfig(2048), ...(withSchema && SCHEMA ? { responseSchema: SCHEMA } : {}) };
+    const res = await fetch(require('./gemini-text').endpoint(), {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': config.GEMINI_API_KEY },
       body: JSON.stringify({ contents: [{ parts }], generationConfig: gen }),
     });

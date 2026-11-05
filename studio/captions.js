@@ -10,7 +10,7 @@
 const config = require('../config');
 const { factLine, starText, countryName, cardFor } = require('./packages');
 
-const TEXT_MODEL = 'gemini-2.5-flash';
+const { TEXT_MODEL, jsonConfig } = require('./gemini-text');
 const LANGS = ['de', 'ar', 'ckb'];
 
 // City names per airport code; unknown codes keep the provider's (German) name.
@@ -153,7 +153,7 @@ async function askModel(offer, lang, fetchImpl) {
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': config.GEMINI_API_KEY },
     body: JSON.stringify({
       contents: [{ parts: [{ text: buildPrompt(offer, lang) }] }],
-      generationConfig: { responseMimeType: 'application/json', temperature: 0.9, maxOutputTokens: 1024, thinkingConfig: { thinkingBudget: 0 } },
+      generationConfig: jsonConfig(1024),
     }),
     signal: AbortSignal.timeout(30000),
   });

@@ -6,7 +6,7 @@
 
 const config = require('../config');
 
-const MODEL = 'gemini-2.5-flash';
+const { TEXT_MODEL: MODEL, jsonConfig } = require('./gemini-text');
 
 // Kept for diagnosis only: with this schema Gemini 2.5 Flash wrote endless digits for "x" (seen 2026-10-18),
 // so the ranking uses plain JSON mode plus parseScores() salvage instead.
@@ -110,7 +110,7 @@ async function rankPhotos(candidates, city, fetchImpl = fetch, kind = null) {
       const res = await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': config.GEMINI_API_KEY },
-        body: JSON.stringify({ contents: [{ parts }], generationConfig: { responseMimeType: 'application/json', temperature: 0.2, maxOutputTokens: 2048, thinkingConfig: { thinkingBudget: 0 } } }),
+        body: JSON.stringify({ contents: [{ parts }], generationConfig: jsonConfig(2048) }),
         signal: AbortSignal.timeout(90000),
       });
       require('./ai-status').report(res.status);

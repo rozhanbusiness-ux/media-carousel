@@ -17,7 +17,7 @@
 const config = require('../config');
 const { EXCLUDE, SAD } = require('./news-sources');
 
-const MODEL = 'gemini-2.5-flash';
+const { TEXT_MODEL: MODEL, jsonConfig } = require('./gemini-text');
 // Kurdish in Badini with Arabic script (client decision 2026-10-30: the audience reads it this way).
 const LANGS = ['de', 'ar', 'ckb'];
 const LANG_NAME = { de: 'German', ar: 'Arabic (Modern Standard)', ckb: 'Kurdish Badini (Behdînî, the Kurmanji of Duhok, in Arabic script) — NOT Sorani: verbs with "د-" not "دە-" (دبیت، دکەت، دچیت), prepositions "ل" / "ژ" with "دا" / "ڤە" (ل سەر، ل ناڤ ... دا), no Sorani definite ending "-ەکە", "ئەڤ" not "ئەم"' };
@@ -81,12 +81,12 @@ function plan(n = 3, rnd = Math.random) {
   return slots;
 }
 
-async function gemini(prompt, fetchImpl, temperature = 0.9) {
+async function gemini(prompt, fetchImpl) {
   const res = await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': config.GEMINI_API_KEY },
     body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { responseMimeType: 'application/json', temperature, maxOutputTokens: 8192, thinkingConfig: { thinkingBudget: 0 } } }),
+      generationConfig: jsonConfig(8192) }),
     signal: AbortSignal.timeout(90000),
   });
   if (!res.ok) throw new Error(`Gemini ${res.status}`);
@@ -158,7 +158,7 @@ async function candidates(slot, avoid, fetchImpl) {
     'Prefer places with something special: a legend, an unusual sight, a local custom, a striking landscape. Mix well-known and lesser-known places.',
     avoid.length ? `Do not list any of these: ${avoid.slice(-150).join('; ')}.` : '',
     'Return ONLY JSON: {"places":["exact Wikivoyage article title", …]}',
-  ].filter(Boolean).join('\n'), fetchImpl, 1);
+  ].filter(Boolean).join('\n'), fetchImpl);
   return Array.isArray(ai?.places) ? ai.places.filter((p) => typeof p === 'string' && p.length < 80 && !avoid.includes(p)) : [];
 }
 
