@@ -67,6 +67,12 @@ module.exports = function mountStudio(app) {
 
   router.get('/drafts/bundle/status', (req, res) => res.json(bundleJob));
   router.get('/drafts/ai-photos/status', (req, res) => res.json(aiJob));
+  // Saved library photo (file name validated against the library pattern; no paths).
+  router.get('/library/:file', (req, res) => {
+    const p = require('./ai-library').fileOf(req.params.file);
+    if (!p) return res.status(400).end();
+    res.set('Cache-Control', 'private, max-age=86400').sendFile(p, (err) => { if (err && !res.headersSent) res.status(404).end(); });
+  });
 
   // One chosen offer of one kind (key from /offer-choices).
   router.post('/drafts/pick', async (req, res) => {
@@ -174,7 +180,7 @@ module.exports = function mountStudio(app) {
     const draft = store.getDraft(req.params.id);
     if (!draft) return res.status(404).json({ error: 'not found' });
     const { what, value } = req.body || {};
-    if (!['offer-next', 'offer-pick', 'photo', 'photo-pick', 'photo-auto', 'photo-ai', 'text', 'all', 'style', 'langs', 'photo-upload', 'bundle-photos', 'bundle-photo-pick', 'bundle-photo-upload', 'bundle-photo-ai', 'bundle-photo-ai-all'].includes(what)) return res.status(400).json({ error: 'bad request' });
+    if (!['offer-next', 'offer-pick', 'photo', 'photo-pick', 'photo-auto', 'photo-ai', 'text', 'all', 'style', 'langs', 'photo-upload', 'bundle-photos', 'bundle-photo-pick', 'bundle-photo-upload', 'bundle-photo-ai', 'bundle-photo-ai-all', 'bundle-lib-save', 'bundle-lib-list', 'bundle-lib-pick'].includes(what)) return res.status(400).json({ error: 'bad request' });
     if (what === 'photo-upload' && !(typeof value === 'string' && value.length < 12000000 && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(value))) {
       return res.status(400).json({ error: 'bad image' });
     }
@@ -183,6 +189,8 @@ module.exports = function mountStudio(app) {
     if (what === 'photo-pick' && !pid(value)) return res.status(400).json({ error: 'bad photo' });
     const slot = (n) => Number.isInteger(n) && n >= -1 && n < 6;
     if (what === 'bundle-photos' && !slot(value)) return res.status(400).json({ error: 'bad slide' });
+    if (['bundle-lib-save', 'bundle-lib-list'].includes(what) && !slot(value)) return res.status(400).json({ error: 'bad slide' });
+    if (what === 'bundle-lib-pick' && !(value && slot(value.n) && typeof value.file === 'string' && require('./ai-library').FILE.test(value.file))) return res.status(400).json({ error: 'bad photo' });
     if (what === 'bundle-photo-ai' && !slot(value)) return res.status(400).json({ error: 'bad slide' });
     if (what === 'bundle-photo-pick' && !(value && slot(value.n) && pid(value.id))) return res.status(400).json({ error: 'bad photo' });
     if (what === 'bundle-photo-upload' && !(value && slot(value.n) && typeof value.data === 'string' && value.data.length < 12000000

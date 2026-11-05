@@ -15,7 +15,8 @@ const { renderSlide, PACKAGE_STYLES } = require('./render');
 const sources = require('./photo-sources');
 const bank = require('./bank');
 const { generatePhoto, generateThemeCover, THEMES, enhancePhoto } = require('./image');
-const { HOME } = require('./destinations');
+const { HOME, photoSubject } = require('./destinations');
+const library = require('./ai-library');
 const { rankPhotos } = require('./photo-rank');
 const store = require('./store');
 const covers = require('./covers');
@@ -146,6 +147,13 @@ const singleDest = (draft) => {
   const keys = new Set(draft.offers.map((o) => (draft.bundleKind === 'package' ? o.country || o.to.name : o.to.code || o.to.name)));
   return keys.size === 1 ? draft.offers[0] : null;
 };
+/** Library key of a slide: the place the photo shows (departure city for flights home), or the theme. */
+function libKey(draft, n) {
+  if (n >= 0) return library.keyOf(photoSubject(draft.offers[n]).to);
+  const one = singleDest(draft);
+  return one ? library.keyOf(one.to) : 'THEME-' + require('./image').themeOf(draft.theme || 'auto').toUpperCase();
+}
+
 /** Cover photo: panorama of the single destination (never the departure city), else the theme photo. */
 async function aiCover(draft, fresh = false) {
   const one = singleDest(draft);
@@ -303,6 +311,30 @@ async function slotCandidates(draft, n, queriesFor) {
  *  'bundle-photo-pick' ({ n, id }), 'bundle-photo-upload' ({ n, data }), 'bundle-photo-ai' (n; -1 = AI cover),
  *  'bundle-photo-ai-all' (value = optional progress callback). */
 async function regenerateBundle(draft, what, value, queriesFor, choosePhoto, LANGS) {
+  // Photo library (client 2026-11-05): save the photo of a slide, list saved photos, use one.
+  if (what === 'bundle-lib-save') {
+    if (!validSlot(draft, value)) throw new Error('bad slide');
+    const key = libKey(draft, value);
+    if (!key) throw new Error('Für dieses Foto gibt es keinen Bibliotheks-Namen.');
+    library.save(key, fs.readFileSync(slotPath(draft, value), 'utf8'));
+    return store.upsertDraft(draft); // nothing to render
+  }
+  if (what === 'bundle-lib-list') {
+    if (!validSlot(draft, value)) throw new Error('bad slide');
+    const key = libKey(draft, value);
+    draft.libPick = { n: value, key, files: library.list(key).map((x) => x.file) };
+    if (!draft.libPick.files.length) { draft.libPick = null; throw new Error('Noch keine gespeicherten Fotos für diese Folie.'); }
+    return store.upsertDraft(draft);
+  }
+  if (what === 'bundle-lib-pick') {
+    const n = value && value.n;
+    if (!validSlot(draft, n) || !(draft.libPick && draft.libPick.n === n && draft.libPick.files.includes(value.file))) throw new Error('Foto nicht mehr verfügbar – bitte Bibliothek neu öffnen.');
+    fs.writeFileSync(slotPath(draft, n), library.dataUriOf(value.file));
+    if (n >= 0 && draft.photoPos) draft.photoPos[n] = null;
+    draft.libPick = null;
+    for (const l of draft.langs) if (!(draft.texts[l] || {}).caption) draft.texts[l] = { caption: bundleCaption(draft.offers, l, titleOf(draft, l)) };
+    return renderBundle(draft);
+  }
   if (what === 'bundle-photos') {
     if (!validSlot(draft, value)) throw new Error('bad slide');
     await slotCandidates(draft, value, queriesFor);

@@ -217,7 +217,15 @@ function render(drafts) {
       ${d.warning ? `<p class="warn">⚠ ${esc(d.warning)}</p>` : ''}
       ${d.bundle ? `<div class="row"><button data-act="bundle-ai-all">🤖 KI-Fotos für alle Angebote</button></div><div class="row"><span>🤖 Neues KI-Foto für:</span>
         <button class="ghost" data-act="bundle-photo-ai" data-n="-1">Cover</button>
-        ${d.offers.map((o, n) => `<button class="ghost" data-act="bundle-photo-ai" data-n="${n}">${n + 1}. ${esc(o.to.name)}</button>`).join('')}</div>` : ''}
+        ${d.offers.map((o, n) => `<button class="ghost" data-act="bundle-photo-ai" data-n="${n}">${n + 1}. ${esc(o.to.name)}</button>`).join('')}</div>
+        <div class="row"><span>📚 Aus Bibliothek:</span><button class="ghost" data-act="bundle-lib-list" data-n="-1">Cover</button>
+        ${d.offers.map((o, n) => `<button class="ghost" data-act="bundle-lib-list" data-n="${n}">${n + 1}. ${esc((o.from && o.from.name) || '')} → ${esc(o.to.name)}</button>`).join('')}</div>
+        <div class="row"><span>💾 In Bibliothek speichern:</span><button class="ghost" data-act="bundle-lib-save" data-n="-1">Cover</button>
+        ${d.offers.map((o, n) => `<button class="ghost" data-act="bundle-lib-save" data-n="${n}">${n + 1}. ${esc((o.from && o.from.name) || '')} → ${esc(o.to.name)}</button>`).join('')}</div>` : ''}
+      ${d.bundle && d.libPick ? `
+        <div class="photo-pick"><h3>Gespeichertes Foto für ${d.libPick.n === -1 ? 'Cover' : esc(d.offers[d.libPick.n].to.name)} wählen</h3>
+          <div class="cands">${d.libPick.files.map((f) => `<button class="cand" data-act="bundle-lib-pick" data-n="${d.libPick.n}" data-file="${esc(f)}"><img src="/api/studio/library/${encodeURIComponent(f)}" alt="" loading="lazy"></button>`).join('')}</div>
+        </div>` : ''}
       ${d.bundle && d.bundlePick ? `
         <div class="photo-pick"><h3>Foto für ${d.bundlePick.n === -1 ? 'Cover' : esc(d.offers[d.bundlePick.n].to.name)} wählen <small>(beste zuerst)</small></h3>
           <div class="row"><button class="ghost" data-act="bundle-photos" data-n="${d.bundlePick.n}">Mehr Fotos</button>
@@ -564,6 +572,13 @@ $('#list').onclick = async (e) => {
   if (act === 'bundle-photos') return regen(box, 'bundle-photos', Number(b.dataset.n));
   if (act === 'bundle-ai-all') return confirm('KI-Fotos für alle Angebote erzeugen (einige Minuten)? Bitte danach genau prüfen.') && aiAll(box);
   if (act === 'bundle-photo-ai') return regen(box, 'bundle-photo-ai', Number(b.dataset.n));
+  if (act === 'bundle-lib-list') return regen(box, 'bundle-lib-list', Number(b.dataset.n));
+  if (act === 'bundle-lib-pick') return regen(box, 'bundle-lib-pick', { n: Number(b.dataset.n), file: b.dataset.file });
+  if (act === 'bundle-lib-save') {
+    try { await api(`/api/studio/drafts/${box.dataset.id}/regenerate`, { method: 'POST', body: JSON.stringify({ what: 'bundle-lib-save', value: Number(b.dataset.n) }) }); $('#msg').textContent = '💾 In der Bibliothek gespeichert.'; }
+    catch (err) { $('#msg').textContent = 'Fehler: ' + err.message; }
+    return;
+  }
   if (act === 'to-simple') return regen(box, 'style', 'flight-simple');
   if (act === 'bundle-photo-pick') return regen(box, 'bundle-photo-pick', { n: Number(b.dataset.n), id: pidOf(b.dataset.pid) });
   if (['photo', 'photo-auto', 'photo-ai', 'text', 'all'].includes(act)) return regen(box, act);
