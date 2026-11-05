@@ -62,6 +62,17 @@ function add(input) {
   return offer;
 }
 
+/** Several offers at once (Fly Erbil daily prices): all valid or none saved. */
+function addMany(inputs) {
+  if (!Array.isArray(inputs) || !inputs.length || inputs.length > 12) throw new Error('invalid');
+  const offers = inputs.map(fromInput);
+  if (offers.some((o) => !o)) throw new Error('invalid');
+  const all = list();
+  if (all.length + offers.length > MAX) throw new Error('full');
+  writeAll([...offers, ...all]);
+  return offers;
+}
+
 function remove(key) {
   const all = readAll();
   const rest = all.filter((o) => o.key !== key);
@@ -71,4 +82,4 @@ function remove(key) {
 
 const isOwnKey = (k) => typeof k === 'string' && /^m[fp]-[a-f0-9]{8}$/.test(k);
 
-module.exports = { MAX, fromInput, list, add, remove, isOwnKey };
+module.exports = { MAX, fromInput, list, add, addMany, remove, isOwnKey };

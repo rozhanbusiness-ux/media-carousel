@@ -24,3 +24,11 @@ test('invalid or expired input is rejected', () => {
   assert.strictEqual(fromInput({ kind: 'package', hotel: 'X Hotel', stars: 9, city: 'Side', country: 'Türkei', nights: 7, board: 'all', withFlight: true, price: 500, validUntil: future(1) }), null);
   assert.strictEqual(fromInput({ kind: 'cruise', price: 1, validUntil: future(1) }), null);
 });
+
+test('addMany saves all valid rows or none (Erbil daily prices)', () => {
+  const { fromInput } = require('./own-offers');
+  const d = new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10);
+  const ok = { kind: 'flight', fromName: 'Düsseldorf', fromCode: 'DUS', toName: 'Erbil', toCode: 'EBL', departureDate: d, returnDate: '', price: '199', validUntil: d };
+  assert.ok(fromInput(ok));
+  assert.strictEqual(fromInput({ ...ok, price: '' }), null);
+});

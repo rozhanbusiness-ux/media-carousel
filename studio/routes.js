@@ -253,6 +253,11 @@ module.exports = function mountStudio(app) {
     try { res.json(ownOffers.add(req.body)); }
     catch (err) { res.status(400).json({ error: err.message === 'full' ? `Maximal ${ownOffers.MAX} eigene Angebote.` : 'Bitte alle Pflichtfelder korrekt ausfüllen.' }); }
   });
+  // Fly Erbil daily prices: several flights to Erbil in one go (client 2026-11-05).
+  router.post('/own-offers/batch', (req, res) => {
+    try { res.json(ownOffers.addMany((req.body || {}).offers)); }
+    catch (err) { res.status(400).json({ error: err.message === 'full' ? `Maximal ${ownOffers.MAX} eigene Angebote.` : 'Bitte in jeder ausgefüllten Zeile Hinflug und Preis korrekt eingeben.' }); }
+  });
   router.delete('/own-offers/:key', (req, res) => {
     if (!ownOffers.isOwnKey(req.params.key)) return res.status(400).json({ error: 'bad key' });
     res.status(ownOffers.remove(req.params.key) ? 200 : 404).json({});
