@@ -167,13 +167,22 @@ async function aiCover(draft, fresh = false) {
 
 /** AI photos for the cover (n = -1) and every offer, two at a time (client: AI first, one go).
  *  Writes each photo that succeeds; returns the slots that failed. */
-async function aiPhotos(draft, report = () => {}) {
+// Library first (client 2026-11-05): a new bundle uses a saved photo of the place when there is
+// one and generates only the rest; "AI photos for all" (fresh) always generates new ones.
+function libraryPhoto(draft, n) {
+  const key = libKey(draft, n);
+  const files = key ? library.list(key).map((x) => x.file) : [];
+  if (!files.length) return null;
+  try { return library.dataUriOf(files[Math.floor(Math.random() * files.length)]); } catch { return null; }
+}
+
+async function aiPhotos(draft, report = () => {}, fresh = false) {
   const total = draft.offers.length + 1; // + cover (-1); the closing slide is a fixed design
   const failed = [];
   let done = 0;
   const one = async (n) => {
     try {
-      const dataUri = n < 0 ? await aiCover(draft) : await generatePhoto(draft.offers[n]);
+      const dataUri = (!fresh && libraryPhoto(draft, n)) || (n < 0 ? await aiCover(draft, fresh) : await generatePhoto(draft.offers[n]));
       if (n >= 0) sources.use(draft.offers[n], null, dataUri);
       fs.writeFileSync(slotPath(draft, n), dataUri);
       if (n >= 0 && draft.photoPos) draft.photoPos[n] = null;
@@ -364,7 +373,7 @@ async function regenerateBundle(draft, what, value, queriesFor, choosePhoto, LAN
     if (n >= 0 && draft.photoPos) draft.photoPos[n] = null; // new photo: centred
     draft.bundlePick = null;
   } else if (what === 'bundle-photo-ai-all') {
-    const failed = await aiPhotos(draft, typeof value === 'function' ? value : () => {});
+    const failed = await aiPhotos(draft, typeof value === 'function' ? value : () => {}, true);
     if (failed.length === draft.offers.length + 1) throw new Error('KI-Fotos fehlgeschlagen – bitte später erneut versuchen.');
     draft.warning = failed.length ? `Kein KI-Foto für: ${failed.map((n) => (n === -1 ? 'Cover' : draft.offers[n].to.name)).join(', ')} – bitte einzeln mit 🤖 KI erneut versuchen.` : '';
     draft.bundlePick = null;

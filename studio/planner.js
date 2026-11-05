@@ -13,7 +13,8 @@ const { toDraftOffer, offerKey, countryName, cardFor } = require('./packages');
 const { buildCaption, formatDate, formatPrice, cityName, LANGS } = require('./captions');
 const { renderSlide, STYLE_BY_WEEKDAY, STYLES, PACKAGE_STYLES } = require('./render');
 const { generateSet, enhancePhoto } = require('./image');
-const { HOME } = require('./destinations');
+const { HOME, photoSubject } = require('./destinations');
+const library = require('./ai-library');
 const sources = require('./photo-sources');
 const bank = require('./bank');
 const registry = require('./photo-registry');
@@ -102,6 +103,13 @@ const aiPicture = ([a, b, c]) => ({ file: null, pexelsId: null, ai: true, dataUr
 
 /** AI photos first (client decision 2026-10-30); real photos only when the AI fails. */
 async function aiFirstPicture(offer, used = usedIds()) {
+  // Library first (client 2026-11-05): a saved photo of the place, no AI cost.
+  const key = library.keyOf(photoSubject(offer).to);
+  const saved = key ? library.list(key).map((x) => x.file) : [];
+  if (saved.length) {
+    try { return { picture: { file: null, pexelsId: null, ai: true, dataUri: library.dataUriOf(saved[Math.floor(Math.random() * saved.length)]) }, ranked: [] }; }
+    catch { /* fall through to AI */ }
+  }
   try { return { picture: aiPicture(await generateSet(offer)), ranked: [] }; }
   catch (err) { console.error('studio ai photo:', err.message); return autoPicture(offer, used); }
 }
