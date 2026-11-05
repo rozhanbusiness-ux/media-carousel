@@ -227,12 +227,13 @@ async function fetchText(url) {
 }
 
 /** Live flight offers: cheapest per route over all offer boxes, future departures only. */
-async function getFlightOffers() {
+/** `month` ('YYYY-MM', optional): only departures in that month, cheapest date per route inside it. */
+async function getFlightOffers(month = '') {
   const pages = await Promise.all(FLIGHT_BOXES.map((b) => fetchText(FLIGHT_BOX_BASE + '?access=' + b.key)));
   const today = new Date().toISOString().slice(0, 10);
   const all = pages.flatMap((html, i) => (html ? parseFlightOffers(html) : [])
     .filter((o) => o.from.code + '-' + o.to.code === FLIGHT_BOXES[i].route)); // only the box's own route
-  return cheapestPerRoute(all.filter((o) => o.departureDate > today)).sort((a, b) => a.price - b.price);
+  return cheapestPerRoute(all.filter((o) => o.departureDate > today && (!month || o.departureDate.startsWith(month)))).sort((a, b) => a.price - b.price);
 }
 
 /** Live package top offers ('package' or 'lastminute'). */

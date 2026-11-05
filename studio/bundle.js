@@ -83,9 +83,10 @@ function coverTexts(draft, lang, date = new Date()) {
   const lines = one
     ? draft.offers.slice(0, 6).map((o) => [pkg ? o.hotel || local(o.to, lang) : local(o.from, lang), price(o.price)])
     : draft.offers.slice(0, 6).map((o) => [local(o.to, lang), price(o.price)]);
-  const theme = require('./image').themeOf(draft.theme || 'auto', date);
+  const theme = themeFor(draft, date);
   return {
-    issueL: 'TRAVEL & TOURISM', issueR: `${(MONTHS[lang] || MONTHS.de)[date.getMonth()]} ${date.getFullYear()}`,
+    // The month on the cover is the TRAVEL month the offers were filtered by (client); none when not filtered.
+    issueL: 'TRAVEL & TOURISM', issueR: draft.month ? `${(MONTHS[lang] || MONTHS.de)[Number(draft.month.slice(5)) - 1]} ${draft.month.slice(0, 4)}` : '',
     kick: one ? (pkg ? w.packages : w.flights) : w.issue,
     title: one ? local(one.to, lang) : (THEME_TITLES[theme] || THEME_TITLES.autumn)[lang],
     sub: one ? price(min) + (!pkg && one.returnDate ? ' · ' + TRIP_WORD[lang] : '') : `${draft.offers.length} ${w.offers} · ${price(min)}`,
@@ -147,18 +148,21 @@ const singleDest = (draft) => {
   const keys = new Set(draft.offers.map((o) => (draft.bundleKind === 'package' ? o.country || o.to.name : o.to.code || o.to.name)));
   return keys.size === 1 ? draft.offers[0] : null;
 };
+/** Cover theme: the chosen one, or the season of the travel month (else of today). */
+const themeFor = (draft, date = new Date()) => require('./image').themeOf(draft.theme || 'auto', draft.month ? new Date(draft.month + '-15T12:00:00') : date);
+
 /** Library key of a slide: the place the photo shows (departure city for flights home), or the theme. */
 function libKey(draft, n) {
   if (n >= 0) return library.keyOf(photoSubject(draft.offers[n]).to);
   const one = singleDest(draft);
-  return one ? library.keyOf(one.to) : 'THEME-' + require('./image').themeOf(draft.theme || 'auto').toUpperCase();
+  return one ? library.keyOf(one.to) : 'THEME-' + themeFor(draft).toUpperCase();
 }
 
 /** Cover photo: panorama of the single destination (never the departure city), else the theme photo. */
 async function aiCover(draft, fresh = false) {
   const one = singleDest(draft);
   if (one) return generatePhoto({ kind: one.kind || 'flight', to: one.to, country: one.country || '' });
-  return generateThemeCover(draft.theme || 'auto', fresh);
+  return generateThemeCover(themeFor(draft), fresh);
 }
 
 /** AI photos for the cover (n = -1) and every offer, two at a time (client: AI first, one go).
@@ -263,10 +267,10 @@ async function renderBundle(draft) {
 }
 
 /** Bundle draft from offer keys of ONE kind (client rule: never mix flights, packages, cruises, ...). */
-async function createBundleDraft({ kind, keys, style, theme, langs, date, liveOffers, queriesFor, choosePhoto }) {
+async function createBundleDraft({ kind, keys, style, theme, month = '', langs, date, liveOffers, queriesFor, choosePhoto }) {
   if (!KINDS.includes(kind)) throw new Error('unknown kind');
   if (!Array.isArray(keys) || keys.length < MIN || keys.length > MAX) throw new Error(`Bitte ${MIN} bis ${MAX} Angebote wählen.`);
-  const all = await liveOffers(kind);
+  const all = await liveOffers(kind, month);
   if (keys.some((k) => (kind === 'package') !== /^m?p-/.test(k))) throw new Error('Nur eine Angebotsart pro Beitrag.');
   const offers = keys.map((k) => all.find((o) => offerKey(o) === k));
   if (offers.some((o) => !o || (o.kind || 'flight') !== kind)) throw new Error('Ein Angebot ist nicht mehr verfügbar – bitte Liste neu laden.');
@@ -277,7 +281,7 @@ async function createBundleDraft({ kind, keys, style, theme, langs, date, liveOf
   if (new Set(offers.map(place)).size !== offers.length) throw new Error(kind === 'package' ? 'Jedes Land nur einmal pro Beitrag.' : 'Jede Destination nur einmal pro Beitrag.');
   const draft = {
     id: crypto.randomBytes(6).toString('hex'), createdAt: new Date().toISOString(), forDate: date.toISOString().slice(0, 10),
-    status: 'pending', style: PACKAGE_STYLES.includes(style) ? style : 'flight', source: 'specials', bundle: true, bundleKind: kind, theme: THEMES.includes(theme) ? theme : 'auto', // style/theme chosen before the photos (client)
+    status: 'pending', style: PACKAGE_STYLES.includes(style) ? style : 'flight', source: 'specials', bundle: true, bundleKind: kind, theme: THEMES.includes(theme) ? theme : 'auto', month: /^\d{4}-\d{2}$/.test(month) ? month : '', // style/theme/month chosen before the photos (client)
     titleIndex: Math.floor(Math.random() * TITLES[kind].length), offers, offer: offers[0], langs, texts: {}, versions: [],
   };
   for (const l of langs) draft.texts[l] = { caption: bundleCaption(offers, l, titleOf(draft, l)) };

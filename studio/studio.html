@@ -121,13 +121,15 @@
   <!-- One offer: choose the kind and the offer (or automatic) BEFORE the AI photos are generated. -->
   <div id="oneBox" class="manual" hidden>
     <h3>Ein Angebot <small>(erst wählen, dann wird einmal generiert)</small></h3>
-    <div class="row"><label>Art <select id="oneKind"><option value="flight">✈️ Flug</option><option value="package">🏨 Paket</option></select></label></div>
+    <div class="row"><label>Art <select id="oneKind"><option value="flight">✈️ Flug</option><option value="package">🏨 Paket</option></select></label>
+      <label>Reisemonat <select class="monthSel" id="oneMonth"></select></label></div>
     <div id="oneList" class="pick" style="max-height:340px;overflow:auto"></div>
     <div class="row"><button class="primary" id="oneGo">Beitrag erstellen</button></div>
   </div>
   <div id="bundleBox" class="manual" hidden>
     <h3>Mehrere Angebote in einem Beitrag <small>(2 bis 6 wählen, Reihenfolge = Reihenfolge der Auswahl)</small></h3>
     <div class="row"><label>Art <select id="bundleKind"><option value="flight">✈️ Flugangebote</option><option value="package">🏨 Pauschalreisen</option></select></label>
+      <label>Reisemonat <select class="monthSel" id="bundleMonth"></select></label>
       <label hidden>Vorlage <select id="bundleStyle"><option value="flight-simple">◻ Schlicht</option></select></label>
       <label>Thema (Cover) <select id="bundleTheme"><option value="auto">Automatisch (Jahreszeit)</option><option value="summer">Sommer</option><option value="holidays">Ferien</option><option value="families">Familien</option><option value="city">Städtereisen</option><option value="eid">Fest (Eid)</option><option value="newroz">Newroz</option><option value="lastminute">Last Minute</option><option value="autumn">Herbst</option><option value="winter">Winter</option><option value="spring">Frühling</option></select></label>
       <small style="color:#8e98b3">Nur ein Ziel (z. B. Erbil): Cover zeigt dieses Ziel.</small></div>
@@ -391,9 +393,9 @@ async function loadBundleList() {
   const kind = $('#bundleKind').value, icon = kind === 'package' ? '🏨' : '✈️';
   bundlePick = []; $('#bundleList').textContent = 'Angebote werden geladen …';
   try {
-    const list = await api('/api/studio/offer-choices?kind=' + kind);
+    const list = await api('/api/studio/offer-choices?kind=' + kind + '&month=' + $('#bundleMonth').value);
     $('#bundleList').innerHTML = list.map((o) =>
-      `<label style="display:block;margin:4px 0"><input type="checkbox" data-key="${esc(o.key)}" data-dest="${esc(o.dest || '')}"> ${icon} ${esc(o.label)} – ${esc(o.price)} €</label>`).join('') || 'Keine Angebote.';
+      `<label style="display:block;margin:4px 0"><input type="checkbox" data-key="${esc(o.key)}" data-dest="${esc(o.dest || '')}"> ${icon} ${esc(o.label)} – ${esc(o.price)} €</label>`).join('') || 'Keine Angebote in diesem Monat – anderen Monat wählen oder eigenes Angebot anlegen.';
   } catch (err) { $('#bundleList').textContent = 'Fehler: ' + err.message; }
   updateBundleCount();
 }
@@ -413,7 +415,7 @@ $('#bundleGo').onclick = async () => {
   if (bundlePick.length < 2) { $('#msg').textContent = 'Bitte mindestens 2 Angebote wählen.'; return; }
   $('#bundleGo').disabled = true; $('#msg').textContent = 'Sammel-Beitrag wird erstellt …';
   try {
-    await api('/api/studio/drafts/bundle', { method: 'POST', body: JSON.stringify({ kind: $('#bundleKind').value, style: $('#bundleStyle').value, theme: $('#bundleTheme').value, keys: bundlePick, ...(defLangs().length ? { langs: defLangs() } : {}) }) });
+    await api('/api/studio/drafts/bundle', { method: 'POST', body: JSON.stringify({ kind: $('#bundleKind').value, style: $('#bundleStyle').value, theme: $('#bundleTheme').value, month: $('#bundleMonth').value, keys: bundlePick, ...(defLangs().length ? { langs: defLangs() } : {}) }) });
     const t0 = Date.now();
     for (;;) {
       await new Promise((r) => setTimeout(r, 5000));
@@ -515,11 +517,23 @@ $('#gen').onclick = () => {
   if (!box.hidden) loadOneList();
 };
 $('#oneKind').onchange = loadOneList;
+// Travel month (flights): this month and the next eleven, or all dates. The cover shows the month.
+(() => {
+  const names = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+  const now = new Date(); let html = '';
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+    html += `<option value="${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}">${names[d.getMonth()]} ${d.getFullYear()}</option>`;
+  }
+  document.querySelectorAll('.monthSel').forEach((s) => { s.innerHTML = html + '<option value="">Alle Termine</option>'; });
+})();
+$('#oneMonth').onchange = loadOneList;
+$('#bundleMonth').onchange = loadBundleList;
 async function loadOneList() {
   const kind = $('#oneKind').value, icon = kind === 'package' ? '🏨' : '✈️';
   $('#oneList').textContent = 'Angebote werden geladen …';
   try {
-    const list = await api('/api/studio/offer-choices?kind=' + kind);
+    const list = await api('/api/studio/offer-choices?kind=' + kind + '&month=' + $('#oneMonth').value);
     $('#oneList').innerHTML = `<label style="display:block;margin:4px 0"><input type="radio" name="onePick" value="" checked> ⚡ Automatisch (bestes neues Angebot)</label>`
       + list.map((o) => `<label style="display:block;margin:4px 0"><input type="radio" name="onePick" value="${esc(o.key)}"> ${icon} ${esc(o.label)} – ${esc(o.price)} €</label>`).join('');
   } catch (err) { $('#oneList').textContent = 'Fehler: ' + err.message; }
@@ -529,8 +543,8 @@ $('#oneGo').onclick = async () => {
   const langs = defLangs().length ? { langs: defLangs() } : {};
   $('#oneGo').disabled = true; $('#msg').textContent = 'Erstelle Entwurf … (ca. 1 Minute)';
   try {
-    if (key) await api('/api/studio/drafts/pick', { method: 'POST', body: JSON.stringify({ kind, key, ...langs }) });
-    else await api(kind === 'package' ? '/api/studio/drafts/package' : '/api/studio/drafts', { method: 'POST', body: JSON.stringify(langs) });
+    if (key) await api('/api/studio/drafts/pick', { method: 'POST', body: JSON.stringify({ kind, key, month: $('#oneMonth').value, ...langs }) });
+    else await api(kind === 'package' ? '/api/studio/drafts/package' : '/api/studio/drafts', { method: 'POST', body: JSON.stringify({ ...langs, month: $('#oneMonth').value }) });
     $('#msg').textContent = 'Fertig.'; $('#oneBox').hidden = true; await load();
   }
   catch (e) { $('#msg').textContent = 'Fehler: ' + e.message; }

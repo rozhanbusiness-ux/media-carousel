@@ -212,8 +212,11 @@ const pickOffer = (offers, recent, skip = new Set()) => offers.find((o) => !rece
 // Packages: specials top offers + last-minute offers, ONE package per country (client rule),
 // the cheapest. The client's own offers are always kept.
 // The client's own offers ("Eigene Angebote") are always added to their kind's list.
-async function liveOffers(kind) {
-  if (kind !== 'package') return [...ownOffers.list('flight'), ...(await getFlightOffers())].sort((a, b) => a.price - b.price);
+// Travel month (client 2026-11-05): flights only show departures in the chosen month ('YYYY-MM').
+// Package offers carry no reliable travel date, so they are not filtered.
+const inMonth = (o, month) => !month || String(o.departureDate || '').startsWith(month);
+async function liveOffers(kind, month = '') {
+  if (kind !== 'package') return [...ownOffers.list('flight').filter((o) => inMonth(o, month)), ...(await getFlightOffers(month))].sort((a, b) => a.price - b.price);
   const [top, last, boxes] = await Promise.all([getPackageOffers('package'), getPackageOffers('lastminute'), getPackageBoxOffers()]);
   const best = new Map();
   for (const o of [...top, ...last, ...boxes].map(toDraftOffer).filter((x) => x.to.name)) {
@@ -323,8 +326,8 @@ function pickFresh(list, skip = new Set()) {
   return { offer: oldest, warning: REPEAT_WARNING };
 }
 
-async function createDailyDraft({ date = new Date(), offers = null, langs = null } = {}) {
-  const list = offers || (await liveOffers('flight'));
+async function createDailyDraft({ date = new Date(), offers = null, langs = null, month = '' } = {}) {
+  const list = offers || (await liveOffers('flight', month));
   const { offer, warning } = pickFresh(list);
   if (!offer) throw new Error('Heute keine Flugangebote verfügbar.');
   return buildDraft({ offer, style: STYLE_BY_WEEKDAY[date.getDay()], date, source: 'specials', langs, warning });
@@ -358,8 +361,8 @@ async function changeOffer(draft, key) {
 }
 
 /** Today's offers of the draft's kind, for the "choose offer" list. */
-async function offerChoices(kind) {
-  return (await liveOffers(kind === 'package' ? 'package' : 'flight')).map((o) => ({
+async function offerChoices(kind, month = '') {
+  return (await liveOffers(kind === 'package' ? 'package' : 'flight', month)).map((o) => ({
     key: offerKey(o), price: o.price,
     // Flights home may repeat the destination from another departure city (same rule as bundle.js).
     dest: o.kind === 'package' ? (o.country || destKey(o)) : HOME.has(o.to.code) ? `${(o.from && (o.from.code || o.from.name)) || ''}-${o.to.code}` : destKey(o),
@@ -368,8 +371,8 @@ async function offerChoices(kind) {
 }
 
 /** One chosen offer (from the list shown before generating), so the AI photos are made once. */
-async function createPickedDraft({ kind, key, date = new Date(), langs = null }) {
-  const offer = (await liveOffers(kind === 'package' ? 'package' : 'flight')).find((o) => offerKey(o) === key);
+async function createPickedDraft({ kind, key, month = '', date = new Date(), langs = null }) {
+  const offer = (await liveOffers(kind === 'package' ? 'package' : 'flight', month)).find((o) => offerKey(o) === key);
   if (!offer) throw new Error('Angebot nicht mehr verfügbar – bitte Liste neu laden.');
   return buildDraft({ offer, style: 'flight-simple', date, source: offer.own ? 'own' : 'specials', langs });
 }
@@ -432,8 +435,8 @@ function deleteDraft(draft) {
 }
 
 /** "Mehrere Angebote": one post with 2-6 offers (studio/bundle.js). */
-async function createBundleDraft({ kind, keys, style, theme, date = new Date(), langs = null }) {
-  return buildBundle({ kind, keys, style, theme, langs: langs || defaultLangs(date), date, liveOffers, queriesFor, choosePhoto });
+async function createBundleDraft({ kind, keys, style, theme, month = '', date = new Date(), langs = null }) {
+  return buildBundle({ kind, keys, style, theme, month, langs: langs || defaultLangs(date), date, liveOffers, queriesFor, choosePhoto });
 }
 
 module.exports = { createBundleDraft, createPickedDraft, offerChoices, createPackageDraft, saveToLibrary, deleteDraft, createDailyDraft, createManualDraft, regenerate, pickOffer };

@@ -19,6 +19,7 @@ const { getFlightOffers } = require('./offers');
 
 const ID = /^[a-f0-9]{12}$/;
 const LANG_SET = ['de', 'ar', 'ckb'];
+const cleanMonth = (v) => (typeof v === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(v) ? v : '');
 const cleanLangs = (v) => (Array.isArray(v) && v.length && v.length <= 3 && v.every((l) => LANG_SET.includes(l)) ? [...new Set(v)] : null);
 let generating = false;
 let bundleJob = { running: false, error: null, id: null };
@@ -42,13 +43,13 @@ module.exports = function mountStudio(app) {
 
   // Today's offers of one kind for the "choose offer" list: [{ key, label, price }].
   router.get('/offer-choices', async (req, res) => {
-    try { res.json(await offerChoices(req.query.kind === 'package' ? 'package' : 'flight')); }
+    try { res.json(await offerChoices(req.query.kind === 'package' ? 'package' : 'flight', cleanMonth(req.query.month))); }
     catch { res.status(502).json({ error: 'offers unavailable' }); }
   });
 
   // "Mehrere Angebote": 2-6 offers of ONE kind (flight or package) in one post.
   router.post('/drafts/bundle', async (req, res) => {
-    const { kind, keys, langs, style, theme } = req.body || {};
+    const { kind, keys, langs, style, theme, month } = req.body || {};
     if (!['flight', 'package'].includes(kind)) return res.status(400).json({ error: 'bad kind' });
     if (!Array.isArray(keys) || keys.length < 2 || keys.length > 6 || !keys.every((k) => typeof k === 'string' && /^[A-Za-z0-9-]{3,40}$/.test(k)) || new Set(keys).size !== keys.length) {
       return res.status(400).json({ error: 'Bitte 2 bis 6 verschiedene Angebote wählen.' });
@@ -58,7 +59,7 @@ module.exports = function mountStudio(app) {
     // timeout (180 s), so the page polls /drafts/bundle/status instead.
     generating = true;
     bundleJob = { running: true, error: null, id: null };
-    createBundleDraft({ kind, keys, style: typeof style === 'string' ? style : undefined, theme: typeof theme === 'string' ? theme : undefined, langs: cleanLangs(langs) })
+    createBundleDraft({ kind, keys, style: typeof style === 'string' ? style : undefined, theme: typeof theme === 'string' ? theme : undefined, month: cleanMonth(month), langs: cleanLangs(langs) })
       .then((draft) => { bundleJob = { running: false, error: null, id: draft && draft.id }; })
       .catch((err) => { console.error('studio bundle:', err.message); bundleJob = { running: false, error: err.message, id: null }; })
       .finally(() => { generating = false; });
@@ -76,11 +77,11 @@ module.exports = function mountStudio(app) {
 
   // One chosen offer of one kind (key from /offer-choices).
   router.post('/drafts/pick', async (req, res) => {
-    const { kind, key, langs } = req.body || {};
+    const { kind, key, langs, month } = req.body || {};
     if (!['flight', 'package'].includes(kind) || typeof key !== 'string' || !/^[A-Za-z0-9-]{3,40}$/.test(key)) return res.status(400).json({ error: 'bad request' });
     if (generating) return res.status(429).json({ error: 'already generating' });
     generating = true;
-    try { res.json(await createPickedDraft({ kind, key, langs: cleanLangs(langs) })); }
+    try { res.json(await createPickedDraft({ kind, key, month: cleanMonth(month), langs: cleanLangs(langs) })); }
     catch (err) { console.error('studio pick draft:', err.message); res.status(500).json({ error: err.message }); }
     finally { generating = false; }
   });
@@ -102,7 +103,7 @@ module.exports = function mountStudio(app) {
     try {
       const langs = cleanLangs(req.body.langs);
       // Only the flight draft: packages are chosen explicitly ("Art: Paket"), and every draft costs AI photos.
-      res.json(await createDailyDraft({ date: day, langs }));
+      res.json(await createDailyDraft({ date: day, langs, month: cleanMonth(req.body.month) }));
     } catch (err) {
       console.error('studio draft:', err.message);
       res.status(500).json({ error: err.message });
