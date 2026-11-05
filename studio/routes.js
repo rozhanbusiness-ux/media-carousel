@@ -258,6 +258,17 @@ module.exports = function mountStudio(app) {
     try { res.json(ownOffers.addMany((req.body || {}).offers)); }
     catch (err) { res.status(400).json({ error: err.message === 'full' ? `Maximal ${ownOffers.MAX} eigene Angebote.` : 'Bitte in jeder ausgefüllten Zeile Hinflug und Preis korrekt eingeben.' }); }
   });
+  // Extra departure airports for the Erbil form (client adds them when a route opens).
+  const feCities = require('./fe-cities');
+  router.get('/fe-cities', (req, res) => res.json(feCities.list()));
+  router.post('/fe-cities', (req, res) => {
+    try { res.json(feCities.add(req.body)); }
+    catch (err) { res.status(400).json({ error: err.message === 'full' ? `Maximal ${feCities.MAX} Städte.` : 'Bitte Stadt und 3-stelligen Flughafen-Code eingeben (z. B. Nürnberg, NUE).' }); }
+  });
+  router.delete('/fe-cities/:code', (req, res) => {
+    if (!/^[A-Z]{3}$/.test(req.params.code)) return res.status(400).json({ error: 'bad code' });
+    feCities.remove(req.params.code); res.json({});
+  });
   router.delete('/own-offers/:key', (req, res) => {
     if (!ownOffers.isOwnKey(req.params.key)) return res.status(400).json({ error: 'bad key' });
     res.status(ownOffers.remove(req.params.key) ? 200 : 404).json({});

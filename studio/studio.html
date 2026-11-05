@@ -141,6 +141,8 @@
     <summary>✈️ Erbil-Tagespreise (schnell eingeben)</summary>
     <p style="font-size:13px;color:#cfd6e6">Nur ausgefüllte Zeilen werden gespeichert. Hinflug und Preis sind Pflicht, Rückflug optional. Die Angebote erscheinen mit ⭐ in den Listen.</p>
     <div id="feRows"></div>
+    <div class="row"><span>+ Neue Stadt mit Direktflug:</span><label>Stadt <input id="feNewName" maxlength="40" placeholder="Nürnberg"></label>
+      <label>Code <input id="feNewCode" maxlength="3" style="width:70px" placeholder="NUE"></label><button class="ghost" id="feAdd">Hinzufügen</button></div>
     <div class="row"><label>Gültig bis <input id="feValid" type="date"></label><button class="primary" id="feGo">Alle speichern</button></div>
   </details>
   <details class="manual" id="own">
@@ -465,9 +467,27 @@ $('#oGo').onclick = async () => {
 loadOwn();
 
 const FE_CITIES = [['DUS', 'Düsseldorf'], ['MUC', 'München'], ['HAJ', 'Hannover'], ['STR', 'Stuttgart'], ['FRA', 'Frankfurt'], ['CGN', 'Köln'], ['BER', 'Berlin'], ['HAM', 'Hamburg']];
-$('#feRows').innerHTML = FE_CITIES.map(([c, n]) => `<div class="row fe" data-code="${c}" data-name="${n}"><b style="width:120px">${n} → Erbil</b>
-  <label>Hinflug <input type="date" data-f="dep"></label><label>Rückflug <input type="date" data-f="ret"></label>
-  <label>Preis € <input type="number" min="1" step="0.01" style="width:110px" data-f="price"></label></div>`).join('');
+async function loadFeRows() {
+  let extra = [];
+  try { extra = await api('/api/studio/fe-cities'); } catch { /* built-in only */ }
+  const rows = [...FE_CITIES.map(([c, n]) => [c, n, false]), ...extra.filter((x) => !FE_CITIES.some(([c]) => c === x.code)).map((x) => [x.code, x.name, true])];
+  $('#feRows').innerHTML = rows.map(([c, n, own]) => `<div class="row fe" data-code="${esc(c)}" data-name="${esc(n)}"><b style="width:120px">${esc(n)} → Erbil</b>
+    <label>Hinflug <input type="date" data-f="dep"></label><label>Rückflug <input type="date" data-f="ret"></label>
+    <label>Preis € <input type="number" min="1" step="0.01" style="width:110px" data-f="price"></label>
+    ${own ? `<button class="ghost" data-fe-del="${esc(c)}" title="Stadt entfernen">✕</button>` : ''}</div>`).join('');
+}
+loadFeRows();
+$('#feAdd').onclick = async () => {
+  try {
+    await api('/api/studio/fe-cities', { method: 'POST', body: JSON.stringify({ name: $('#feNewName').value, code: $('#feNewCode').value.toUpperCase() }) });
+    $('#feNewName').value = ''; $('#feNewCode').value = ''; $('#msg').textContent = 'Stadt hinzugefügt.'; await loadFeRows();
+  } catch (err) { $('#msg').textContent = 'Fehler: ' + err.message; }
+};
+$('#feRows').onclick = async (e) => {
+  const c = e.target.dataset && e.target.dataset.feDel; if (!c) return;
+  if (!confirm('Stadt aus der Liste entfernen?')) return;
+  try { await api('/api/studio/fe-cities/' + c, { method: 'DELETE' }); await loadFeRows(); } catch (err) { $('#msg').textContent = 'Fehler: ' + err.message; }
+};
 $('#feValid').value = new Date().toISOString().slice(0, 10); // daily prices: valid for today by default
 $('#feGo').onclick = async () => {
   const offers = [...document.querySelectorAll('#feRows .fe')].map((r) => {
