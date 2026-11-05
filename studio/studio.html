@@ -47,7 +47,7 @@
 </style>
 </head>
 <body>
-<header><b>MEDIA STUDIO</b><a href="/">← Carousel</a></header>
+<header><b>MEDIA STUDIO</b><span><a href="/">← Carousel</a> <a href="#" id="logout" style="margin-inline-start:18px">⎋ Abmelden</a></span></header>
 <main>
   <div class="row" style="align-items:center">
     <button class="primary" id="gen">Ein Angebot</button>
@@ -208,6 +208,13 @@ const STYLE_NAMES = [['flight', '1 Glas'], ['flight-cover', '★ Magazin'], ['fl
 api('/api/studio/format').then((r) => { $('#studioFormat').value = r.format; }).catch(() => {});
 $('#studioFormat').onchange = (e) => api('/api/studio/format', { method: 'PUT', body: JSON.stringify({ format: e.target.value }) })
   .then(() => { $('#msg').textContent = 'Format gespeichert – gilt für neue Beiträge.'; }).catch((err) => { $('#msg').textContent = 'Fehler: ' + err.message; });
+// Log out of the Nginx Basic Auth (realm "Restricted"): a request with deliberately wrong
+// credentials makes the browser drop the saved ones; the next visit asks for the password again.
+$('#logout').onclick = async (e) => {
+  e.preventDefault();
+  try { await fetch('/studio/logout', { headers: { Authorization: 'Basic ' + btoa('logout:logout') }, cache: 'no-store' }); } catch { /* 401 expected */ }
+  document.body.innerHTML = '<main style="padding:40px;text-align:center"><h2>Abgemeldet</h2><p>Zum erneuten Anmelden die Seite neu laden. Falls das Passwort nicht abgefragt wird: Browser schließen.</p></main>';
+};
 const defLangs = () => [...document.querySelectorAll('input[name=deflang]:checked')].map((i) => i.value);
 try { const saved = JSON.parse(localStorage.getItem('studioLangs') || '[]'); document.querySelectorAll('input[name=deflang]').forEach((i) => { i.checked = saved.includes(i.value); }); } catch {}
 document.querySelectorAll('input[name=deflang]').forEach((i) => i.onchange = () => { try { localStorage.setItem('studioLangs', JSON.stringify(defLangs())); } catch {} });

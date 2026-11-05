@@ -405,6 +405,8 @@ module.exports = function mountStudio(app) {
 
   app.use('/api/studio', express.json({ limit: '15mb' }), router);
   // no-cache: after an update the browser must load the new page, not an old copy
+  // Logout helper: always 401 for the Basic Auth realm, so the browser forgets the saved login.
+  app.get('/studio/logout', (req, res) => res.set('WWW-Authenticate', 'Basic realm="Restricted"').set('Cache-Control', 'no-store').status(401).send('Abgemeldet'));
   app.get('/studio', (req, res) => res.set('Cache-Control', 'no-cache').sendFile(path.join(__dirname, 'studio.html')));
   // Vendored MP4 muxer for the in-browser Reel (studio/vendor, MIT).
   app.get('/studio/mp4-muxer.js', (req, res) => res.type('application/javascript').sendFile(path.join(__dirname, 'vendor', 'mp4-muxer.js')));
