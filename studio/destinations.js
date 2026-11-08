@@ -65,10 +65,12 @@ const GERMAN = {
   DTM: ['the Phoenix lake in Dortmund with the city skyline at golden hour'],
 };
 
-/** What the photo of a flight should show: the departure city for flights home, else the destination. */
+/** What the photo of a flight should show: the departure city only when the post repeats the same
+ *  destination (e.g. Erbil from several German cities; flag `fromDeparture`), else the destination
+ *  (client 2026-11-08: Sulaymaniyah or Baghdad once in a post show Sulaymaniyah or Baghdad). */
 function photoSubject(offer) {
   const from = offer && offer.from;
-  if (!(offer && offer.to && HOME.has(offer.to.code) && from && (from.code || from.name))) return offer;
+  if (!(offer && offer.fromDeparture && offer.to && HOME.has(offer.to.code) && from && (from.code || from.name))) return offer;
   return { kind: 'flight', to: { code: from.code || '', name: from.name }, country: 'Germany', ai: GERMAN[from.code] || null };
 }
 

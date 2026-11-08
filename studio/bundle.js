@@ -148,12 +148,19 @@ const singleDest = (draft) => {
   const keys = new Set(draft.offers.map((o) => (draft.bundleKind === 'package' ? o.country || o.to.name : o.to.code || o.to.name)));
   return keys.size === 1 ? draft.offers[0] : null;
 };
+/** Offer n for its photo: departure city only when its destination appears more than once in the post. */
+function photoOffer(draft, n) {
+  const o = draft.offers[n];
+  const same = draft.offers.filter((x) => x.to && o.to && x.to.code && x.to.code === o.to.code).length;
+  return same > 1 ? { ...o, fromDeparture: true } : o;
+}
+
 /** Cover theme: the chosen one, or the season of the travel month (else of today). */
 const themeFor = (draft, date = new Date()) => require('./image').themeOf(draft.theme || 'auto', draft.month ? new Date(draft.month + '-15T12:00:00') : date);
 
 /** Library key of a slide: the place the photo shows (departure city for flights home), or the theme. */
 function libKey(draft, n) {
-  if (n >= 0) return library.keyOf(photoSubject(draft.offers[n]).to);
+  if (n >= 0) return library.keyOf(photoSubject(photoOffer(draft, n)).to);
   const one = singleDest(draft);
   return one ? library.keyOf(one.to) : 'THEME-' + themeFor(draft).toUpperCase();
 }
@@ -182,7 +189,7 @@ async function aiPhotos(draft, report = () => {}, fresh = false) {
   let done = 0;
   const one = async (n) => {
     try {
-      const dataUri = (!fresh && libraryPhoto(draft, n)) || (n < 0 ? await aiCover(draft, fresh) : await generatePhoto(draft.offers[n]));
+      const dataUri = (!fresh && libraryPhoto(draft, n)) || (n < 0 ? await aiCover(draft, fresh) : await generatePhoto(photoOffer(draft, n)));
       if (n >= 0) sources.use(draft.offers[n], null, dataUri);
       fs.writeFileSync(slotPath(draft, n), dataUri);
       if (n >= 0 && draft.photoPos) draft.photoPos[n] = null;
@@ -358,7 +365,7 @@ async function regenerateBundle(draft, what, value, queriesFor, choosePhoto, LAN
     if (!(what === 'bundle-photo-ai' ? validAiSlot(draft, n) : validSlot(draft, n))) throw new Error('bad slide');
     let dataUri;
     if (what === 'bundle-photo-ai') {
-      dataUri = n < 0 ? await aiCover(draft, true) : await generatePhoto(draft.offers[n]);
+      dataUri = n < 0 ? await aiCover(draft, true) : await generatePhoto(photoOffer(draft, n));
     } else if (what === 'bundle-photo-upload') dataUri = value.data;
     else {
       const c = draft.bundlePick && draft.bundlePick.n === n && draft.bundlePick.list.find((x) => x.id === value.id);
