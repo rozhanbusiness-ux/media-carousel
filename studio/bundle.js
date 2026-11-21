@@ -182,9 +182,9 @@ async function aiCover(draft, fresh = false) {
  *  Writes each photo that succeeds; returns the slots that failed. */
 // Library first (client 2026-11-05): a new bundle uses a saved photo of the place when there is
 // one and generates only the rest; "AI photos for all" (fresh) always generates new ones.
-function libraryPhoto(draft, n) {
+function libraryPhoto(draft, n, subject) {
   const key = libKey(draft, n);
-  const files = key ? library.list(key).map((x) => x.file) : [];
+  const files = key ? library.list(key, subject).map((x) => x.file) : [];
   if (!files.length) return null;
   try { return library.dataUriOf(files[Math.floor(Math.random() * files.length)]); } catch { return null; }
 }
@@ -192,19 +192,20 @@ function libraryPhoto(draft, n) {
 // Each post starts at a different subject of the list (client 2026-11-21), fixed per draft so
 // regenerating the same post keeps the same order.
 const shotStart = (draft) => [...String(draft.id)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % require('./image').SHOTS.length;
+/** Subject of every offer slide: one per slide, none repeated (client 2026-11-21). */
+const planOf = (draft) => require('./image').planSubjects(draft.offers.map((_, n) => photoSubject(photoOffer(draft, n)).to), shotStart(draft));
 
 async function aiPhotos(draft, report = () => {}, fresh = false) {
   const total = draft.offers.length + 1; // + cover (-1); the closing slide is a fixed design
   const failed = [];
   let done = 0;
-  // Variety rule (client 2026-11-21): library photos have no known shot type, so at most one
-  // offer slide per post takes one; every other slide is generated with its own shot type.
-  let libUsed = false;
-  const plan = require('./image').planSubjects(draft.offers.map((_, n) => photoSubject(photoOffer(draft, n)).to), shotStart(draft));
+  // Library first, by subject (client 2026-11-21): a saved photo of the slide's subject, else a new
+  // AI photo of that subject. Slide n's subject is kept in draft.subjects (for saving it tagged).
+  const plan = planOf(draft);
+  draft.subjects = plan;
   const one = async (n) => {
     try {
-      let lib = null;
-      if (!fresh && (n < 0 || !libUsed)) { lib = libraryPhoto(draft, n); if (lib && n >= 0) libUsed = true; }
+      const lib = fresh ? null : libraryPhoto(draft, n, n < 0 ? undefined : plan[n]);
       const dataUri = lib || (n < 0 ? await aiCover(draft, fresh) : await generatePhoto(photoOffer(draft, n), undefined, plan[n]));
       if (n >= 0) sources.use(draft.offers[n], null, dataUri);
       fs.writeFileSync(slotPath(draft, n), dataUri);
@@ -352,7 +353,7 @@ async function regenerateBundle(draft, what, value, queriesFor, choosePhoto, LAN
     if (!validSlot(draft, value)) throw new Error('bad slide');
     const key = libKey(draft, value);
     if (!key) throw new Error('Für dieses Foto gibt es keinen Bibliotheks-Namen.');
-    library.save(key, fs.readFileSync(slotPath(draft, value), 'utf8'));
+    library.save(key, fs.readFileSync(slotPath(draft, value), 'utf8'), value >= 0 ? (draft.subjects || planOf(draft))[value] : undefined);
     return store.upsertDraft(draft); // nothing to render
   }
   if (what === 'bundle-lib-list') {
@@ -381,7 +382,7 @@ async function regenerateBundle(draft, what, value, queriesFor, choosePhoto, LAN
     if (!(what === 'bundle-photo-ai' ? validAiSlot(draft, n) : validSlot(draft, n))) throw new Error('bad slide');
     let dataUri;
     if (what === 'bundle-photo-ai') {
-      dataUri = n < 0 ? await aiCover(draft, true) : await generatePhoto(photoOffer(draft, n), undefined, n + 1 + Math.floor(Math.random() * (require('./image').SHOTS.length - 1)));
+      dataUri = n < 0 ? await aiCover(draft, true) : await generatePhoto(photoOffer(draft, n), undefined, (draft.subjects || planOf(draft))[n]);
     } else if (what === 'bundle-photo-upload') dataUri = value.data;
     else {
       const c = draft.bundlePick && draft.bundlePick.n === n && draft.bundlePick.list.find((x) => x.id === value.id);

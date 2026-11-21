@@ -22,16 +22,32 @@ const keyOf = (place) => {
   return KEY.test(k) ? k.toUpperCase() : '';
 };
 
-function list(key) {
+// Subject of each photo (client 2026-11-21): landmark, water, castle, ... (see SHOTS in image.js).
+// Kept in one small index file next to the photos. Photos saved before this have no tag and count
+// as 'landmark' (they were landmark close-ups).
+const INDEX = path.join(DIR, 'subjects.json');
+const SUBJECT = /^[a-z]{2,20}$/;
+function readIndex() { try { return JSON.parse(fs.readFileSync(INDEX, 'utf8')) || {}; } catch { return {}; } }
+function tag(file, subject) {
+  if (!FILE.test(file) || !SUBJECT.test(subject || '')) return;
+  const idx = readIndex();
+  idx[file] = subject;
+  fs.mkdirSync(DIR, { recursive: true });
+  fs.writeFileSync(INDEX, JSON.stringify(idx));
+}
+
+function list(key, subject) {
   if (!KEY.test(key)) return [];
+  const idx = readIndex();
   try {
     return fs.readdirSync(DIR).filter((f) => FILE.test(f) && FILE.exec(f)[1] === key)
-      .map((f) => ({ file: f, added: fs.statSync(path.join(DIR, f)).mtimeMs })).sort((a, b) => b.added - a.added);
+      .map((f) => ({ file: f, subject: idx[f] || 'landmark', added: fs.statSync(path.join(DIR, f)).mtimeMs }))
+      .filter((x) => !subject || x.subject === subject).sort((a, b) => b.added - a.added);
   } catch { return []; }
 }
 
 /** Save a photo (data URI) under a key; returns the file name. The same photo is kept once. */
-function save(key, dataUri) {
+function save(key, dataUri, subject) {
   const m = DATA.exec(dataUri || '');
   if (!KEY.test(key) || !m) throw new Error('Foto kann nicht gespeichert werden.');
   const buf = Buffer.from(m[2], 'base64');
@@ -40,6 +56,7 @@ function save(key, dataUri) {
   if (list(key).length >= MAX_PER_KEY && !fs.existsSync(path.join(DIR, file))) throw new Error(`Bibliothek für ${key} ist voll (max. ${MAX_PER_KEY}).`);
   fs.mkdirSync(DIR, { recursive: true });
   fs.writeFileSync(path.join(DIR, file), buf);
+  if (subject) tag(file, subject);
   return file;
 }
 
@@ -53,4 +70,4 @@ function dataUriOf(file) {
   return `data:image/${ext === 'jpg' ? 'jpeg' : ext};base64,${fs.readFileSync(p).toString('base64')}`;
 }
 
-module.exports = { keyOf, list, save, fileOf, dataUriOf, KEY, FILE };
+module.exports = { keyOf, list, save, tag, fileOf, dataUriOf, KEY, FILE };
