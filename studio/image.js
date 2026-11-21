@@ -57,12 +57,14 @@ const LIGHTS = [
   'warm golden hour light shortly before sunset, glowing warm sky',
   'blue hour just after sunset, deep blue sky, warm lights switched on, no black night',
 ];
+// Composition techniques of great travel photography; one per photo, rotated.
 const VIEWS = [
-  'wide view that shows the place within its surroundings',
-  'close view that fills the frame with its most characteristic details',
-  'low angle from ground level looking up, strong perspective',
-  'view from the opposite bank, side or square, the place seen across open space',
-  'framed view with a natural element in the foreground (branches, flowers, a railing, stones or grass)',
+  'LAYERED DEPTH: a real foreground element sharp in the lower third, the place in the middle, sky or hills behind; the eye travels into the picture',
+  'LEADING LINES: a path, railing, riverbank, bridge deck or row of trees leads the eye from the lower corner to the place',
+  'FRAME IN A FRAME: the place seen through a real arch, gateway, window, branches or between two buildings',
+  'REFLECTION OR SYMMETRY: the place mirrored in still water or a wet surface, or a calm symmetrical front view',
+  'INTIMATE DETAIL: tight, close framing of the signature detail with the rest of the place recognisable behind it',
+  'HUMAN SCALE: a small person or object gives scale to the place, rule of thirds, generous calm space around it',
 ];
 const LIFE = [
   'no people at all, calm and pristine',
@@ -95,12 +97,14 @@ function planSubjects(places, start = 0) {
 
 function buildPrompt(city, variant, kind, sh) {
   return [
-    `Photorealistic travel poster photograph of ${city}.` + (sh ? "" : ` Scene: ${stripTimeOfDay(variant)}.`),
     sh
-      ? `SUBJECT: ${sh.shot}. It must be a REAL, recognisable place of ${city}, close enough to feel there. NOT a flat aerial view, NOT a distant skyline.` + (sh.view ? ` VIEWPOINT: ${sh.view}. LIFE IN THE PICTURE: ${sh.life}.` : '')
+      ? `An award-winning editorial travel photograph of ${city} for the cover story of a premium travel magazine: a unique, artistic, unexpected view, not a cliché postcard.`
+      : `Photorealistic travel poster photograph of ${city}. Scene: ${stripTimeOfDay(variant)}.`,
+    sh
+      ? `SUBJECT: ${String(sh.shot).replace(/\.+$/, "")}. It must be a REAL, recognisable place of ${city}, close enough to feel there. NOT a flat aerial view, NOT a distant skyline.` + (sh.view ? ` COMPOSITION: ${sh.view}. LIFE IN THE PICTURE: ${sh.life}. Follow the camera position and layers of the brief exactly; show the signature detail; do NOT make the cliché shot.` : '')
       : 'MOST IMPORTANT: ONE famous landmark is the hero, photographed CLOSE UP from street level or a low angle, large in the frame and full of detail; it must be instantly recognisable. NOT an aerial view, NOT a city panorama, NOT a skyline seen from far away.',
     KIND_RULES[kind] || KIND_RULES.flight,
-    'REALISM: must look like a real photo by a top travel photographer (full-frame camera, 24-35mm lens, f/8, RAW, natural colour grading); real materials, real proportions, architecturally accurate; ONE real viewpoint: only landmarks that are really visible together from one place, no collage of distant landmarks; no CGI, no illustration, no painted or plastic AI look, no HDR glow. COLOURS: natural and believable, true to the light of the scene (daylight, golden hour or blue hour must look clearly different); never neon or cartoonish.',
+    'REALISM: must look like a real photo by a top travel photographer (full-frame camera, the lens a master would choose for this shot, from wide angle to telephoto compression, RAW, natural colour grading); real materials, real proportions, architecturally accurate; ONE real viewpoint: only landmarks that are really visible together from one place, no collage of distant landmarks; no CGI, no illustration, no painted or plastic AI look, no HDR glow. COLOURS: natural and believable, true to the light of the scene (daylight, golden hour or blue hour must look clearly different); never neon or cartoonish.',
     'POSTER COMPOSITION (vertical 9:16): the top 15% of the frame is calm sky, because a price and a route are written there; the main subject fills most of the frame below it, tack-sharp; anything tall stays below that sky band;',
     'the bottom 15% is a little darker and calm, because a light logo is placed there; do NOT add water, a lake or trees just for that, show what is really in front of the subject.',
     'ONE SEAMLESS PHOTO: these zones are only where things sit, never separate panels; the sky is one continuous natural sky and the light changes gradually; no horizontal bands, stripes, seams, borders, collage or split-screen look.',
