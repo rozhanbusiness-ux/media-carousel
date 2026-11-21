@@ -28,10 +28,10 @@ const keyOf = (place) => {
 const INDEX = path.join(DIR, 'subjects.json');
 const SUBJECT = /^[a-z]{2,20}$/;
 function readIndex() { try { return JSON.parse(fs.readFileSync(INDEX, 'utf8')) || {}; } catch { return {}; } }
-function tag(file, subject) {
+function tag(file, subject, place) {
   if (!FILE.test(file) || !SUBJECT.test(subject || '')) return;
   const idx = readIndex();
-  idx[file] = subject;
+  idx[file] = place ? { subject, place: String(place).slice(0, 120) } : subject;
   fs.mkdirSync(DIR, { recursive: true });
   fs.writeFileSync(INDEX, JSON.stringify(idx));
 }
@@ -41,13 +41,13 @@ function list(key, subject) {
   const idx = readIndex();
   try {
     return fs.readdirSync(DIR).filter((f) => FILE.test(f) && FILE.exec(f)[1] === key)
-      .map((f) => ({ file: f, subject: idx[f] || 'landmark', added: fs.statSync(path.join(DIR, f)).mtimeMs }))
+      .map((f) => ({ file: f, subject: (idx[f] && idx[f].subject) || idx[f] || 'landmark', place: (idx[f] && idx[f].place) || null, added: fs.statSync(path.join(DIR, f)).mtimeMs }))
       .filter((x) => !subject || x.subject === subject).sort((a, b) => b.added - a.added);
   } catch { return []; }
 }
 
 /** Save a photo (data URI) under a key; returns the file name. The same photo is kept once. */
-function save(key, dataUri, subject) {
+function save(key, dataUri, subject, place) {
   const m = DATA.exec(dataUri || '');
   if (!KEY.test(key) || !m) throw new Error('Foto kann nicht gespeichert werden.');
   const buf = Buffer.from(m[2], 'base64');
@@ -56,7 +56,7 @@ function save(key, dataUri, subject) {
   if (list(key).length >= MAX_PER_KEY && !fs.existsSync(path.join(DIR, file))) throw new Error(`Bibliothek für ${key} ist voll (max. ${MAX_PER_KEY}).`);
   fs.mkdirSync(DIR, { recursive: true });
   fs.writeFileSync(path.join(DIR, file), buf);
-  if (subject) tag(file, subject);
+  if (subject) tag(file, subject, place);
   return file;
 }
 

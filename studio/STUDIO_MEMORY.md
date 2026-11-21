@@ -125,8 +125,9 @@ decision needed.
 
 ## 2026-11-21: photo variety by subject and the city library
 - Subjects (image.js SHOTS): landmark, water, castle, nature, bridge, heights, promenade, museum; each with its own light.
-- Real places per city and subject in subjects.js (17 cities). A subject a city lacks is left out; cities
-  without a list only get landmark / water / nature (the AI must not invent a castle or bridge).
+- Real places are found by Gemini with Google Search (places.js, cached in cache/studio-places.json);
+  no hand-written lists (client: "search the web"). A new photo always takes a place that is not yet
+  in the library for that city and subject. subjects.js only lists the cities of the library screen.
 - A bundle plans one subject per slide, none repeated; the start of the list depends on the draft id.
 - Library photos carry a subject (cache/studio-ailib/subjects.json); old untagged photos count as landmark.
   Bundles take a library photo of the planned subject first, else generate one.

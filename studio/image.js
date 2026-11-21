@@ -44,23 +44,14 @@ const SHOTS = [
   { id: 'museum', shot: 'the exterior of the city\'s best-known museum, opera house or modern architecture icon, with its forecourt', light: 'bright daylight with strong side light' },
 ];
 const shotOf = (i) => SHOTS[((i % SHOTS.length) + SHOTS.length) % SHOTS.length];
-// Cities without a list of real places (subjects.js) only get the safe subjects, where the AI
-// cannot invent a castle or a bridge that does not exist.
-const SAFE = ['landmark', 'water', 'nature'];
+/** Subject ids: every subject for every city (client 2026-11-21): Gemini searches the web for
+ *  real places of the city (places.js), so no hand-written lists are needed. */
+const subjectIds = () => SHOTS.map((x) => x.id);
 
-/** Subject ids a place can have: its real places, else only the safe generic subjects. */
-function subjectIds(place) {
-  const real = require('./subjects').of(place);
-  return SHOTS.filter((x) => (real ? real[x.id] : SAFE.includes(x.id))).map((x) => x.id);
-}
-
-/** Subject for a place: `i` is a subject id or a number (n-th available subject). Returns { shot, light }. */
+/** Generic { shot, light } of a subject id (or n-th subject). */
 function subjectFor(place, i) {
-  const real = require('./subjects').of(place);
-  const ids = subjectIds(place);
-  const id = typeof i === 'string' && ids.includes(i) ? i : ids[((Number(i) || 0) % ids.length + ids.length) % ids.length];
-  const sh = SHOTS.find((x) => x.id === id);
-  return { shot: real ? real[id] : sh.shot, light: sh.light };
+  const sh = typeof i === 'string' ? SHOTS.find((x) => x.id === i) || SHOTS[0] : shotOf(Number(i) || 0);
+  return { id: sh.id, shot: sh.shot, light: sh.light };
 }
 
 /** One subject per slide, never the same subject twice in a post while another one is still free.
@@ -76,8 +67,7 @@ function planSubjects(places, start = 0) {
   });
 }
 
-function buildPrompt(city, variant, kind, shotIdx, place) {
-  const sh = shotIdx == null ? null : subjectFor(place, shotIdx);
+function buildPrompt(city, variant, kind, sh) {
   return [
     `Photorealistic travel poster photograph of ${city}.` + (sh ? "" : ` Scene: ${stripTimeOfDay(variant)}.`),
     sh
@@ -104,17 +94,33 @@ function scenesFor(offer, n) {
 }
 
 /** Returns a data URI (image) or throws. `scene` is optional (else a random one). */
-async function generatePhoto(offerOrCity, scene, shotIdx) {
+async function generatePhoto(offerOrCity, scene, subject, opts = {}) {
+  return (await generateSubjectPhoto(offerOrCity, scene, subject, opts)).dataUri;
+}
+
+/** Photo of a subject at a REAL place found on the web (places.js): never a place that is already
+ *  in the library for this city and subject, so each new photo shows a different place.
+ *  Returns { dataUri, place } (place = name, or null for a generic scene). */
+async function generateSubjectPhoto(offerOrCity, scene, subject, opts = {}) {
   if (!config.GEMINI_API_KEY) throw new Error('GEMINI_API_KEY is not set');
   const offer = destinations.photoSubject(toOffer(offerOrCity));
   const city = [offer.to.name, offer.country].filter(Boolean).join(', ');
   const variant = scene || scenesFor(offer, 1)[0];
+  let sh = null, found = null;
+  if (subject != null) {
+    sh = subjectFor(offer.to, subject);
+    const lib = require('./ai-library');
+    const key = lib.keyOf(offer.to);
+    const exclude = [...(opts.exclude || []), ...lib.list(key, sh.id).map((x) => x.place).filter(Boolean)];
+    try { found = await require('./places').pick(key || city, offer.to.name, offer.country || '', sh.id, exclude); } catch (err) { console.error('studio places:', err.message); }
+    if (found) sh = { ...sh, shot: `${found.name}. ${found.view}` };
+  }
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${config.GEMINI_IMAGE_MODEL}:generateContent`;
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': config.GEMINI_API_KEY },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: buildPrompt(city, variant, offer.kind, shotIdx, offer.to) }] }],
+      contents: [{ parts: [{ text: buildPrompt(city, variant, offer.kind, sh) }] }],
       generationConfig: { responseModalities: ['Image'], imageConfig: { imageSize: config.GEMINI_IMAGE_SIZE || '2K', aspectRatio: '9:16' } },
     }),
     signal: AbortSignal.timeout(120000),
@@ -125,7 +131,7 @@ async function generatePhoto(offerOrCity, scene, shotIdx) {
   const part = (json?.candidates?.[0]?.content?.parts || []).find((p) => p.inlineData || p.inline_data);
   if (!part) throw new Error('Gemini returned no image');
   const inline = part.inlineData || part.inline_data;
-  return `data:${inline.mimeType || inline.mime_type || 'image/png'};base64,${inline.data}`;
+  return { dataUri: `data:${inline.mimeType || inline.mime_type || 'image/png'};base64,${inline.data}`, place: found ? found.name : null };
 }
 
 /** Three different AI photos (one per slide), generated in parallel. Fails when the first one fails;
@@ -234,4 +240,4 @@ async function generateThemeCover(theme, fresh = false) {
   return dataUri;
 }
 
-module.exports = { SHOTS, shotOf, subjectFor, subjectIds, planSubjects, THEMES, themeOf, generateThemeCover, buildThemePrompt, generatePhoto, generateSet, enhancePhoto, buildPrompt, scenesFor };
+module.exports = { SHOTS, shotOf, subjectFor, subjectIds, planSubjects, generateSubjectPhoto, THEMES, themeOf, generateThemeCover, buildThemePrompt, generatePhoto, generateSet, enhancePhoto, buildPrompt, scenesFor };

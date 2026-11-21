@@ -531,8 +531,8 @@ async function loadLib() {
   const c = libData.cities.find((x) => x.key === sel.value) || libData.cities[0];
   const job = libData.job;
   $('#libState').textContent = job.running ? `Erzeuge ${SUBJ_DE[job.subject] || job.subject} (${job.key}) …` : job.error ? 'Fehler: ' + job.error : '';
-  $('#libGrid').innerHTML = c.subjects.map((x) => `<div style="margin:12px 0"><b>${esc(SUBJ_DE[x.id] || x.id)}</b> <small style="color:#8e98b3">${esc(x.text)}</small>
-    <div class="cands">${x.files.map((f) => `<div class="cand" style="cursor:default"><img src="/api/studio/library/${encodeURIComponent(f)}" alt="" loading="lazy"><button class="ghost" data-lib-del="${esc(f)}" style="position:absolute;bottom:4px;left:4px;padding:2px 8px">Löschen</button></div>`).join('')}
+  $('#libGrid').innerHTML = c.subjects.map((x) => `<div style="margin:12px 0"><b>${esc(SUBJ_DE[x.id] || x.id)}</b>
+    <div class="cands">${x.files.map(({ file: f, place }) => `<div class="cand" style="cursor:default" title="${esc(place || '')}"><img src="/api/studio/library/${encodeURIComponent(f)}" alt="" loading="lazy"><small style="position:absolute;top:4px;left:4px;right:4px;background:rgba(0,0,0,.6);font-size:11px;padding:2px 4px;border-radius:4px">${esc(place || '')}</small><button class="ghost" data-lib-del="${esc(f)}" style="position:absolute;bottom:4px;left:4px;padding:2px 8px">Löschen</button></div>`).join('')}
     <button class="ghost" data-lib-gen="${esc(x.id)}" ${job.running ? 'disabled' : ''}>+ Foto erzeugen</button></div></div>`).join('');
   return job.running;
 }

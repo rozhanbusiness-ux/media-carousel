@@ -205,10 +205,13 @@ async function aiPhotos(draft, report = () => {}, fresh = false) {
   // AI photo of that subject. Slide n's subject is kept in draft.subjects (for saving it tagged).
   const plan = planOf(draft);
   draft.subjects = plan;
+  draft.places = draft.offers.map(() => null);
   const one = async (n) => {
     try {
       const lib = fresh ? null : libraryPhoto(draft, n, n < 0 ? undefined : plan[n]);
-      const dataUri = lib || (n < 0 ? await aiCover(draft, fresh) : await generatePhoto(photoOffer(draft, n), undefined, plan[n]));
+      let dataUri = lib;
+      if (!dataUri && n < 0) dataUri = await aiCover(draft, fresh);
+      else if (!dataUri) ({ dataUri, place: draft.places[n] } = await require('./image').generateSubjectPhoto(photoOffer(draft, n), undefined, plan[n]));
       if (n >= 0) sources.use(draft.offers[n], null, dataUri);
       fs.writeFileSync(slotPath(draft, n), dataUri);
       if (n >= 0 && draft.photoPos) draft.photoPos[n] = null;
@@ -355,7 +358,7 @@ async function regenerateBundle(draft, what, value, queriesFor, choosePhoto, LAN
     if (!validSlot(draft, value)) throw new Error('bad slide');
     const key = libKey(draft, value);
     if (!key) throw new Error('Für dieses Foto gibt es keinen Bibliotheks-Namen.');
-    library.save(key, fs.readFileSync(slotPath(draft, value), 'utf8'), value >= 0 ? (draft.subjects || planOf(draft))[value] : undefined);
+    library.save(key, fs.readFileSync(slotPath(draft, value), 'utf8'), value >= 0 ? (draft.subjects || planOf(draft))[value] : undefined, value >= 0 && draft.places ? draft.places[value] : undefined);
     return store.upsertDraft(draft); // nothing to render
   }
   if (what === 'bundle-lib-list') {
@@ -384,7 +387,8 @@ async function regenerateBundle(draft, what, value, queriesFor, choosePhoto, LAN
     if (!(what === 'bundle-photo-ai' ? validAiSlot(draft, n) : validSlot(draft, n))) throw new Error('bad slide');
     let dataUri;
     if (what === 'bundle-photo-ai') {
-      dataUri = n < 0 ? await aiCover(draft, true) : await generatePhoto(photoOffer(draft, n), undefined, (draft.subjects || planOf(draft))[n]);
+      if (n < 0) dataUri = await aiCover(draft, true);
+      else { const r = await require('./image').generateSubjectPhoto(photoOffer(draft, n), undefined, (draft.subjects || planOf(draft))[n]); dataUri = r.dataUri; draft.places = draft.places || []; draft.places[n] = r.place; }
     } else if (what === 'bundle-photo-upload') dataUri = value.data;
     else {
       const c = draft.bundlePick && draft.bundlePick.n === n && draft.bundlePick.list.find((x) => x.id === value.id);
