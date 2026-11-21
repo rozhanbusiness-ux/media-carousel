@@ -36,6 +36,7 @@ const KIND_RULES = {
 const SHOTS = [
   { id: 'landmark', shot: 'the most famous landmark of the city, close up from street level', light: 'bright clean daylight, clear blue sky' },
   { id: 'water', shot: 'the city by the water: its harbour, port or marina with boats, or its river or lake shore (if none, its best-known fountain or pond)', light: 'warm golden hour light shortly before sunset' },
+  { id: 'castle', shot: 'the best-known castle, fortress, citadel or palace of the city or right next to it (if none, its old city walls or town gate), seen whole and close, with its approach or gardens', light: 'bright daylight with a few soft white clouds' },
   { id: 'nature', shot: 'nature in or right next to the city: its best-known park, forest, gardens or lake, lush and green or in true autumn/winter colours, the city only hinted at', light: 'soft morning daylight' },
   { id: 'bridge', shot: 'the best-known bridge of the city (if none, its most famous street or gateway), seen from an angle with strong perspective', light: 'blue hour just after sunset, deep blue sky, warm lights switched on, no black night' },
   { id: 'heights', shot: 'a hill, mountain or high viewpoint of the city with people-free natural ground in the foreground and the place below and behind (not a flat aerial view)', light: 'clear afternoon light, crisp air' },
