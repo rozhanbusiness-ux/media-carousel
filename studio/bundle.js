@@ -80,9 +80,15 @@ function coverTexts(draft, lang, date = new Date()) {
   const min = Math.min(...draft.offers.map((o) => o.price));
   const one = singleDest(draft);
   const pkg = draft.bundleKind === 'package';
+  // Customers asked for dates (2026-11-21): each cover line shows the departure day next to the price.
+  const day = (iso) => { const d = formatDate(iso); return d ? d.slice(0, 6) : ''; };
+  const withDate = (o) => price(o.price) + (!pkg && o.departureDate ? ` · ${day(o.departureDate)}` : '');
+  const repeated = (o) => !pkg && o.from && draft.offers.filter((x) => x.to && o.to && (x.to.code || x.to.name) === (o.to.code || o.to.name)).length > 1;
   const lines = one
-    ? draft.offers.slice(0, 6).map((o) => [pkg ? o.hotel || local(o.to, lang) : local(o.from, lang), price(o.price)])
-    : draft.offers.slice(0, 6).map((o) => [local(o.to, lang), price(o.price)]);
+    ? draft.offers.slice(0, 6).map((o) => [pkg ? o.hotel || local(o.to, lang) : local(o.from, lang), withDate(o)])
+    // Mixed posts (client 2026-11-21): a destination that appears more than once is shown with its
+    // departure city ("Düsseldorf → Erbil"), never "Erbil, Erbil, Erbil".
+    : draft.offers.slice(0, 6).map((o) => [repeated(o) ? `${local(o.from, lang)} → ${local(o.to, lang)}` : local(o.to, lang), withDate(o)]);
   const theme = themeFor(draft, date);
   return {
     // The month on the cover is the TRAVEL month the offers were filtered by (client); none when not filtered.
