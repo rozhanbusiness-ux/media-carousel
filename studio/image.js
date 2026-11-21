@@ -8,20 +8,12 @@
 const config = require('../config');
 const destinations = require('./destinations');
 
-// Generic scenes: elevated panoramas first (client 2026-11-04: the panorama matters most).
+// Generic scenes (client 2026-11-21): ONE big landmark, close up, never a city seen from above.
 const VARIANTS = [
-  'an elevated panoramic view over the whole city with its main landmarks',
-  'a wide panoramic view of the skyline across the river, sea or lake',
-  'a wide landscape panorama of the coast, hills or water around the city',
+  'the most famous landmark of the place, seen up close from street level',
+  'the best-known historic building or monument of the place, filling the frame',
+  'the iconic sight of the place from a low angle, close enough to see its details',
 ];
-
-// Season from the date (client 2026-11-04): the photo should look like it was taken this week.
-const SEASONS = ['winter', 'winter', 'spring', 'spring', 'spring', 'summer', 'summer', 'summer', 'autumn', 'autumn', 'autumn', 'winter'];
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-function seasonLine(date = new Date()) {
-  const m = date.getMonth();
-  return `SEASON: ${SEASONS[m]} (${MONTHS[m]}); show the real look of this place in this month: e.g. autumn colours where the trees really change colour, a light dusting of snow or Christmas lights only where that is realistic; never snow, autumn leaves or blossoms where they would be untrue for this place and month.`;
-}
 
 // The scene lists name times of day ("at golden hour"); the light is now always bright daylight.
 const stripTimeOfDay = (s) => String(s).replace(/,?\s*(at|in)\s+(golden|blue)\s+hour|,?\s*at\s+(sunset|sunrise|dusk|dawn)|,?\s*in\s+(soft|warm)\s+[a-z -]*light|,?\s*on a clear evening/gi, '').trim();
@@ -41,14 +33,12 @@ const KIND_RULES = {
 function buildPrompt(city, variant, kind) {
   return [
     `Photorealistic travel poster photograph of ${city}. Scene: ${stripTimeOfDay(variant)}.`,
-    'MOST IMPORTANT: a wide PANORAMIC view from an elevated viewpoint (a hill, tower or rooftop), showing the city or place as a whole with its main landmarks, exactly as they are really visible together from that one spot.',
+    'MOST IMPORTANT: ONE famous landmark is the hero, photographed CLOSE UP from street level or a low angle, large in the frame and full of detail; it must be instantly recognisable. NOT an aerial view, NOT a city panorama, NOT a skyline seen from far away.',
     KIND_RULES[kind] || KIND_RULES.flight,
-    seasonLine(),
     'REALISM: must look like a real photo by a top travel photographer (full-frame camera, 24-35mm lens, f/8, RAW, natural colour grading); real materials, real proportions, architecturally accurate; ONE real viewpoint: only landmarks that are really visible together from one place, no collage of distant landmarks; no CGI, no illustration, no painted or plastic AI look, no HDR glow. COLOURS: vivid and saturated but believable, as on a perfect clear day; never neon or cartoonish.',
-    'POSTER COMPOSITION (vertical 9:16) — STRICT, the layout depends on it: the top 40% of the frame is ONLY clear light-blue sky (soft gradient, at most a few thin clouds); nothing may reach into it: no tower, spire, dome, roof, tree, mountain top, bird or object; shoot from far enough away and with a low enough camera so the whole subject sits below that line;',
-    'the middle (40% to 78% from the top) holds the hero scene, horizontally centred, tack-sharp and instantly recognisable;',
+    'POSTER COMPOSITION (vertical 9:16): the top 22% of the frame is calm clear blue sky, because a price and a route are written there; the landmark fills the area below it, horizontally centred, tack-sharp; a tall landmark may rise high but its top stays below that sky band;',
     'the bottom 22% is noticeably darker and calm: the foreground in shadow (shaded plaza, dark water, shaded trees or ground), little detail, no bright surfaces, because a light logo is placed there.',
-    'ONE SEAMLESS PHOTO: these zones are only where things sit, never separate panels; the sky is one continuous natural sky and the light changes gradually; no horizontal bands, stripes, seams, borders, collage or split-screen look. If a tall landmark would reach into the sky zone, show it smaller and further away instead.',
+    'ONE SEAMLESS PHOTO: these zones are only where things sit, never separate panels; the sky is one continuous natural sky and the light changes gradually; no horizontal bands, stripes, seams, borders, collage or split-screen look.',
     'LIGHT: bright, clean daylight on a sunny day (late morning to afternoon), clear blue sky, crisp detail everywhere, crystal-clear air, no haze, no dusk or night.',
     'MOOD: aspirational, premium and inviting; tidy scene, no traffic, no cranes, no construction, no rubbish, at most a few small distant people, none facing the camera.',
     'FORBIDDEN: any mosque or minaret anywhere in the frame; any readable text anywhere: no brand names or logos on buildings, rooftops or billboards (e.g. hotel or company signs), no shop signs, no letters, no flags with writing, no watermarks, borders or frames.',

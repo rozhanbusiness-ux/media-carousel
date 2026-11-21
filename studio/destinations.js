@@ -8,8 +8,8 @@
 
 // Keys: airport code, or lower-case place name (offers without a code).
 const D = {
-  EBL: { q: ['Erbil citadel', 'Erbil Shanadar park', 'Erbil Qaysari bazaar', 'Erbil city skyline'], ai: ['the ancient Erbil Citadel on its mound at golden hour, seen from the square below', 'Shanadar Park in Erbil with green lawns and fountains in soft morning light'] },
-  ISU: { q: ['Sulaymaniyah Azmar mountain', 'Sulaymaniyah city view', 'Sulaymaniyah park', 'Goizha mountain'], ai: ['a panoramic view over Sulaymaniyah with the Azmar and Goizha mountains at sunset', 'a green park in Sulaymaniyah with mountains in the background on a clear spring day'] },
+  EBL: { q: ['Erbil citadel', 'Erbil Shanadar park', 'Erbil Qaysari bazaar', 'Erbil city skyline'], ai: ['the massive ancient walls and gate of the Erbil Citadel seen up close from the square below', 'the Erbil Citadel gate and the fountains of the square in front of it, close up'] },
+  ISU: { q: ['Sulaymaniyah Azmar mountain', 'Sulaymaniyah city view', 'Sulaymaniyah park', 'Goizha mountain'], ai: ['the Azmar mountain ridge close behind a green park in Sulaymaniyah on a clear day', 'the historic Qaysari bazaar arches in Sulaymaniyah seen up close'] },
   BGW: { q: ['Baghdad Tigris river bridge', 'Baghdad Al-Shaheed monument', 'Baghdad Mutanabbi street'], ai: ['the Tigris river in Baghdad at golden hour with a modern bridge', 'the Al-Shaheed Monument in Baghdad, its turquoise split dome under a clear blue sky'] },
   duhok: { q: ['Duhok dam lake', 'Duhok city mountains', 'Duhok Kurdistan valley'], ai: ['the Duhok dam lake surrounded by mountains on a bright day', 'Duhok city nestled in a green valley between mountains at golden hour'] },
   dohuk: { alias: 'duhok' },
@@ -50,19 +50,19 @@ const D = {
 // their own city and every slide of a multi-city post looks different.
 const HOME = new Set(['EBL', 'ISU', 'BGW', 'BSR', 'NJF', 'OSM', 'KIK']);
 const GERMAN = {
-  // Kept low on purpose: the tall Rheinturm made the model paste a separate sky band above it.
-  DUS: ['a wide view across the Rhine to the Düsseldorf skyline, the Rheinturm small in the far distance', 'the Rhine promenade of Düsseldorf old town seen from the river bank, the city low on the horizon'],
-  CGN: ['Cologne Cathedral and the Hohenzollern Bridge over the Rhine at golden hour', 'the colourful old town houses on the Rhine bank in Cologne on a clear evening'],
-  FRA: ['the Frankfurt skyline over the Main river at blue hour, seen from a bridge', 'the Römerberg square in Frankfurt with its half-timbered houses on a bright morning'],
-  MUC: ['the Munich skyline with the Frauenkirche towers and the Alps far behind on a clear day', 'Marienplatz in Munich with the New Town Hall in warm late-afternoon light'],
-  STR: ['the Schlossplatz in Stuttgart with the New Palace and fountains on a sunny evening', 'a view over Stuttgart city between green vineyard hills at golden hour'],
-  HAM: ['the Elbphilharmonie and the Hamburg harbour at golden hour seen across the water', 'the Speicherstadt brick warehouses in Hamburg reflected in the canals at blue hour'],
-  HAJ: ['the New Town Hall of Hanover reflected in the Maschteich lake on a clear evening', 'the Herrenhausen Gardens in Hanover with fountains and hedges in soft sunlight'],
-  BER: ['the Brandenburg Gate in Berlin at golden hour under a clear sky', 'the Berlin Cathedral and the Spree river at blue hour'],
-  NUE: ['the old town of Nuremberg with the castle above the rooftops at golden hour'],
-  LEJ: ['the Augustusplatz in Leipzig with the Gewandhaus and the City-Hochhaus on a clear evening'],
-  BRE: ['the market square of Bremen with the town hall and the Roland statue in warm light'],
-  DTM: ['the Phoenix lake in Dortmund with the city skyline at golden hour'],
+  // One landmark close up (client 2026-11-21), not the city from above.
+  DUS: ['the curved Gehry buildings at the Media Harbour in Düsseldorf seen up close from the quay', 'the Rheinturm in Düsseldorf seen from close below, rising above the Media Harbour'],
+  CGN: ['the Gothic west front of Cologne Cathedral seen up close from the square', 'the Hohenzollern Bridge in Cologne seen close up from the river bank'],
+  FRA: ['the half-timbered Römer houses on the Römerberg square in Frankfurt, close up', 'the Eiserner Steg footbridge in Frankfurt seen close up with the Main river'],
+  MUC: ['the Gothic New Town Hall on Marienplatz in Munich seen up close from the square', 'the twin towers of the Frauenkirche in Munich from close below'],
+  STR: ['the New Palace on the Schlossplatz in Stuttgart seen close up with its fountains'],
+  HAM: ['the Elbphilharmonie in Hamburg seen up close from the water', 'the brick Speicherstadt warehouses and canal bridges in Hamburg, close up'],
+  HAJ: ['the New Town Hall of Hanover with its dome seen up close across the Maschteich lake'],
+  BER: ['the Brandenburg Gate in Berlin seen up close from Pariser Platz', 'the Berlin Cathedral seen close up from the Lustgarten'],
+  NUE: ['the Kaiserburg castle of Nuremberg seen close up from below'],
+  LEJ: ['the Völkerschlachtdenkmal monument in Leipzig seen close up across its reflecting pool'],
+  BRE: ['the Gothic town hall and the Roland statue on the market square in Bremen, close up'],
+  DTM: ['the U-Tower in Dortmund seen up close from the street'],
 };
 
 /** What the photo of a flight should show: the departure city only when the post repeats the same
