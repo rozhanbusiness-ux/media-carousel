@@ -44,9 +44,20 @@ const SHOTS = [
   { id: 'museum', shot: 'the exterior of the city\'s best-known museum, opera house or modern architecture icon, with its forecourt', light: 'bright daylight with strong side light' },
 ];
 const shotOf = (i) => SHOTS[((i % SHOTS.length) + SHOTS.length) % SHOTS.length];
+// Cities without a list of real places (subjects.js) only get the safe subjects, where the AI
+// cannot invent a castle or a bridge that does not exist.
+const SAFE = ['landmark', 'water', 'nature'];
 
-function buildPrompt(city, variant, kind, shotIdx) {
-  const sh = shotIdx == null ? null : shotOf(shotIdx);
+/** Subject n for a place: { shot, light } from its real places, else from the safe generic list. */
+function subjectFor(place, i) {
+  const real = require('./subjects').of(place);
+  const list = SHOTS.filter((x) => (real ? real[x.id] : SAFE.includes(x.id)));
+  const sh = list[((i % list.length) + list.length) % list.length];
+  return { shot: real ? real[sh.id] : sh.shot, light: sh.light };
+}
+
+function buildPrompt(city, variant, kind, shotIdx, place) {
+  const sh = shotIdx == null ? null : subjectFor(place, shotIdx);
   return [
     `Photorealistic travel poster photograph of ${city}.` + (sh ? "" : ` Scene: ${stripTimeOfDay(variant)}.`),
     sh
@@ -83,7 +94,7 @@ async function generatePhoto(offerOrCity, scene, shotIdx) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': config.GEMINI_API_KEY },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: buildPrompt(city, variant, offer.kind, shotIdx) }] }],
+      contents: [{ parts: [{ text: buildPrompt(city, variant, offer.kind, shotIdx, offer.to) }] }],
       generationConfig: { responseModalities: ['Image'], imageConfig: { imageSize: config.GEMINI_IMAGE_SIZE || '2K', aspectRatio: '9:16' } },
     }),
     signal: AbortSignal.timeout(120000),
@@ -203,4 +214,4 @@ async function generateThemeCover(theme, fresh = false) {
   return dataUri;
 }
 
-module.exports = { SHOTS, shotOf, THEMES, themeOf, generateThemeCover, buildThemePrompt, generatePhoto, generateSet, enhancePhoto, buildPrompt, scenesFor };
+module.exports = { SHOTS, shotOf, subjectFor, THEMES, themeOf, generateThemeCover, buildThemePrompt, generatePhoto, generateSet, enhancePhoto, buildPrompt, scenesFor };
