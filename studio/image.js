@@ -48,12 +48,32 @@ const shotOf = (i) => SHOTS[((i % SHOTS.length) + SHOTS.length) % SHOTS.length];
 // cannot invent a castle or a bridge that does not exist.
 const SAFE = ['landmark', 'water', 'nature'];
 
-/** Subject n for a place: { shot, light } from its real places, else from the safe generic list. */
+/** Subject ids a place can have: its real places, else only the safe generic subjects. */
+function subjectIds(place) {
+  const real = require('./subjects').of(place);
+  return SHOTS.filter((x) => (real ? real[x.id] : SAFE.includes(x.id))).map((x) => x.id);
+}
+
+/** Subject for a place: `i` is a subject id or a number (n-th available subject). Returns { shot, light }. */
 function subjectFor(place, i) {
   const real = require('./subjects').of(place);
-  const list = SHOTS.filter((x) => (real ? real[x.id] : SAFE.includes(x.id)));
-  const sh = list[((i % list.length) + list.length) % list.length];
-  return { shot: real ? real[sh.id] : sh.shot, light: sh.light };
+  const ids = subjectIds(place);
+  const id = typeof i === 'string' && ids.includes(i) ? i : ids[((Number(i) || 0) % ids.length + ids.length) % ids.length];
+  const sh = SHOTS.find((x) => x.id === id);
+  return { shot: real ? real[id] : sh.shot, light: sh.light };
+}
+
+/** One subject per slide, never the same subject twice in a post while another one is still free.
+ *  `places` in slide order; the list starts at `start` so each post opens differently. */
+function planSubjects(places, start = 0) {
+  const order = SHOTS.map((_, k) => SHOTS[(k + start) % SHOTS.length].id);
+  const used = new Set();
+  return places.map((place) => {
+    const ids = subjectIds(place);
+    const id = order.find((x) => ids.includes(x) && !used.has(x)) || order.find((x) => ids.includes(x));
+    used.add(id);
+    return id;
+  });
 }
 
 function buildPrompt(city, variant, kind, shotIdx, place) {
@@ -64,9 +84,9 @@ function buildPrompt(city, variant, kind, shotIdx, place) {
       ? `SUBJECT: ${sh.shot}. It must be a REAL, recognisable place of ${city}, close enough to feel there. NOT a flat aerial view, NOT a distant skyline.`
       : 'MOST IMPORTANT: ONE famous landmark is the hero, photographed CLOSE UP from street level or a low angle, large in the frame and full of detail; it must be instantly recognisable. NOT an aerial view, NOT a city panorama, NOT a skyline seen from far away.',
     KIND_RULES[kind] || KIND_RULES.flight,
-    'REALISM: must look like a real photo by a top travel photographer (full-frame camera, 24-35mm lens, f/8, RAW, natural colour grading); real materials, real proportions, architecturally accurate; ONE real viewpoint: only landmarks that are really visible together from one place, no collage of distant landmarks; no CGI, no illustration, no painted or plastic AI look, no HDR glow. COLOURS: vivid and saturated but believable, as on a perfect clear day; never neon or cartoonish.',
-    'POSTER COMPOSITION (vertical 9:16): the top 22% of the frame is calm clear blue sky, because a price and a route are written there; the main subject fills the area below it, tack-sharp; anything tall stays below that sky band;',
-    'the bottom 22% is noticeably darker and calm: the foreground in shadow (shaded plaza, dark water, shaded trees or ground), little detail, no bright surfaces, because a light logo is placed there.',
+    'REALISM: must look like a real photo by a top travel photographer (full-frame camera, 24-35mm lens, f/8, RAW, natural colour grading); real materials, real proportions, architecturally accurate; ONE real viewpoint: only landmarks that are really visible together from one place, no collage of distant landmarks; no CGI, no illustration, no painted or plastic AI look, no HDR glow. COLOURS: natural and believable, true to the light of the scene (daylight, golden hour or blue hour must look clearly different); never neon or cartoonish.',
+    'POSTER COMPOSITION (vertical 9:16): the top 15% of the frame is calm sky, because a price and a route are written there; the main subject fills most of the frame below it, tack-sharp; anything tall stays below that sky band;',
+    'the bottom 15% is a little darker and calm, because a light logo is placed there; do NOT add water, a lake or trees just for that, show what is really in front of the subject.',
     'ONE SEAMLESS PHOTO: these zones are only where things sit, never separate panels; the sky is one continuous natural sky and the light changes gradually; no horizontal bands, stripes, seams, borders, collage or split-screen look.',
     sh ? `LIGHT: ${sh.light}; crisp detail, crystal-clear air, no haze; the top sky band stays calm and even so the price text reads well.` : 'LIGHT: bright, clean daylight on a sunny day (late morning to afternoon), clear blue sky, crisp detail everywhere, crystal-clear air, no haze, no dusk or night.',
     'MOOD: aspirational, premium and inviting; tidy scene, no traffic, no cranes, no construction, no rubbish, at most a few small distant people, none facing the camera.',
@@ -214,4 +234,4 @@ async function generateThemeCover(theme, fresh = false) {
   return dataUri;
 }
 
-module.exports = { SHOTS, shotOf, subjectFor, THEMES, themeOf, generateThemeCover, buildThemePrompt, generatePhoto, generateSet, enhancePhoto, buildPrompt, scenesFor };
+module.exports = { SHOTS, shotOf, subjectFor, subjectIds, planSubjects, THEMES, themeOf, generateThemeCover, buildThemePrompt, generatePhoto, generateSet, enhancePhoto, buildPrompt, scenesFor };

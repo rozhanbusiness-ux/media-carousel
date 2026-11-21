@@ -200,11 +200,12 @@ async function aiPhotos(draft, report = () => {}, fresh = false) {
   // Variety rule (client 2026-11-21): library photos have no known shot type, so at most one
   // offer slide per post takes one; every other slide is generated with its own shot type.
   let libUsed = false;
+  const plan = require('./image').planSubjects(draft.offers.map((_, n) => photoSubject(photoOffer(draft, n)).to), shotStart(draft));
   const one = async (n) => {
     try {
       let lib = null;
       if (!fresh && (n < 0 || !libUsed)) { lib = libraryPhoto(draft, n); if (lib && n >= 0) libUsed = true; }
-      const dataUri = lib || (n < 0 ? await aiCover(draft, fresh) : await generatePhoto(photoOffer(draft, n), undefined, n + shotStart(draft)));
+      const dataUri = lib || (n < 0 ? await aiCover(draft, fresh) : await generatePhoto(photoOffer(draft, n), undefined, plan[n]));
       if (n >= 0) sources.use(draft.offers[n], null, dataUri);
       fs.writeFileSync(slotPath(draft, n), dataUri);
       if (n >= 0 && draft.photoPos) draft.photoPos[n] = null;
