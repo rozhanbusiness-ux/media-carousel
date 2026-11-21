@@ -30,28 +30,30 @@ const KIND_RULES = {
   home: 'Show the natural surroundings (lake, mountains, countryside or coast); no specific house, cabin or villa.',
 };
 
-// Variety rule (client 2026-11-21): slides of one post must not all look alike. Each slide of a
-// bundle gets its own shot type and light, in this fixed order (deterministic, easy to check).
+// Variety rule (client 2026-11-21): slides of one post must not all show buildings. Each slide of
+// a bundle gets its own SUBJECT and its own light, in a fixed order (deterministic, easy to check).
+// A subject the city does not have is replaced by the closest real equivalent of that city.
 const SHOTS = [
-  { id: 'hero', shot: 'classic view: the landmark close up from street level or a low angle, large in the frame, horizontally centred', light: 'bright clean daylight on a sunny day, clear blue sky' },
-  { id: 'golden', shot: 'diagonal three-quarter view: the landmark seen from the side at an angle, strong perspective lines leading into the frame', light: 'warm golden hour light shortly before sunset, long soft shadows, warm sky' },
-  { id: 'frame', shot: 'natural frame: the landmark seen through an arch, a gateway, a narrow street or overhanging tree branches that frame it in the foreground', light: 'bright daylight, clear sky' },
-  { id: 'blue', shot: 'the landmark at blue hour, its facade lit by warm lights against a deep blue sky', light: 'blue hour just after sunset, deep blue sky, warm illuminated facade, no stars, no black night' },
-  { id: 'life', shot: 'lively square or street in front of the landmark: a cafe terrace, a market or a few strolling people in the foreground (small, never facing the camera), the landmark clearly behind them', light: 'soft late-afternoon daylight' },
-  { id: 'detail', shot: 'architectural detail: a tight close-up of the most characteristic part of the landmark (a facade, a tower top, an ornament, a gate), filling most of the frame, still recognisable', light: 'bright side light that shows texture, clear blue sky behind' },
-  { id: 'mirror', shot: 'the landmark mirrored in water (a river, a lake, a fountain basin or a wet pavement after rain), reflection in the lower half', light: 'calm clear light, clear sky' },
+  { id: 'landmark', shot: 'the most famous landmark of the city, close up from street level', light: 'bright clean daylight, clear blue sky' },
+  { id: 'water', shot: 'the city by the water: its harbour, port or marina with boats, or its river or lake shore (if none, its best-known fountain or pond)', light: 'warm golden hour light shortly before sunset' },
+  { id: 'nature', shot: 'nature in or right next to the city: its best-known park, forest, gardens or lake, lush and green or in true autumn/winter colours, the city only hinted at', light: 'soft morning daylight' },
+  { id: 'bridge', shot: 'the best-known bridge of the city (if none, its most famous street or gateway), seen from an angle with strong perspective', light: 'blue hour just after sunset, deep blue sky, warm lights switched on, no black night' },
+  { id: 'heights', shot: 'a hill, mountain or high viewpoint of the city with people-free natural ground in the foreground and the place below and behind (not a flat aerial view)', light: 'clear afternoon light, crisp air' },
+  { id: 'promenade', shot: 'the city\'s beach, corniche, riverside promenade or lakeside walk, with a few small strolling people far away', light: 'warm late-afternoon light' },
+  { id: 'museum', shot: 'the exterior of the city\'s best-known museum, opera house or modern architecture icon, with its forecourt', light: 'bright daylight with strong side light' },
 ];
 const shotOf = (i) => SHOTS[((i % SHOTS.length) + SHOTS.length) % SHOTS.length];
 
 function buildPrompt(city, variant, kind, shotIdx) {
   const sh = shotIdx == null ? null : shotOf(shotIdx);
   return [
-    `Photorealistic travel poster photograph of ${city}. Scene: ${stripTimeOfDay(variant)}.`,
-    'MOST IMPORTANT: ONE famous landmark is the hero, photographed CLOSE UP from street level or a low angle, large in the frame and full of detail; it must be instantly recognisable. NOT an aerial view, NOT a city panorama, NOT a skyline seen from far away.',
-    sh ? `SHOT TYPE (this overrides the default framing): ${sh.shot}.` : '',
+    `Photorealistic travel poster photograph of ${city}.` + (sh ? "" : ` Scene: ${stripTimeOfDay(variant)}.`),
+    sh
+      ? `SUBJECT: ${sh.shot}. It must be a REAL, recognisable place of ${city}, close enough to feel there. NOT a flat aerial view, NOT a distant skyline.`
+      : 'MOST IMPORTANT: ONE famous landmark is the hero, photographed CLOSE UP from street level or a low angle, large in the frame and full of detail; it must be instantly recognisable. NOT an aerial view, NOT a city panorama, NOT a skyline seen from far away.',
     KIND_RULES[kind] || KIND_RULES.flight,
     'REALISM: must look like a real photo by a top travel photographer (full-frame camera, 24-35mm lens, f/8, RAW, natural colour grading); real materials, real proportions, architecturally accurate; ONE real viewpoint: only landmarks that are really visible together from one place, no collage of distant landmarks; no CGI, no illustration, no painted or plastic AI look, no HDR glow. COLOURS: vivid and saturated but believable, as on a perfect clear day; never neon or cartoonish.',
-    'POSTER COMPOSITION (vertical 9:16): the top 22% of the frame is calm clear blue sky, because a price and a route are written there; the landmark fills the area below it, horizontally centred, tack-sharp; a tall landmark may rise high but its top stays below that sky band;',
+    'POSTER COMPOSITION (vertical 9:16): the top 22% of the frame is calm clear blue sky, because a price and a route are written there; the main subject fills the area below it, tack-sharp; anything tall stays below that sky band;',
     'the bottom 22% is noticeably darker and calm: the foreground in shadow (shaded plaza, dark water, shaded trees or ground), little detail, no bright surfaces, because a light logo is placed there.',
     'ONE SEAMLESS PHOTO: these zones are only where things sit, never separate panels; the sky is one continuous natural sky and the light changes gradually; no horizontal bands, stripes, seams, borders, collage or split-screen look.',
     sh ? `LIGHT: ${sh.light}; crisp detail, crystal-clear air, no haze; the top sky band stays calm and even so the price text reads well.` : 'LIGHT: bright, clean daylight on a sunny day (late morning to afternoon), clear blue sky, crisp detail everywhere, crystal-clear air, no haze, no dusk or night.',
