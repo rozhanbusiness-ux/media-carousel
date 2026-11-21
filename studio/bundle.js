@@ -193,9 +193,14 @@ async function aiPhotos(draft, report = () => {}, fresh = false) {
   const total = draft.offers.length + 1; // + cover (-1); the closing slide is a fixed design
   const failed = [];
   let done = 0;
+  // Variety rule (client 2026-11-21): library photos have no known shot type, so at most one
+  // offer slide per post takes one; every other slide is generated with its own shot type.
+  let libUsed = false;
   const one = async (n) => {
     try {
-      const dataUri = (!fresh && libraryPhoto(draft, n)) || (n < 0 ? await aiCover(draft, fresh) : await generatePhoto(photoOffer(draft, n)));
+      let lib = null;
+      if (!fresh && (n < 0 || !libUsed)) { lib = libraryPhoto(draft, n); if (lib && n >= 0) libUsed = true; }
+      const dataUri = lib || (n < 0 ? await aiCover(draft, fresh) : await generatePhoto(photoOffer(draft, n), undefined, n));
       if (n >= 0) sources.use(draft.offers[n], null, dataUri);
       fs.writeFileSync(slotPath(draft, n), dataUri);
       if (n >= 0 && draft.photoPos) draft.photoPos[n] = null;
@@ -371,7 +376,7 @@ async function regenerateBundle(draft, what, value, queriesFor, choosePhoto, LAN
     if (!(what === 'bundle-photo-ai' ? validAiSlot(draft, n) : validSlot(draft, n))) throw new Error('bad slide');
     let dataUri;
     if (what === 'bundle-photo-ai') {
-      dataUri = n < 0 ? await aiCover(draft, true) : await generatePhoto(photoOffer(draft, n));
+      dataUri = n < 0 ? await aiCover(draft, true) : await generatePhoto(photoOffer(draft, n), undefined, n + 1 + Math.floor(Math.random() * (require('./image').SHOTS.length - 1)));
     } else if (what === 'bundle-photo-upload') dataUri = value.data;
     else {
       const c = draft.bundlePick && draft.bundlePick.n === n && draft.bundlePick.list.find((x) => x.id === value.id);
