@@ -189,6 +189,10 @@ function libraryPhoto(draft, n) {
   try { return library.dataUriOf(files[Math.floor(Math.random() * files.length)]); } catch { return null; }
 }
 
+// Each post starts at a different subject of the list (client 2026-11-21), fixed per draft so
+// regenerating the same post keeps the same order.
+const shotStart = (draft) => [...String(draft.id)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % require('./image').SHOTS.length;
+
 async function aiPhotos(draft, report = () => {}, fresh = false) {
   const total = draft.offers.length + 1; // + cover (-1); the closing slide is a fixed design
   const failed = [];
@@ -200,7 +204,7 @@ async function aiPhotos(draft, report = () => {}, fresh = false) {
     try {
       let lib = null;
       if (!fresh && (n < 0 || !libUsed)) { lib = libraryPhoto(draft, n); if (lib && n >= 0) libUsed = true; }
-      const dataUri = lib || (n < 0 ? await aiCover(draft, fresh) : await generatePhoto(photoOffer(draft, n), undefined, n));
+      const dataUri = lib || (n < 0 ? await aiCover(draft, fresh) : await generatePhoto(photoOffer(draft, n), undefined, n + shotStart(draft)));
       if (n >= 0) sources.use(draft.offers[n], null, dataUri);
       fs.writeFileSync(slotPath(draft, n), dataUri);
       if (n >= 0 && draft.photoPos) draft.photoPos[n] = null;
