@@ -141,6 +141,8 @@
   <div id="savedBox" class="manual" hidden>
     <h3>⭐ Gespeicherte Angebote <small>(eigene Angebote und Erbil-Tagespreise, bis zum Ablaufdatum)</small></h3>
     <div id="savedList"></div>
+    <div class="row"><label>Thema (Cover, bei 2–6) <select id="savedTheme"><option value="auto">Automatisch</option><option value="summer">Sommer</option><option value="holidays">Ferien</option><option value="families">Familien</option><option value="city">Städtereisen</option><option value="eid">Fest (Eid)</option><option value="newroz">Newroz</option><option value="lastminute">Last Minute</option></select></label>
+      <button class="primary" id="savedGo">Beitrag aus Auswahl erstellen</button><span id="savedCount"></span></div>
   </div>
   <!-- Fly Erbil daily prices (client 2026-11-05): one row per German airport, saved as own offers. -->
   <details class="manual" id="fe">
@@ -432,6 +434,18 @@ $('#bundleList').onchange = (e) => {
   updateBundleCount();
 };
 function updateBundleCount() { $('#bundleCount').textContent = `${bundlePick.length} / 6 gewählt`; }
+// Starts a bundle in the background and waits for it (used by "Mehrere Angebote" and the stored offers tab).
+async function runBundle(body) {
+  await api('/api/studio/drafts/bundle', { method: 'POST', body: JSON.stringify({ style: 'flight-simple', ...body, ...(defLangs().length ? { langs: defLangs() } : {}) }) });
+  const t0 = Date.now();
+  for (;;) {
+    await new Promise((r) => setTimeout(r, 5000));
+    const job = await api('/api/studio/drafts/bundle/status');
+    if (!job.running) { if (job.error) throw new Error(job.error); return; }
+    if (Date.now() - t0 > 15 * 60000) throw new Error('dauert zu lange, bitte später die Liste neu laden');
+    $('#msg').textContent = `Sammel-Beitrag wird erstellt … (${Math.round((Date.now() - t0) / 1000)} s)`;
+  }
+}
 $('#bundleGo').onclick = async () => {
   if (bundlePick.length < 2) { $('#msg').textContent = 'Bitte mindestens 2 Angebote wählen.'; return; }
   $('#bundleGo').disabled = true; $('#msg').textContent = 'Sammel-Beitrag wird erstellt …';
@@ -462,19 +476,43 @@ async function loadOwn() {
 }
 // Stored offers tab: sorted by departure date, with delete.
 async function loadSaved() {
+  savedPick = []; if ($('#savedCount')) $('#savedCount').textContent = '';
   let list = [];
   try { list = await api('/api/studio/own-offers'); } catch { /* shown empty */ }
   list.sort((a, b) => String(a.departureDate || a.validUntil).localeCompare(String(b.departureDate || b.validUntil)));
   const de = (d) => (d ? d.split('-').reverse().join('.') : '–');
   $('#savedList').innerHTML = list.length ? `<table style="width:100%;border-collapse:collapse;font-size:15px">
-    <tr style="text-align:start;color:#cfd6e6"><th>Art</th><th>Strecke / Hotel</th><th>Hinflug</th><th>Rückflug</th><th>Preis</th><th>Gültig bis</th><th></th></tr>
+    <tr style="text-align:start;color:#cfd6e6"><th></th><th>Art</th><th>Strecke / Hotel</th><th>Hinflug</th><th>Rückflug</th><th>Preis</th><th>Gültig bis</th><th></th></tr>
     ${list.map((o) => `<tr style="border-top:1px solid rgba(255,255,255,.12)">
+      <td><input type="checkbox" data-saved-key="${esc(o.key)}" data-saved-kind="${o.kind === 'package' ? 'package' : 'flight'}"></td>
       <td>${o.kind === 'package' ? '🏨' : '✈️'}</td>
       <td>${o.kind === 'package' ? esc(o.to.name) + ' – ' + esc(o.hotel) : esc(o.from.name) + ' → ' + esc(o.to.name)}</td>
       <td>${esc(de(o.departureDate))}</td><td>${esc(de(o.returnDate))}</td><td>${esc(o.price)} €</td><td>${esc(de(o.validUntil))}</td>
       <td><button class="ghost" data-del-saved="${esc(o.key)}">Löschen</button></td></tr>`).join('')}</table>`
     : '<p>Keine gespeicherten Angebote.</p>';
 }
+// Selected stored offers -> one post (1 offer) or a bundle (2-6 offers of one kind), in selection order.
+let savedPick = [];
+$('#savedList').addEventListener('change', (e) => {
+  const k = e.target.dataset && e.target.dataset.savedKey; if (!k) return;
+  if (e.target.checked) {
+    const kinds = new Set(savedPick.map((x) => x.kind).concat(e.target.dataset.savedKind));
+    if (savedPick.length >= 6 || kinds.size > 1) { e.target.checked = false; $('#msg').textContent = kinds.size > 1 ? 'Flüge und Pakete nicht mischen.' : 'Maximal 6 Angebote.'; return; }
+    savedPick.push({ key: k, kind: e.target.dataset.savedKind });
+  } else savedPick = savedPick.filter((x) => x.key !== k);
+  $('#savedCount').textContent = savedPick.length ? `${savedPick.length} gewählt` : '';
+});
+$('#savedGo').onclick = async () => {
+  if (!savedPick.length) { $('#msg').textContent = 'Bitte Angebote auswählen.'; return; }
+  const kind = savedPick[0].kind, keys = savedPick.map((x) => x.key);
+  $('#savedGo').disabled = true; $('#msg').textContent = 'Erstelle Beitrag …';
+  try {
+    if (keys.length === 1) await api('/api/studio/drafts/pick', { method: 'POST', body: JSON.stringify({ kind, key: keys[0], month: '', ...(defLangs().length ? { langs: defLangs() } : {}) }) });
+    else await runBundle({ kind, keys, theme: $('#savedTheme').value, month: '' });
+    $('#msg').textContent = 'Fertig.'; savedPick = []; $('#savedCount').textContent = ''; $('#savedBox').hidden = true; await load();
+  } catch (err) { $('#msg').textContent = 'Fehler: ' + err.message; }
+  $('#savedGo').disabled = false;
+};
 $('#savedOpen').onclick = () => { const b = $('#savedBox'); b.hidden = !b.hidden; if (!b.hidden) loadSaved(); };
 $('#savedList').onclick = async (e) => {
   const k = e.target.dataset.delSaved;
