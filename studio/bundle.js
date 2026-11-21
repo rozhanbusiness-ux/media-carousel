@@ -211,7 +211,7 @@ async function aiPhotos(draft, report = () => {}, fresh = false) {
       const lib = fresh ? null : libraryPhoto(draft, n, n < 0 ? undefined : plan[n]);
       let dataUri = lib;
       if (!dataUri && n < 0) dataUri = await aiCover(draft, fresh);
-      else if (!dataUri) ({ dataUri, place: draft.places[n] } = await require('./image').generateSubjectPhoto(photoOffer(draft, n), undefined, plan[n]));
+      else if (!dataUri) ({ dataUri, place: draft.places[n] } = await require('./image').generateSubjectPhoto(photoOffer(draft, n), undefined, plan[n], { offset: n }));
       if (n >= 0) sources.use(draft.offers[n], null, dataUri);
       fs.writeFileSync(slotPath(draft, n), dataUri);
       if (n >= 0 && draft.photoPos) draft.photoPos[n] = null;

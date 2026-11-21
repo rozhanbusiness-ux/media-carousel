@@ -33,7 +33,7 @@ async function search(city, country, subject, fetchImpl = fetch) {
     `Search the web. List up to 10 REAL, well-known and photogenic ${KINDS[subject]} in or near ${city}${country ? ', ' + country : ''}.`,
     'Each must really exist and be clearly connected to this city (inside it or in its surrounding region, at most about 80 km away).',
     'Never include mosques or minarets. Different places only, no duplicates.',
-    'Answer ONLY with a JSON array: [{"name": "<official name>", "view": "<one sentence: what a photographer sees there, specific and visual>"}].',
+    'Answer ONLY with a JSON array: [{"name": "<official name>", "view": "<one sentence: the best-known photo viewpoint of this place (where photographers stand and what they see), specific and visual>"}].',
   ].join(' ');
   const call = async (tools) => {
     const res = await fetchImpl(endpoint(), {

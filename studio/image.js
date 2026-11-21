@@ -48,6 +48,32 @@ const shotOf = (i) => SHOTS[((i % SHOTS.length) + SHOTS.length) % SHOTS.length];
  *  real places of the city (places.js), so no hand-written lists are needed. */
 const subjectIds = () => SHOTS.map((x) => x.id);
 
+// Light, viewpoint and life vary per photo (client 2026-11-21: three bridges must not look like one
+// photo). Picked from fixed lists by the number of photos the library already has for this city and
+// subject, so consecutive photos always differ.
+const LIGHTS = [
+  'soft early-morning light, pastel sky, gentle long shadows',
+  'clear midday-to-afternoon daylight, deep blue sky, crisp contrast',
+  'warm golden hour light shortly before sunset, glowing warm sky',
+  'blue hour just after sunset, deep blue sky, warm lights switched on, no black night',
+];
+const VIEWS = [
+  'wide view that shows the place within its surroundings',
+  'close view that fills the frame with its most characteristic details',
+  'low angle from ground level looking up, strong perspective',
+  'view from the opposite bank, side or square, the place seen across open space',
+  'framed view with a natural element in the foreground (branches, flowers, a railing, stones or grass)',
+];
+const LIFE = [
+  'no people at all, calm and pristine',
+  'a few small people far away (walking, cycling), none facing the camera',
+  'one element of life in the foreground: a boat, a bicycle, a cafe table or market stall (no readable text)',
+];
+function variation(n, seed = '') {
+  const h = [...String(seed)].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 0);
+  return { light: LIGHTS[(n + h) % LIGHTS.length], view: VIEWS[(n * 2 + h) % VIEWS.length], life: LIFE[(n + (h >> 3)) % LIFE.length] };
+}
+
 /** Generic { shot, light } of a subject id (or n-th subject). */
 function subjectFor(place, i) {
   const sh = typeof i === 'string' ? SHOTS.find((x) => x.id === i) || SHOTS[0] : shotOf(Number(i) || 0);
@@ -71,7 +97,7 @@ function buildPrompt(city, variant, kind, sh) {
   return [
     `Photorealistic travel poster photograph of ${city}.` + (sh ? "" : ` Scene: ${stripTimeOfDay(variant)}.`),
     sh
-      ? `SUBJECT: ${sh.shot}. It must be a REAL, recognisable place of ${city}, close enough to feel there. NOT a flat aerial view, NOT a distant skyline.`
+      ? `SUBJECT: ${sh.shot}. It must be a REAL, recognisable place of ${city}, close enough to feel there. NOT a flat aerial view, NOT a distant skyline.` + (sh.view ? ` VIEWPOINT: ${sh.view}. LIFE IN THE PICTURE: ${sh.life}.` : '')
       : 'MOST IMPORTANT: ONE famous landmark is the hero, photographed CLOSE UP from street level or a low angle, large in the frame and full of detail; it must be instantly recognisable. NOT an aerial view, NOT a city panorama, NOT a skyline seen from far away.',
     KIND_RULES[kind] || KIND_RULES.flight,
     'REALISM: must look like a real photo by a top travel photographer (full-frame camera, 24-35mm lens, f/8, RAW, natural colour grading); real materials, real proportions, architecturally accurate; ONE real viewpoint: only landmarks that are really visible together from one place, no collage of distant landmarks; no CGI, no illustration, no painted or plastic AI look, no HDR glow. COLOURS: natural and believable, true to the light of the scene (daylight, golden hour or blue hour must look clearly different); never neon or cartoonish.',
@@ -79,7 +105,7 @@ function buildPrompt(city, variant, kind, sh) {
     'the bottom 15% is a little darker and calm, because a light logo is placed there; do NOT add water, a lake or trees just for that, show what is really in front of the subject.',
     'ONE SEAMLESS PHOTO: these zones are only where things sit, never separate panels; the sky is one continuous natural sky and the light changes gradually; no horizontal bands, stripes, seams, borders, collage or split-screen look.',
     sh ? `LIGHT: ${sh.light}; crisp detail, crystal-clear air, no haze; the top sky band stays calm and even so the price text reads well.` : 'LIGHT: bright, clean daylight on a sunny day (late morning to afternoon), clear blue sky, crisp detail everywhere, crystal-clear air, no haze, no dusk or night.',
-    'MOOD: aspirational, premium and inviting; tidy scene, no traffic, no cranes, no construction, no rubbish, at most a few small distant people, none facing the camera.',
+    sh && sh.life ? 'MOOD: aspirational, premium and inviting; tidy scene, no traffic, no cranes, no construction, no rubbish; nobody faces the camera.' : 'MOOD: aspirational, premium and inviting; tidy scene, no traffic, no cranes, no construction, no rubbish, at most a few small distant people, none facing the camera.',
     'FORBIDDEN: any mosque or minaret anywhere in the frame; any readable text anywhere: no brand names or logos on buildings, rooftops or billboards (e.g. hotel or company signs), no shop signs, no letters, no flags with writing, no watermarks, borders or frames.',
   ].filter(Boolean).join(' ');
 }
@@ -114,6 +140,7 @@ async function generateSubjectPhoto(offerOrCity, scene, subject, opts = {}) {
     const exclude = [...(opts.exclude || []), ...lib.list(key, sh.id).map((x) => x.place).filter(Boolean)];
     try { found = await require('./places').pick(key || city, offer.to.name, offer.country || '', sh.id, exclude); } catch (err) { console.error('studio places:', err.message); }
     if (found) sh = { ...sh, shot: `${found.name}. ${found.view}` };
+    sh = { ...sh, ...variation(lib.list(key, sh.id).length + (opts.offset || 0), (found && found.name) || sh.id) };
   }
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${config.GEMINI_IMAGE_MODEL}:generateContent`;
   const res = await fetch(url, {
@@ -240,4 +267,4 @@ async function generateThemeCover(theme, fresh = false) {
   return dataUri;
 }
 
-module.exports = { SHOTS, shotOf, subjectFor, subjectIds, planSubjects, generateSubjectPhoto, THEMES, themeOf, generateThemeCover, buildThemePrompt, generatePhoto, generateSet, enhancePhoto, buildPrompt, scenesFor };
+module.exports = { variation, LIGHTS, VIEWS, LIFE, SHOTS, shotOf, subjectFor, subjectIds, planSubjects, generateSubjectPhoto, THEMES, themeOf, generateThemeCover, buildThemePrompt, generatePhoto, generateSet, enhancePhoto, buildPrompt, scenesFor };
