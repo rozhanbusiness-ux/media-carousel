@@ -53,6 +53,7 @@
     <button class="primary" id="gen">Ein Angebot</button>
     <button class="primary" id="genPkg" hidden>Paket-Entwurf erstellen</button>
     <button class="primary" id="bundleOpen">🗂 Mehrere Angebote</button>
+    <button class="primary" id="savedOpen">⭐ Gespeicherte Angebote</button>
     <span style="font-size:14px;color:#cfd6e6">Sprachen:</span>
     <label class="chk"><input type="checkbox" name="deflang" value="de"> Deutsch</label>
     <label class="chk"><input type="checkbox" name="deflang" value="ar"> العربية</label>
@@ -135,6 +136,11 @@
       <small style="color:#8e98b3">Nur ein Ziel (z. B. Erbil): Cover zeigt dieses Ziel.</small></div>
     <div id="bundleList" class="pick" style="max-height:340px;overflow:auto"></div>
     <div class="row"><button class="primary" id="bundleGo">Sammel-Beitrag erstellen</button><span id="bundleCount"></span></div>
+  </div>
+  <!-- All stored own offers in one place (client 2026-11-21). -->
+  <div id="savedBox" class="manual" hidden>
+    <h3>⭐ Gespeicherte Angebote <small>(eigene Angebote und Erbil-Tagespreise, bis zum Ablaufdatum)</small></h3>
+    <div id="savedList"></div>
   </div>
   <!-- Fly Erbil daily prices (client 2026-11-05): one row per German airport, saved as own offers. -->
   <details class="manual" id="fe">
@@ -418,9 +424,8 @@ async function loadBundleList() {
 $('#bundleList').onchange = (e) => {
   const k = e.target.dataset.key; if (!k) return;
   if (e.target.checked) {
-    const dest = e.target.dataset.dest;
-    const dup = dest && [...$('#bundleList').querySelectorAll('input:checked')].some((i) => i !== e.target && i.dataset.dest === dest);
-    if (bundlePick.length >= 6 || dup) { e.target.checked = false; $('#msg').textContent = dup ? 'Diese Destination bzw. dieses Land ist schon gewählt.' : 'Maximal 6 Angebote.'; return; }
+    // Any offers may be combined (client 2026-11-21); only the maximum of six stays.
+    if (bundlePick.length >= 6) { e.target.checked = false; $('#msg').textContent = 'Maximal 6 Angebote.'; return; }
     bundlePick.push(k);
   }
   else bundlePick = bundlePick.filter((x) => x !== k);
@@ -455,6 +460,27 @@ async function loadOwn() {
     · ${esc(o.price)} € · bis ${esc(o.validUntil)}</span><button class="ghost" data-del-own="${esc(o.key)}">Löschen</button></div>`).join('')
     : '<p>Noch keine eigenen Angebote.</p>';
 }
+// Stored offers tab: sorted by departure date, with delete.
+async function loadSaved() {
+  let list = [];
+  try { list = await api('/api/studio/own-offers'); } catch { /* shown empty */ }
+  list.sort((a, b) => String(a.departureDate || a.validUntil).localeCompare(String(b.departureDate || b.validUntil)));
+  const de = (d) => (d ? d.split('-').reverse().join('.') : '–');
+  $('#savedList').innerHTML = list.length ? `<table style="width:100%;border-collapse:collapse;font-size:15px">
+    <tr style="text-align:start;color:#cfd6e6"><th>Art</th><th>Strecke / Hotel</th><th>Hinflug</th><th>Rückflug</th><th>Preis</th><th>Gültig bis</th><th></th></tr>
+    ${list.map((o) => `<tr style="border-top:1px solid rgba(255,255,255,.12)">
+      <td>${o.kind === 'package' ? '🏨' : '✈️'}</td>
+      <td>${o.kind === 'package' ? esc(o.to.name) + ' – ' + esc(o.hotel) : esc(o.from.name) + ' → ' + esc(o.to.name)}</td>
+      <td>${esc(de(o.departureDate))}</td><td>${esc(de(o.returnDate))}</td><td>${esc(o.price)} €</td><td>${esc(de(o.validUntil))}</td>
+      <td><button class="ghost" data-del-saved="${esc(o.key)}">Löschen</button></td></tr>`).join('')}</table>`
+    : '<p>Keine gespeicherten Angebote.</p>';
+}
+$('#savedOpen').onclick = () => { const b = $('#savedBox'); b.hidden = !b.hidden; if (!b.hidden) loadSaved(); };
+$('#savedList').onclick = async (e) => {
+  const k = e.target.dataset.delSaved;
+  if (!k || !confirm('Dieses Angebot löschen?')) return;
+  try { await api('/api/studio/own-offers/' + k, { method: 'DELETE' }); await loadSaved(); await loadOwn(); } catch (err) { $('#msg').textContent = 'Fehler: ' + err.message; }
+};
 $('#ownList').onclick = async (e) => {
   const k = e.target.dataset.delOwn;
   if (!k || !confirm('Dieses Angebot löschen?')) return;

@@ -15,7 +15,7 @@ const { renderSlide, PACKAGE_STYLES } = require('./render');
 const sources = require('./photo-sources');
 const bank = require('./bank');
 const { generatePhoto, generateThemeCover, THEMES, enhancePhoto } = require('./image');
-const { HOME, photoSubject } = require('./destinations');
+const { photoSubject } = require('./destinations');
 const library = require('./ai-library');
 const { rankPhotos } = require('./photo-rank');
 const store = require('./store');
@@ -298,9 +298,9 @@ async function createBundleDraft({ kind, keys, style, theme, month = '', langs, 
   if (offers.some((o) => !o || (o.kind || 'flight') !== kind)) throw new Error('Ein Angebot ist nicht mehr verfügbar – bitte Liste neu laden.');
   // Each destination once; packages: each COUNTRY once (client rule).
   // Flights home (Erbil from several German cities, client 2026-11-04): unique per route, not per destination.
-  const place = (o) => (kind === 'package' ? o.country || o.to.name
-    : HOME.has(o.to.code) ? `${o.from.code || o.from.name}-${o.to.code}` : o.to.code || o.to.name);
-  if (new Set(offers.map(place)).size !== offers.length) throw new Error(kind === 'package' ? 'Jedes Land nur einmal pro Beitrag.' : 'Jede Destination nur einmal pro Beitrag.');
+  // No "one destination per post" rule any more (client 2026-11-21): the same destination may appear
+  // several times (other city or date). Only the very same offer twice is refused.
+  if (new Set(keys).size !== keys.length) throw new Error('Ein Angebot wurde doppelt gewählt.');
   const draft = {
     id: crypto.randomBytes(6).toString('hex'), createdAt: new Date().toISOString(), forDate: date.toISOString().slice(0, 10),
     status: 'pending', style: PACKAGE_STYLES.includes(style) ? style : 'flight', source: 'specials', bundle: true, bundleKind: kind, theme: THEMES.includes(theme) ? theme : 'auto', month: /^\d{4}-\d{2}$/.test(month) ? month : '', // style/theme/month chosen before the photos (client)
