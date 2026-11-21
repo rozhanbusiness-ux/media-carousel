@@ -68,6 +68,27 @@ module.exports = function mountStudio(app) {
 
   router.get('/drafts/bundle/status', (req, res) => res.json(bundleJob));
   router.get('/drafts/ai-photos/status', (req, res) => res.json(aiJob));
+  // City library (client 2026-11-21): photos of each city by subject, filled once and reused.
+  let libJob = { running: false, error: null, key: null, subject: null };
+  router.get('/city-library', (req, res) => {
+    const lib = require('./ai-library'); const img = require('./image'); const subj = require('./subjects');
+    res.json({ job: libJob, cities: subj.CITIES.map((c) => ({ key: c.key, name: c.name,
+      subjects: img.subjectIds(c.place).map((id) => ({ id, text: img.subjectFor(c.place, id).shot, files: lib.list(c.key, id).map((x) => x.file) })) })) });
+  });
+  router.post('/city-library/generate', (req, res) => {
+    const { key, subject } = req.body || {};
+    const city = require('./subjects').CITIES.find((c) => c.key === key);
+    if (!city || !require('./image').subjectIds(city.place).includes(subject)) return res.status(400).json({ error: 'bad request' });
+    if (libJob.running) return res.status(429).json({ error: 'Es wird schon ein Foto erzeugt.' });
+    libJob = { running: true, error: null, key, subject };
+    require('./image').generatePhoto({ kind: 'flight', to: city.place, country: city.country }, undefined, subject)
+      .then((dataUri) => { require('./ai-library').save(key, dataUri, subject); libJob = { ...libJob, running: false }; })
+      .catch((err) => { console.error('studio city library:', err.message); libJob = { ...libJob, running: false, error: err.message }; });
+    res.status(202).json({ started: true });
+  });
+  router.delete('/library/:file', (req, res) => {
+    try { require('./ai-library').remove(req.params.file); res.json({ ok: true }); } catch (err) { res.status(400).json({ error: err.message }); }
+  });
   // Saved library photo (file name validated against the library pattern; no paths).
   router.get('/library/:file', (req, res) => {
     const p = require('./ai-library').fileOf(req.params.file);

@@ -122,3 +122,14 @@ decision needed.
 ## Incidents
 - 2026-10-20: commit bec494d broke logo and photo position on offer slides (a comment swallowed
   two settings in `render.js`); fixed in 5ae7ed8. Offer posts made in between should be regenerated.
+
+## 2026-11-21: photo variety by subject and the city library
+- Subjects (image.js SHOTS): landmark, water, castle, nature, bridge, heights, promenade, museum; each with its own light.
+- Real places per city and subject in subjects.js (17 cities). A subject a city lacks is left out; cities
+  without a list only get landmark / water / nature (the AI must not invent a castle or bridge).
+- A bundle plans one subject per slide, none repeated; the start of the list depends on the draft id.
+- Library photos carry a subject (cache/studio-ailib/subjects.json); old untagged photos count as landmark.
+  Bundles take a library photo of the planned subject first, else generate one.
+- Screen "🏙 Städte-Bibliothek": per city and subject, generate photos (one at a time, polled) and delete bad ones.
+- Destination cover (one destination) also uses a subject, e.g. the Gali Ali Beg waterfall for Erbil.
+- Rejected by the client: a cover with a dark price table; a "travel story" photo concept.

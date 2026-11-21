@@ -47,7 +47,7 @@ const S = {
   STR: {
     landmark: 'the New Palace on the Schlossplatz in Stuttgart with its fountains',
     water: 'the Max-Eyth-See lake in Stuttgart with the Neckar vineyards behind',
-    castle: 'Ludwigsburg Residential Palace near Stuttgart with its baroque gardens',
+    castle: 'Lichtenstein Castle near Stuttgart, the fairy-tale castle on its steep rock cliff above the forest',
     nature: 'the Killesberg park in Stuttgart with its lakes and flower beds',
     heights: 'the vineyards on the Württemberg hill above Stuttgart, rows of vines in the foreground and the Neckar valley below',
     museum: 'the futuristic Mercedes-Benz Museum building in Stuttgart',
@@ -106,6 +106,7 @@ const S = {
   AMS: {
     landmark: 'classic gabled canal houses along the Herengracht in Amsterdam',
     water: 'an Amsterdam canal with a canal tour boat and houseboats',
+    castle: 'Muiderslot near Amsterdam, the medieval moated castle with its red-brick towers reflected in the water',
     nature: 'the Vondelpark in Amsterdam with its pond and old trees',
     bridge: 'the white Magere Brug drawbridge over the Amstel in Amsterdam',
     museum: 'the Rijksmuseum in Amsterdam seen from the Museumplein with its pond',
@@ -115,7 +116,7 @@ const S = {
     landmark: 'the massive ancient walls of the Erbil Citadel seen up close from the square below',
     castle: 'the main gate of the Erbil Citadel with the fountains of the square in front of it',
     nature: 'the Sami Abdulrahman Park in Erbil with its lake, lawns and trees',
-    water: 'the lake in the Sami Abdulrahman Park in Erbil with the city behind',
+    water: 'the Gali Ali Beg waterfall in Erbil province, white water falling into a green mountain gorge',
   },
   ISU: {
     landmark: 'the historic Qaysari bazaar arches in Sulaymaniyah',
@@ -138,6 +139,15 @@ const S = {
 };
 S.dohuk = S.duhok;
 
+// Cities of the library screen: library key (= ai-library keyOf), place and country for the prompt.
+const CITIES = [
+  ['EBL', 'Erbil', 'Iraq'], ['ISU', 'Sulaymaniyah', 'Iraq'], ['BGW', 'Baghdad', 'Iraq'], ['DUHOK', 'Duhok', 'Iraq'],
+  ['DUS', 'Düsseldorf', 'Germany'], ['CGN', 'Köln', 'Germany'], ['FRA', 'Frankfurt', 'Germany'], ['MUC', 'München', 'Germany'],
+  ['STR', 'Stuttgart', 'Germany'], ['HAM', 'Hamburg', 'Germany'], ['HAJ', 'Hannover', 'Germany'], ['BER', 'Berlin', 'Germany'],
+  ['NUE', 'Nürnberg', 'Germany'], ['LEJ', 'Leipzig', 'Germany'], ['BRE', 'Bremen', 'Germany'], ['DTM', 'Dortmund', 'Germany'],
+  ['AMS', 'Amsterdam', 'Netherlands'],
+].map(([key, name, country]) => ({ key, name, country, place: key === 'DUHOK' ? { name: 'duhok' } : { code: key, name } }));
+
 /** Real places of a city by subject, or null when the city has no list yet. */
 function of(place) {
   if (!place) return null;
@@ -145,4 +155,4 @@ function of(place) {
   return S[place.code] || S[name] || S[name.split(/[ ,(]/)[0]] || null;
 }
 
-module.exports = { of, S };
+module.exports = { of, S, CITIES };

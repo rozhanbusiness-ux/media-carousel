@@ -70,4 +70,13 @@ function dataUriOf(file) {
   return `data:image/${ext === 'jpg' ? 'jpeg' : ext};base64,${fs.readFileSync(p).toString('base64')}`;
 }
 
-module.exports = { keyOf, list, save, tag, fileOf, dataUriOf, KEY, FILE };
+/** Delete a library photo (validated name) and its tag. */
+function remove(file) {
+  const p = fileOf(file);
+  if (!p) throw new Error('bad file');
+  try { fs.unlinkSync(p); } catch { /* already gone */ }
+  const idx = readIndex();
+  if (idx[file]) { delete idx[file]; fs.writeFileSync(INDEX, JSON.stringify(idx)); }
+}
+
+module.exports = { remove, keyOf, list, save, tag, fileOf, dataUriOf, KEY, FILE };

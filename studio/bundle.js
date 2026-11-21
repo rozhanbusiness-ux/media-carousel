@@ -174,7 +174,9 @@ function libKey(draft, n) {
 /** Cover photo: panorama of the single destination (never the departure city), else the theme photo. */
 async function aiCover(draft, fresh = false) {
   const one = singleDest(draft);
-  if (one) return generatePhoto({ kind: one.kind || 'flight', to: one.to, country: one.country || '' });
+  // Destination cover (client 2026-11-21): one of its real subjects (e.g. the Gali Ali Beg waterfall
+  // for Erbil), varying from post to post.
+  if (one) return generatePhoto({ kind: one.kind || 'flight', to: one.to, country: one.country || '' }, undefined, require('./image').planSubjects([one.to], shotStart(draft))[0]);
   return generateThemeCover(themeFor(draft), fresh);
 }
 

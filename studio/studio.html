@@ -54,6 +54,7 @@
     <button class="primary" id="genPkg" hidden>Paket-Entwurf erstellen</button>
     <button class="primary" id="bundleOpen">🗂 Mehrere Angebote</button>
     <button class="primary" id="savedOpen">⭐ Gespeicherte Angebote</button>
+    <button class="primary" id="libOpen">🏙 Städte-Bibliothek</button>
     <span style="font-size:14px;color:#cfd6e6">Sprachen:</span>
     <label class="chk"><input type="checkbox" name="deflang" value="de"> Deutsch</label>
     <label class="chk"><input type="checkbox" name="deflang" value="ar"> العربية</label>
@@ -143,6 +144,12 @@
     <div id="savedList"></div>
     <div class="row"><label>Thema (Cover, bei 2–6) <select id="savedTheme"><option value="auto">Automatisch</option><option value="summer">Sommer</option><option value="holidays">Ferien</option><option value="families">Familien</option><option value="city">Städtereisen</option><option value="eid">Fest (Eid)</option><option value="newroz">Newroz</option><option value="lastminute">Last Minute</option></select></label>
       <button class="primary" id="savedGo">Beitrag aus Auswahl erstellen</button><span id="savedCount"></span></div>
+  </div>
+  <!-- City library (client 2026-11-21): one photo per subject and city, checked once, reused in posts. -->
+  <div id="libBox" class="manual" hidden>
+    <h3>🏙 Städte-Bibliothek <small>(je Stadt ein Foto pro Motiv; schlechte löschen, gute bleiben und werden in Beiträgen benutzt)</small></h3>
+    <div class="row"><label>Stadt <select id="libCity"></select></label><button class="ghost" id="libMissing">Alle fehlenden erzeugen</button><span id="libState"></span></div>
+    <div id="libGrid"></div>
   </div>
   <!-- Fly Erbil daily prices (client 2026-11-05): one row per German airport, saved as own offers. -->
   <details class="manual" id="fe">
@@ -512,6 +519,44 @@ $('#savedGo').onclick = async () => {
     $('#msg').textContent = 'Fertig.'; savedPick = []; $('#savedCount').textContent = ''; $('#savedBox').hidden = true; await load();
   } catch (err) { $('#msg').textContent = 'Fehler: ' + err.message; }
   $('#savedGo').disabled = false;
+};
+// City library: photos per subject; generation runs one at a time on the server (polled).
+const SUBJ_DE = { landmark: 'Wahrzeichen', water: 'Wasser / Hafen', castle: 'Burg / Schloss', nature: 'Natur / Park', bridge: 'Brücke', heights: 'Aussicht / Berg', promenade: 'Promenade / Strand', museum: 'Museum' };
+let libData = null;
+async function loadLib() {
+  try { libData = await api('/api/studio/city-library'); } catch (err) { $('#msg').textContent = 'Fehler: ' + err.message; return; }
+  const sel = $('#libCity'), cur = sel.value;
+  sel.innerHTML = libData.cities.map((c) => `<option value="${esc(c.key)}">${esc(c.name)} (${c.subjects.filter((x) => x.files.length).length}/${c.subjects.length})</option>`).join('');
+  if (cur) sel.value = cur;
+  const c = libData.cities.find((x) => x.key === sel.value) || libData.cities[0];
+  const job = libData.job;
+  $('#libState').textContent = job.running ? `Erzeuge ${SUBJ_DE[job.subject] || job.subject} (${job.key}) …` : job.error ? 'Fehler: ' + job.error : '';
+  $('#libGrid').innerHTML = c.subjects.map((x) => `<div style="margin:12px 0"><b>${esc(SUBJ_DE[x.id] || x.id)}</b> <small style="color:#8e98b3">${esc(x.text)}</small>
+    <div class="cands">${x.files.map((f) => `<div class="cand" style="cursor:default"><img src="/api/studio/library/${encodeURIComponent(f)}" alt="" loading="lazy"><button class="ghost" data-lib-del="${esc(f)}" style="position:absolute;bottom:4px;left:4px;padding:2px 8px">Löschen</button></div>`).join('')}
+    <button class="ghost" data-lib-gen="${esc(x.id)}" ${job.running ? 'disabled' : ''}>+ Foto erzeugen</button></div></div>`).join('');
+  return job.running;
+}
+async function libGenerate(subject) {
+  await api('/api/studio/city-library/generate', { method: 'POST', body: JSON.stringify({ key: $('#libCity').value, subject }) });
+  while (await loadLib()) await new Promise((r) => setTimeout(r, 3000));
+  if (libData.job.error) throw new Error(libData.job.error);
+}
+$('#libOpen').onclick = () => { const b = $('#libBox'); b.hidden = !b.hidden; if (!b.hidden) loadLib(); };
+$('#libCity').onchange = () => loadLib();
+$('#libGrid').onclick = async (e) => {
+  const del = e.target.dataset.libDel, gen = e.target.dataset.libGen;
+  try {
+    if (del && confirm('Dieses Foto aus der Bibliothek löschen?')) { await api('/api/studio/library/' + encodeURIComponent(del), { method: 'DELETE' }); await loadLib(); }
+    if (gen) await libGenerate(gen);
+  } catch (err) { $('#msg').textContent = 'Fehler: ' + err.message; }
+};
+$('#libMissing').onclick = async () => {
+  $('#libMissing').disabled = true;
+  try {
+    const c = libData.cities.find((x) => x.key === $('#libCity').value);
+    for (const x of c.subjects.filter((y) => !y.files.length)) await libGenerate(x.id);
+  } catch (err) { $('#msg').textContent = 'Fehler: ' + err.message; }
+  $('#libMissing').disabled = false;
 };
 $('#savedOpen').onclick = () => { const b = $('#savedBox'); b.hidden = !b.hidden; if (!b.hidden) loadSaved(); };
 $('#savedList').onclick = async (e) => {
