@@ -108,12 +108,13 @@ const seasonOf = (month) => { const m = Number(String(month || '').slice(5, 7)) 
 
 function buildFestivePrompt(city, hero, kind, season) {
   return [
-    `A breathtaking, vibrant travel poster image of ${city}, celebrating the city in one rich picture.`,
-    `HERO: ${String(hero).replace(/\.+$/, '')}; it is the clear focus, large and recognisable, in the middle of the frame.`,
-    `AROUND IT: other famous, real sights of ${city} that make the city instantly recognisable, arranged naturally in the background and to the sides (river, bridges, towers, old town, skyline), all architecturally accurate.`,
+    `A REAL PHOTOGRAPH (not an illustration, not a painting, not a 3D render, not a cartoon) of ${city}: a vibrant, premium travel advertising photo shot on a full-frame camera.`,
+    `HERO: ${String(hero).replace(/\.+$/, '')}. It fills the middle of the frame, large, sharp and exactly as it really looks; it is unmistakably the subject of the photo.`,
+    `BACKGROUND: only what is really visible from this viewpoint; at most one or two other real sights of ${city} small in the distance, never a collage of the city's landmarks.`,
     'VIEWPOINT: slightly elevated (from a riverside promenade, a terrace or a hill), so the city looks rich, wide and full of life; a promenade, river or square with railings, lanterns and flowers in the lower part.',
     SEASONS[season] || SEASONS.autumn,
-    'COLOURS AND LIGHT: vivid, saturated, joyful colours; bright sunshine, deep blue sky with fluffy white clouds, sparkling water with reflections, warm glow; polished, high-end advertising look.',
+    'COLOURS AND LIGHT: rich, joyful colours as in a professionally edited real photo (punchy but believable); bright sunshine, deep blue sky with soft white clouds, sparkling water; real textures of stone, glass, water and snow, real proportions, natural perspective.',
+    'STRICTLY NO cartoon, illustration, painting, digital art, toy-like or miniature look, no outlines, no flat colours, no exaggerated HDR, no oversized Ferris wheels or invented buildings.',
     'VERTICAL 9:16 POSTER: the seasonal frame and the sky in the top quarter stay calm enough for a price and a route written there; the bottom eighth is a little darker for a light logo; one seamless picture, no panels or borders.',
     KIND_RULES[kind] || KIND_RULES.flight,
     'MOOD: happy, inviting, premium; a few small people strolling, none facing the camera; no traffic jams, no cranes, no construction.',
