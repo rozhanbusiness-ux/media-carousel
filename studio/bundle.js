@@ -184,9 +184,11 @@ async function aiCover(draft, fresh = false) {
  *  Writes each photo that succeeds; returns the slots that failed. */
 // Library first (client 2026-11-05): a new bundle uses a saved photo of the place when there is
 // one and generates only the rest; "AI photos for all" (fresh) always generates new ones.
+const seasonOfDraft = (draft) => require('./image').seasonOf(draft.month);
 function libraryPhoto(draft, n, subject) {
   const key = libKey(draft, n);
-  const files = key ? library.list(key, subject).map((x) => x.file) : [];
+  // Offer slides: only photos of the post's season (client 2026-11-23); cover: any saved photo.
+  const files = key ? library.list(key, subject, n >= 0 ? seasonOfDraft(draft) : undefined).map((x) => x.file) : [];
   if (!files.length) return null;
   try { return library.dataUriOf(files[Math.floor(Math.random() * files.length)]); } catch { return null; }
 }
@@ -211,7 +213,7 @@ async function aiPhotos(draft, report = () => {}, fresh = false) {
       const lib = fresh ? null : libraryPhoto(draft, n, n < 0 ? undefined : plan[n]);
       let dataUri = lib;
       if (!dataUri && n < 0) dataUri = await aiCover(draft, fresh);
-      else if (!dataUri) ({ dataUri, place: draft.places[n] } = await require('./image').generateSubjectPhoto(photoOffer(draft, n), undefined, plan[n], { offset: n }));
+      else if (!dataUri) ({ dataUri, place: draft.places[n] } = await require('./image').generateSubjectPhoto(photoOffer(draft, n), undefined, plan[n], { offset: n, season: seasonOfDraft(draft) }));
       if (n >= 0) sources.use(draft.offers[n], null, dataUri);
       fs.writeFileSync(slotPath(draft, n), dataUri);
       if (n >= 0 && draft.photoPos) draft.photoPos[n] = null;
@@ -358,7 +360,7 @@ async function regenerateBundle(draft, what, value, queriesFor, choosePhoto, LAN
     if (!validSlot(draft, value)) throw new Error('bad slide');
     const key = libKey(draft, value);
     if (!key) throw new Error('Für dieses Foto gibt es keinen Bibliotheks-Namen.');
-    library.save(key, fs.readFileSync(slotPath(draft, value), 'utf8'), value >= 0 ? (draft.subjects || planOf(draft))[value] : undefined, value >= 0 && draft.places ? draft.places[value] : undefined);
+    library.save(key, fs.readFileSync(slotPath(draft, value), 'utf8'), value >= 0 ? (draft.subjects || planOf(draft))[value] : undefined, value >= 0 && draft.places ? draft.places[value] : undefined, value >= 0 ? seasonOfDraft(draft) : undefined);
     return store.upsertDraft(draft); // nothing to render
   }
   if (what === 'bundle-lib-list') {
@@ -388,7 +390,7 @@ async function regenerateBundle(draft, what, value, queriesFor, choosePhoto, LAN
     let dataUri;
     if (what === 'bundle-photo-ai') {
       if (n < 0) dataUri = await aiCover(draft, true);
-      else { const r = await require('./image').generateSubjectPhoto(photoOffer(draft, n), undefined, (draft.subjects || planOf(draft))[n]); dataUri = r.dataUri; draft.places = draft.places || []; draft.places[n] = r.place; }
+      else { const r = await require('./image').generateSubjectPhoto(photoOffer(draft, n), undefined, (draft.subjects || planOf(draft))[n], { season: seasonOfDraft(draft) }); dataUri = r.dataUri; draft.places = draft.places || []; draft.places[n] = r.place; }
     } else if (what === 'bundle-photo-upload') dataUri = value.data;
     else {
       const c = draft.bundlePick && draft.bundlePick.n === n && draft.bundlePick.list.find((x) => x.id === value.id);

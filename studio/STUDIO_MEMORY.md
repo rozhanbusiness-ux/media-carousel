@@ -134,3 +134,7 @@ decision needed.
 - Screen "🏙 Städte-Bibliothek": per city and subject, generate photos (one at a time, polled) and delete bad ones.
 - Destination cover (one destination) also uses a subject, e.g. the Gali Ali Beg waterfall for Erbil.
 - Rejected by the client: a cover with a dark price table; a "travel story" photo concept.
+- 2026-11-23: the client rejected the "editorial magazine" photos. New default style "festive panorama"
+  (after the Fly Erbil website): the hero place with other sights of the city around it, slightly elevated,
+  vivid colours, seasonal frame (winter/spring/summer/autumn from the travel month). Library photos carry
+  the season; offer slides only use photos of the post's season. The editorial style stays selectable.

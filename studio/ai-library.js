@@ -28,26 +28,26 @@ const keyOf = (place) => {
 const INDEX = path.join(DIR, 'subjects.json');
 const SUBJECT = /^[a-z]{2,20}$/;
 function readIndex() { try { return JSON.parse(fs.readFileSync(INDEX, 'utf8')) || {}; } catch { return {}; } }
-function tag(file, subject, place) {
+function tag(file, subject, place, season) {
   if (!FILE.test(file) || !SUBJECT.test(subject || '')) return;
   const idx = readIndex();
-  idx[file] = place ? { subject, place: String(place).slice(0, 120) } : subject;
+  idx[file] = place || season ? { subject, place: place ? String(place).slice(0, 120) : null, season: SUBJECT.test(season || '') ? season : null } : subject;
   fs.mkdirSync(DIR, { recursive: true });
   fs.writeFileSync(INDEX, JSON.stringify(idx));
 }
 
-function list(key, subject) {
+function list(key, subject, season) {
   if (!KEY.test(key)) return [];
   const idx = readIndex();
   try {
     return fs.readdirSync(DIR).filter((f) => FILE.test(f) && FILE.exec(f)[1] === key)
-      .map((f) => ({ file: f, subject: (idx[f] && idx[f].subject) || idx[f] || 'landmark', place: (idx[f] && idx[f].place) || null, added: fs.statSync(path.join(DIR, f)).mtimeMs }))
-      .filter((x) => !subject || x.subject === subject).sort((a, b) => b.added - a.added);
+      .map((f) => ({ file: f, subject: (idx[f] && idx[f].subject) || idx[f] || 'landmark', place: (idx[f] && idx[f].place) || null, season: (idx[f] && idx[f].season) || null, added: fs.statSync(path.join(DIR, f)).mtimeMs }))
+      .filter((x) => (!subject || x.subject === subject) && (!season || x.season === season)).sort((a, b) => b.added - a.added);
   } catch { return []; }
 }
 
 /** Save a photo (data URI) under a key; returns the file name. The same photo is kept once. */
-function save(key, dataUri, subject, place) {
+function save(key, dataUri, subject, place, season) {
   const m = DATA.exec(dataUri || '');
   if (!KEY.test(key) || !m) throw new Error('Foto kann nicht gespeichert werden.');
   const buf = Buffer.from(m[2], 'base64');
@@ -56,7 +56,7 @@ function save(key, dataUri, subject, place) {
   if (list(key).length >= MAX_PER_KEY && !fs.existsSync(path.join(DIR, file))) throw new Error(`Bibliothek für ${key} ist voll (max. ${MAX_PER_KEY}).`);
   fs.mkdirSync(DIR, { recursive: true });
   fs.writeFileSync(path.join(DIR, file), buf);
-  if (subject) tag(file, subject, place);
+  if (subject) tag(file, subject, place, season);
   return file;
 }
 

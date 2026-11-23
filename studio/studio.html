@@ -148,7 +148,9 @@
   <!-- City library (client 2026-11-21): one photo per subject and city, checked once, reused in posts. -->
   <div id="libBox" class="manual" hidden>
     <h3>🏙 Städte-Bibliothek <small>(je Stadt ein Foto pro Motiv; schlechte löschen, gute bleiben und werden in Beiträgen benutzt)</small></h3>
-    <div class="row"><label>Stadt <select id="libCity"></select></label><button class="ghost" id="libMissing">Alle fehlenden erzeugen</button><span id="libState"></span></div>
+    <div class="row"><label>Stadt <select id="libCity"></select></label>
+      <label>Jahreszeit <select id="libSeason"><option value="winter">❄️ Winter</option><option value="spring">🌸 Frühling</option><option value="summer">☀️ Sommer</option><option value="autumn">🍂 Herbst</option></select></label>
+      <label>Stil <select id="libStyle"><option value="festive">🎉 Festlich (Panorama)</option><option value="editorial">📷 Magazin (ein Motiv)</option></select></label><button class="ghost" id="libMissing">Alle fehlenden erzeugen</button><span id="libState"></span></div>
     <div id="libGrid"></div>
   </div>
   <!-- Fly Erbil daily prices (client 2026-11-05): one row per German airport, saved as own offers. -->
@@ -524,7 +526,9 @@ $('#savedGo').onclick = async () => {
 const SUBJ_DE = { landmark: 'Wahrzeichen', water: 'Wasser / Hafen', castle: 'Burg / Schloss', nature: 'Natur / Park', bridge: 'Brücke', heights: 'Aussicht / Berg', promenade: 'Promenade / Strand', museum: 'Museum' };
 let libData = null;
 async function loadLib() {
-  try { libData = await api('/api/studio/city-library'); } catch (err) { $('#msg').textContent = 'Fehler: ' + err.message; return; }
+  const qs = $('#libSeason').dataset.set ? '?season=' + $('#libSeason').value : '';
+  try { libData = await api('/api/studio/city-library' + qs); } catch (err) { $('#msg').textContent = 'Fehler: ' + err.message; return; }
+  if (!$('#libSeason').dataset.set) { $('#libSeason').value = libData.season; $('#libSeason').dataset.set = '1'; }
   const sel = $('#libCity'), cur = sel.value;
   sel.innerHTML = libData.cities.map((c) => `<option value="${esc(c.key)}">${esc(c.name)} (${c.subjects.filter((x) => x.files.length).length}/${c.subjects.length})</option>`).join('');
   if (cur) sel.value = cur;
@@ -537,12 +541,13 @@ async function loadLib() {
   return job.running;
 }
 async function libGenerate(subject) {
-  await api('/api/studio/city-library/generate', { method: 'POST', body: JSON.stringify({ key: $('#libCity').value, subject }) });
+  await api('/api/studio/city-library/generate', { method: 'POST', body: JSON.stringify({ key: $('#libCity').value, subject, season: $('#libSeason').value, style: $('#libStyle').value }) });
   while (await loadLib()) await new Promise((r) => setTimeout(r, 3000));
   if (libData.job.error) throw new Error(libData.job.error);
 }
 $('#libOpen').onclick = () => { const b = $('#libBox'); b.hidden = !b.hidden; if (!b.hidden) loadLib(); };
 $('#libCity').onchange = () => loadLib();
+$('#libSeason').onchange = () => loadLib();
 $('#libGrid').onclick = async (e) => {
   const del = e.target.dataset.libDel, gen = e.target.dataset.libGen;
   try {

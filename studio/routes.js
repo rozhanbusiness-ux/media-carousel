@@ -72,17 +72,19 @@ module.exports = function mountStudio(app) {
   let libJob = { running: false, error: null, key: null, subject: null };
   router.get('/city-library', (req, res) => {
     const lib = require('./ai-library'); const img = require('./image'); const subj = require('./subjects');
-    res.json({ job: libJob, cities: subj.CITIES.map((c) => ({ key: c.key, name: c.name,
-      subjects: img.subjectIds().map((id) => ({ id, files: lib.list(c.key, id).map((x) => ({ file: x.file, place: x.place })) })) })) });
+    const season = Object.keys(img.SEASONS).includes(req.query.season) ? req.query.season : img.seasonOf();
+    res.json({ job: libJob, season, cities: subj.CITIES.map((c) => ({ key: c.key, name: c.name,
+      subjects: img.subjectIds().map((id) => ({ id, files: lib.list(c.key, id, season).map((x) => ({ file: x.file, place: x.place })) })) })) });
   });
   router.post('/city-library/generate', (req, res) => {
-    const { key, subject } = req.body || {};
+    const { key, subject, season, style } = req.body || {};
+    if (!Object.keys(require('./image').SEASONS).includes(season)) return res.status(400).json({ error: 'bad season' });
     const city = require('./subjects').CITIES.find((c) => c.key === key);
     if (!city || !require('./image').subjectIds().includes(subject)) return res.status(400).json({ error: 'bad request' });
     if (libJob.running) return res.status(429).json({ error: 'Es wird schon ein Foto erzeugt.' });
     libJob = { running: true, error: null, key, subject };
-    require('./image').generateSubjectPhoto({ kind: 'flight', to: city.place, country: city.country }, undefined, subject)
-      .then(({ dataUri, place }) => { require('./ai-library').save(key, dataUri, subject, place); libJob = { ...libJob, running: false }; })
+    require('./image').generateSubjectPhoto({ kind: 'flight', to: city.place, country: city.country }, undefined, subject, { season, style: style === 'editorial' ? 'editorial' : 'festive' })
+      .then(({ dataUri, place }) => { require('./ai-library').save(key, dataUri, subject, place, season); libJob = { ...libJob, running: false }; })
       .catch((err) => { console.error('studio city library:', err.message); libJob = { ...libJob, running: false, error: err.message }; });
     res.status(202).json({ started: true });
   });

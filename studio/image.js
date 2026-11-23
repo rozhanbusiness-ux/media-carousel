@@ -95,6 +95,32 @@ function planSubjects(places, start = 0) {
   });
 }
 
+// Festive panorama style (client 2026-11-23, after the Fly Erbil website): the city celebrated in one
+// rich, vivid picture with several of its sights, framed by a seasonal foreground. The season follows
+// the travel month, so a winter post never shows autumn leaves.
+const SEASONS = {
+  winter: 'WINTER: the top corner and one side are framed by snow-covered fir branches with warm fairy lights; a light dusting of snow on roofs and ground; a festive Christmas-market glow where it fits; crisp clear winter sky',
+  spring: 'SPRING: the top corner and one side are framed by branches full of pink and white cherry or apple blossom; fresh green trees, tulips and flower beds',
+  summer: 'SUMMER: the top corner and one side are framed by lush green leaves and colourful summer flowers; deep blue sky, warm sunshine, lively outdoor life',
+  autumn: 'AUTUMN: the top corner and one side are framed by branches of glowing orange, red and golden autumn leaves; golden trees along the streets and riverbanks',
+};
+const seasonOf = (month) => { const m = Number(String(month || '').slice(5, 7)) || (new Date().getMonth() + 1); return m === 12 || m <= 2 ? 'winter' : m <= 5 ? 'spring' : m <= 8 ? 'summer' : 'autumn'; };
+
+function buildFestivePrompt(city, hero, kind, season) {
+  return [
+    `A breathtaking, vibrant travel poster image of ${city}, celebrating the city in one rich picture.`,
+    `HERO: ${String(hero).replace(/\.+$/, '')}; it is the clear focus, large and recognisable, in the middle of the frame.`,
+    `AROUND IT: other famous, real sights of ${city} that make the city instantly recognisable, arranged naturally in the background and to the sides (river, bridges, towers, old town, skyline), all architecturally accurate.`,
+    'VIEWPOINT: slightly elevated (from a riverside promenade, a terrace or a hill), so the city looks rich, wide and full of life; a promenade, river or square with railings, lanterns and flowers in the lower part.',
+    SEASONS[season] || SEASONS.autumn,
+    'COLOURS AND LIGHT: vivid, saturated, joyful colours; bright sunshine, deep blue sky with fluffy white clouds, sparkling water with reflections, warm glow; polished, high-end advertising look.',
+    'VERTICAL 9:16 POSTER: the seasonal frame and the sky in the top quarter stay calm enough for a price and a route written there; the bottom eighth is a little darker for a light logo; one seamless picture, no panels or borders.',
+    KIND_RULES[kind] || KIND_RULES.flight,
+    'MOOD: happy, inviting, premium; a few small people strolling, none facing the camera; no traffic jams, no cranes, no construction.',
+    'FORBIDDEN: any mosque or minaret anywhere in the frame; any readable text: no brand names, logos, shop signs, letters, flags with writing, watermarks or frames.',
+  ].join(' ');
+}
+
 function buildPrompt(city, variant, kind, sh) {
   return [
     sh
@@ -151,7 +177,7 @@ async function generateSubjectPhoto(offerOrCity, scene, subject, opts = {}) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': config.GEMINI_API_KEY },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: buildPrompt(city, variant, offer.kind, sh) }] }],
+      contents: [{ parts: [{ text: sh && opts.style !== 'editorial' ? buildFestivePrompt(city, found ? found.name : sh.shot, offer.kind, opts.season || seasonOf()) : buildPrompt(city, variant, offer.kind, sh) }] }],
       generationConfig: { responseModalities: ['Image'], imageConfig: { imageSize: config.GEMINI_IMAGE_SIZE || '2K', aspectRatio: '9:16' } },
     }),
     signal: AbortSignal.timeout(120000),
@@ -271,4 +297,4 @@ async function generateThemeCover(theme, fresh = false) {
   return dataUri;
 }
 
-module.exports = { variation, LIGHTS, VIEWS, LIFE, SHOTS, shotOf, subjectFor, subjectIds, planSubjects, generateSubjectPhoto, THEMES, themeOf, generateThemeCover, buildThemePrompt, generatePhoto, generateSet, enhancePhoto, buildPrompt, scenesFor };
+module.exports = { SEASONS, seasonOf, buildFestivePrompt, variation, LIGHTS, VIEWS, LIFE, SHOTS, shotOf, subjectFor, subjectIds, planSubjects, generateSubjectPhoto, THEMES, themeOf, generateThemeCover, buildThemePrompt, generatePhoto, generateSet, enhancePhoto, buildPrompt, scenesFor };
