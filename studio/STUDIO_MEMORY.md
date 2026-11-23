@@ -138,3 +138,15 @@ decision needed.
   (after the Fly Erbil website): the hero place with other sights of the city around it, slightly elevated,
   vivid colours, seasonal frame (winter/spring/summer/autumn from the travel month). Library photos carry
   the season; offer slides only use photos of the post's season. The editorial style stays selectable.
+
+## 2026-11-23: NEXT SESSION STARTS HERE (photo quality)
+- The client rejected every generated photo so far: Gemini "editorial" (boring, same structure),
+  Gemini "festive" (cartoonish at first, then dull), Canva (realistic but grey). Real stock photos
+  were also rejected: he wants AI photos as good as the Fly Erbil website (flyebl.com slider:
+  vivid, sunny, deep blue sky with white clouds, rich city view, seasonal autumn-leaf frame).
+- Plan agreed: the Gemini key is now a network secret for generativelanguage.googleapis.com
+  (header x-goog-api-key) in the cloud environment. Iterate HERE: generate Düsseldorf photos with
+  the studio's image model, look at them yourself, refine (short clear prompts, fewer constraints,
+  maybe a style reference image), and show the client only the best two. Only after his approval
+  copy the prompt into studio/image.js and give him the deploy command once.
+- Server deploy is still pending for everything since 0c9a239 (he has not run the update command).
