@@ -132,7 +132,8 @@ const PHOTO_LIGHTS = {
   day: 'Clear sunny late afternoon: deep blue sky with a few white clouds, warm light on the facades.',
 };
 const LIGHT_ORDER = ['blue', 'golden', 'blue', 'golden', 'day', 'golden', 'blue', 'golden', 'blue', 'day'];
-const lightOf = (n) => PHOTO_LIGHTS[LIGHT_ORDER[((n % 10) + 10) % 10]];
+const lightKeyOf = (n) => LIGHT_ORDER[((n % 10) + 10) % 10];
+const lightOf = (n) => PHOTO_LIGHTS[typeof n === 'string' && PHOTO_LIGHTS[n] ? n : lightKeyOf(Number(n) || 0)];
 
 function buildPhotoPrompt(city, place, spot, kind, n) {
   return [
@@ -230,7 +231,7 @@ async function generateSubjectPhoto(offerOrCity, scene, subject, opts = {}) {
     const exclude = [...(opts.exclude || []), ...lib.list(key, sh.id).map((x) => x.place).filter(Boolean)];
     try { found = await require('./places').pick(key || city, offer.to.name, offer.country || '', sh.id, exclude); } catch (err) { console.error('studio places:', err.message); }
     if (found) sh = { ...sh, shot: `${found.name}. ${found.view}` };
-    sh = { ...sh, n: lib.list(key).length + (opts.offset || 0) };
+    sh = { ...sh, n: opts.light && PHOTO_LIGHTS[opts.light] ? opts.light : lib.list(key).length + (opts.offset || 0) };
   }
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${config.GEMINI_IMAGE_MODEL}:generateContent`;
   const res = await fetch(url, {
@@ -357,4 +358,4 @@ async function generateThemeCover(theme, fresh = false) {
   return dataUri;
 }
 
-module.exports = { buildKeywordCoverPrompt, generateKeywordCover, buildTravelCoverPrompt, generateTravelCover, buildPhotoPrompt, lightOf, SEASONS, seasonOf, buildFestivePrompt, variation, LIGHTS, VIEWS, LIFE, SHOTS, shotOf, subjectFor, subjectIds, planSubjects, generateSubjectPhoto, THEMES, themeOf, generateThemeCover, buildThemePrompt, generatePhoto, generateSet, enhancePhoto, buildPrompt, scenesFor };
+module.exports = { lightKeyOf, PHOTO_LIGHTS, buildKeywordCoverPrompt, generateKeywordCover, buildTravelCoverPrompt, generateTravelCover, buildPhotoPrompt, lightOf, SEASONS, seasonOf, buildFestivePrompt, variation, LIGHTS, VIEWS, LIFE, SHOTS, shotOf, subjectFor, subjectIds, planSubjects, generateSubjectPhoto, THEMES, themeOf, generateThemeCover, buildThemePrompt, generatePhoto, generateSet, enhancePhoto, buildPrompt, scenesFor };

@@ -160,8 +160,7 @@
   <div id="libBox" class="manual" hidden>
     <h3>🏙 Foto-Bibliothek <small>(jedes erzeugte Foto bleibt hier und wird in Beiträgen wieder benutzt)</small></h3>
     <div id="libCities" class="libcities"></div>
-    <div class="row"><button class="ghost" id="libMissing">Für jedes Motiv ohne Foto eins erzeugen</button>
-      <button class="ghost" id="libPurge">🧹 Alte Fotos (alter Stil) löschen</button><span id="libState"></span></div>
+    <div class="row"><button class="ghost" id="libPurge">🧹 Alte Fotos (alter Stil) löschen</button><span id="libState"></span></div>
     <div id="libGrid"></div>
   </div>
   <!-- Fly Erbil daily prices (client 2026-11-05): one row per German airport, saved as own offers. -->
@@ -543,10 +542,11 @@ async function loadLib() {
   const c = libData.cities.find((x) => x.key === libKey) || libData.cities[0];
   const job = libData.job;
   $('#libState').textContent = job.running ? `Erzeuge Foto (${job.key}, ${SUBJ_DE[job.subject] || job.subject}) … ca. 1 Minute` : job.error ? 'Fehler: ' + job.error : '';
-  $('#libGrid').innerHTML = c.subjects.map((x) => `<h4 style="margin:10px 0 4px">${esc(SUBJ_DE[x.id] || x.id)} <small style="color:#8e98b3">(${x.files.length})</small></h4>
+  const withPhotos = c.subjects.filter((x) => x.files.length);
+  $('#libGrid').innerHTML = !withPhotos.length ? '<p style="color:#8e98b3">Noch keine Fotos. Sie kommen automatisch, sobald ein Beitrag mit dieser Stadt erstellt wird.</p>' : withPhotos.map((x) => `<h4 style="margin:10px 0 4px">${esc(SUBJ_DE[x.id] || x.id)} <small style="color:#8e98b3">(${x.files.length})</small></h4>
     <div class="libgrid">${x.files.map(({ file: f, place }) => `<div class="libph"><img src="/api/studio/library/${encodeURIComponent(f)}" alt="" loading="lazy">
       ${place ? `<div class="pl">${esc(place)}</div>` : ''}<button class="del" title="Löschen" data-lib-del="${esc(f)}">✕</button></div>`).join('')}
-      <button class="libnew" data-lib-gen="${esc(x.id)}" ${job.running ? 'disabled' : ''}>+ Neues Foto</button></div>`).join('');
+      </div>`).join('');
   return job.running;
 }
 async function libGenerate(subject) {
@@ -562,14 +562,6 @@ $('#libGrid').onclick = async (e) => {
     if (del && confirm('Dieses Foto löschen?')) { await api('/api/studio/library/' + encodeURIComponent(del), { method: 'DELETE' }); await loadLib(); }
     if (gen) await libGenerate(gen);
   } catch (err) { $('#msg').textContent = 'Fehler: ' + err.message; }
-};
-$('#libMissing').onclick = async () => {
-  $('#libMissing').disabled = true;
-  try {
-    const c = libData.cities.find((x) => x.key === libKey);
-    for (const x of c.subjects.filter((y) => !y.files.length)) await libGenerate(x.id);
-  } catch (err) { $('#msg').textContent = 'Fehler: ' + err.message; }
-  $('#libMissing').disabled = false;
 };
 $('#libPurge').onclick = async () => {
   if (!confirm('Alle Fotos im alten Stil (vor dem 24.11.2026) aus der Bibliothek löschen? Das kann nicht rückgängig gemacht werden.')) return;

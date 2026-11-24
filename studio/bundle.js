@@ -228,12 +228,14 @@ async function aiPhotos(draft, report = () => {}, fresh = false) {
   const plan = planOf(draft);
   draft.subjects = plan;
   draft.places = draft.offers.map(() => null);
+  // Light per slide (client 2026-11-24): neighbours never share the same light.
+  draft.lights = draft.offers.map((_, n) => require('./image').lightKeyOf(shotStart(draft) + n));
   const one = async (n) => {
     try {
       const lib = fresh ? null : libraryPhoto(draft, n, n < 0 ? undefined : plan[n]);
       let dataUri = lib;
       if (!dataUri && n < 0) dataUri = await aiCover(draft, fresh);
-      else if (!dataUri) ({ dataUri, place: draft.places[n] } = await require('./image').generateSubjectPhoto(photoOffer(draft, n), undefined, plan[n], { offset: n, season: seasonOfDraft(draft) }));
+      else if (!dataUri) ({ dataUri, place: draft.places[n] } = await require('./image').generateSubjectPhoto(photoOffer(draft, n), undefined, plan[n], { light: draft.lights[n] }));
       if (n >= 0) sources.use(draft.offers[n], null, dataUri);
       fs.writeFileSync(slotPath(draft, n), dataUri);
       if (n >= 0 && draft.photoPos) draft.photoPos[n] = null;
@@ -411,7 +413,25 @@ async function regenerateBundle(draft, what, value, queriesFor, choosePhoto, LAN
     let dataUri;
     if (what === 'bundle-photo-ai') {
       if (n < 0) dataUri = await aiCover(draft, true);
-      else { const r = await require('./image').generateSubjectPhoto(photoOffer(draft, n), undefined, (draft.subjects || planOf(draft))[n], { season: seasonOfDraft(draft) }); dataUri = r.dataUri; draft.places = draft.places || []; draft.places[n] = r.place; keep(draft, n, dataUri); }
+      else {
+        // New photo for ONE slide (client 2026-11-24): the variety rule still holds. It takes a subject
+        // no other slide of the post has (and not its own old one), and a light different from its neighbours.
+        const img = require('./image');
+        const subs = draft.subjects || planOf(draft);
+        const others = new Set(subs.filter((_, i) => i !== n));
+        const order = img.SHOTS.map((x) => x.id);
+        const start = (order.indexOf(subs[n]) + 1) % order.length;
+        const subject = [...order.slice(start), ...order.slice(0, start)].find((id) => !others.has(id) && id !== subs[n]) || subs[n];
+        const lights = draft.lights || subs.map((_, i) => img.lightKeyOf(shotStart(draft) + i));
+        const near = new Set([lights[n - 1], lights[n + 1], lights[n]]);
+        const light = ['blue', 'golden', 'day'].find((l) => !near.has(l)) || ['blue', 'golden', 'day'].find((l) => l !== lights[n]);
+        const r = await img.generateSubjectPhoto(photoOffer(draft, n), undefined, subject, { light });
+        dataUri = r.dataUri;
+        draft.subjects = subs.map((x, i) => (i === n ? subject : x));
+        draft.lights = lights.map((x, i) => (i === n ? light : x));
+        draft.places = draft.places || []; draft.places[n] = r.place;
+        keep(draft, n, dataUri);
+      }
     } else if (what === 'bundle-photo-upload') dataUri = value.data;
     else {
       const c = draft.bundlePick && draft.bundlePick.n === n && draft.bundlePick.list.find((x) => x.id === value.id);
