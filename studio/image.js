@@ -122,6 +122,30 @@ function buildFestivePrompt(city, hero, kind, season) {
   ].join(' ');
 }
 
+// Short prompt (client 2026-11-24, tested in the session on Düsseldorf and Munich): the place by
+// name, where it is seen from, the light, a dark bottom for the logo, the camera. Long rule lists
+// made the photos dull or cartoonish; this short form gave real, attractive photos.
+// Light mix: mostly blue hour and golden sunset, sometimes clear daylight (4 / 4 / 2 in 10).
+const PHOTO_LIGHTS = {
+  blue: 'Blue hour just after sunset: deep blue sky with a last pink glow on the horizon, warm lit facades, windows and street lamps.',
+  golden: 'Golden-hour sunset: warm orange and pink sky with soft clouds, the scene glowing, reflections where there is water.',
+  day: 'Clear sunny late afternoon: deep blue sky with a few white clouds, warm light on the facades.',
+};
+const LIGHT_ORDER = ['blue', 'golden', 'blue', 'golden', 'day', 'golden', 'blue', 'golden', 'blue', 'day'];
+const lightOf = (n) => PHOTO_LIGHTS[LIGHT_ORDER[((n % 10) + 10) % 10]];
+
+function buildPhotoPrompt(city, place, spot, kind, n) {
+  return [
+    `Professional travel photograph of ${city}, vertical format.`,
+    `${String(place).replace(/\.+$/, '')}${spot ? ', seen ' + String(spot).replace(/^(seen\s+)?/i, '').replace(/\.+$/, '') : ''}, large in the frame.`,
+    lightOf(n),
+    'The lower fifth of the frame is naturally dark (shadowed foreground: dark water, shaded pavement or a silhouetted railing), calm and without detail, for a logo.',
+    'Shot on a Sony A7R IV, rich but natural colours, crisp detail, magazine quality.',
+    kind && kind !== 'flight' ? KIND_RULES[kind] : '',
+    'No text, no signs, no logos, no mosques or minarets.',
+  ].filter(Boolean).join(' ');
+}
+
 function buildPrompt(city, variant, kind, sh) {
   return [
     sh
@@ -171,14 +195,14 @@ async function generateSubjectPhoto(offerOrCity, scene, subject, opts = {}) {
     const exclude = [...(opts.exclude || []), ...lib.list(key, sh.id).map((x) => x.place).filter(Boolean)];
     try { found = await require('./places').pick(key || city, offer.to.name, offer.country || '', sh.id, exclude); } catch (err) { console.error('studio places:', err.message); }
     if (found) sh = { ...sh, shot: `${found.name}. ${found.view}` };
-    sh = { ...sh, ...variation(lib.list(key, sh.id).length + (opts.offset || 0), (found && found.name) || sh.id) };
+    sh = { ...sh, n: lib.list(key).length + (opts.offset || 0) };
   }
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${config.GEMINI_IMAGE_MODEL}:generateContent`;
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': config.GEMINI_API_KEY },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: sh && opts.style !== 'editorial' ? buildFestivePrompt(city, found ? found.name : sh.shot, offer.kind, opts.season || seasonOf()) : buildPrompt(city, variant, offer.kind, sh) }] }],
+      contents: [{ parts: [{ text: sh ? buildPhotoPrompt(city, found ? found.name : sh.shot, found ? found.spot : '', offer.kind, sh.n || 0) : buildPrompt(city, variant, offer.kind, sh) }] }],
       generationConfig: { responseModalities: ['Image'], imageConfig: { imageSize: config.GEMINI_IMAGE_SIZE || '2K', aspectRatio: '9:16' } },
     }),
     signal: AbortSignal.timeout(120000),
@@ -298,4 +322,4 @@ async function generateThemeCover(theme, fresh = false) {
   return dataUri;
 }
 
-module.exports = { SEASONS, seasonOf, buildFestivePrompt, variation, LIGHTS, VIEWS, LIFE, SHOTS, shotOf, subjectFor, subjectIds, planSubjects, generateSubjectPhoto, THEMES, themeOf, generateThemeCover, buildThemePrompt, generatePhoto, generateSet, enhancePhoto, buildPrompt, scenesFor };
+module.exports = { buildPhotoPrompt, lightOf, SEASONS, seasonOf, buildFestivePrompt, variation, LIGHTS, VIEWS, LIFE, SHOTS, shotOf, subjectFor, subjectIds, planSubjects, generateSubjectPhoto, THEMES, themeOf, generateThemeCover, buildThemePrompt, generatePhoto, generateSet, enhancePhoto, buildPrompt, scenesFor };

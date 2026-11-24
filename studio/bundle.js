@@ -188,7 +188,7 @@ const seasonOfDraft = (draft) => require('./image').seasonOf(draft.month);
 function libraryPhoto(draft, n, subject) {
   const key = libKey(draft, n);
   // Offer slides: only photos of the post's season (client 2026-11-23); cover: any saved photo.
-  const files = key ? library.list(key, subject, n >= 0 ? seasonOfDraft(draft) : undefined).map((x) => x.file) : [];
+  const files = key ? library.list(key, subject).map((x) => x.file) : [];
   if (!files.length) return null;
   try { return library.dataUriOf(files[Math.floor(Math.random() * files.length)]); } catch { return null; }
 }
@@ -198,6 +198,13 @@ function libraryPhoto(draft, n, subject) {
 const shotStart = (draft) => [...String(draft.id)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % require('./image').SHOTS.length;
 /** Subject of every offer slide: one per slide, none repeated (client 2026-11-21). */
 const planOf = (draft) => require('./image').planSubjects(draft.offers.map((_, n) => photoSubject(photoOffer(draft, n)).to), shotStart(draft));
+
+/** Every new AI photo of an offer slide goes into the library at once (client 2026-11-24: AI photos
+ *  cost money, so each one is kept and can be picked again). */
+function keep(draft, n, dataUri) {
+  try { const key = libKey(draft, n); if (key) library.save(key, dataUri, (draft.subjects || planOf(draft))[n], draft.places && draft.places[n]); }
+  catch (err) { console.error('studio library keep:', err.message); }
+}
 
 async function aiPhotos(draft, report = () => {}, fresh = false) {
   const total = draft.offers.length + 1; // + cover (-1); the closing slide is a fixed design
@@ -217,6 +224,7 @@ async function aiPhotos(draft, report = () => {}, fresh = false) {
       if (n >= 0) sources.use(draft.offers[n], null, dataUri);
       fs.writeFileSync(slotPath(draft, n), dataUri);
       if (n >= 0 && draft.photoPos) draft.photoPos[n] = null;
+      if (!lib && n >= 0) keep(draft, n, dataUri);
     } catch (err) { console.error('studio bundle ai:', err.message); failed.push(n); }
     report(++done, total);
   };
@@ -390,7 +398,7 @@ async function regenerateBundle(draft, what, value, queriesFor, choosePhoto, LAN
     let dataUri;
     if (what === 'bundle-photo-ai') {
       if (n < 0) dataUri = await aiCover(draft, true);
-      else { const r = await require('./image').generateSubjectPhoto(photoOffer(draft, n), undefined, (draft.subjects || planOf(draft))[n], { season: seasonOfDraft(draft) }); dataUri = r.dataUri; draft.places = draft.places || []; draft.places[n] = r.place; }
+      else { const r = await require('./image').generateSubjectPhoto(photoOffer(draft, n), undefined, (draft.subjects || planOf(draft))[n], { season: seasonOfDraft(draft) }); dataUri = r.dataUri; draft.places = draft.places || []; draft.places[n] = r.place; keep(draft, n, dataUri); }
     } else if (what === 'bundle-photo-upload') dataUri = value.data;
     else {
       const c = draft.bundlePick && draft.bundlePick.n === n && draft.bundlePick.list.find((x) => x.id === value.id);

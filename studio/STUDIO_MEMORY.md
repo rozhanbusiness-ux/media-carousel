@@ -150,3 +150,9 @@ decision needed.
   maybe a style reference image), and show the client only the best two. Only after his approval
   copy the prompt into studio/image.js and give him the deploy command once.
 - Server deploy is still pending for everything since 0c9a239 (he has not run the update command).
+- 2026-11-24: WORKING STYLE FOUND. Tested in the session with a Gemini key (network secret, header
+  x-goog-api-key; Node needs NODE_USE_ENV_PROXY=1 NODE_EXTRA_CA_CERTS=/root/.ccr/ca-bundle.crt).
+  Short prompt (image.js buildPhotoPrompt): place by name + camera spot, light (blue hour / golden /
+  day in 4/4/2), dark lower fifth for the logo, "Sony A7R IV, rich but natural colours", no text.
+  Approved by the client on Düsseldorf and Munich. Festive and editorial prompts are no longer used.
+- Every new AI photo of an offer slide is saved to the library at once (cost); library max 300 per city.

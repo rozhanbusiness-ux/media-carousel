@@ -11,7 +11,7 @@ const path = require('path');
 const crypto = require('crypto');
 
 const DIR = path.join(__dirname, '..', 'cache', 'studio-ailib');
-const MAX_PER_KEY = 30;
+const MAX_PER_KEY = 300; // every generated photo is kept (client 2026-11-24: AI photos cost money)
 const KEY = /^[A-Za-z0-9-]{2,40}$/;
 const FILE = /^([A-Za-z0-9-]{2,40})-([a-f0-9]{8})\.(jpg|png|webp)$/;
 const DATA = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/=]+)$/;

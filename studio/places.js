@@ -63,7 +63,7 @@ async function search(city, country, subject, fetchImpl = fetch) {
     .map((p) => {
       const f = (k, label) => (p[k] ? `${label}: ${String(p[k]).trim().slice(0, 240)}` : '');
       const view = p.spot || p.layers ? [f('spot', 'Camera position'), f('layers', 'Layers'), f('detail', 'Signature detail'), f('avoid', 'Avoid the cliché')].filter(Boolean).join('. ') : String(p.view || '').trim().slice(0, 300);
-      return { name: p.name.trim().slice(0, 120), view };
+      return { name: p.name.trim().slice(0, 120), view, spot: p.spot ? String(p.spot).trim().slice(0, 200) : '' };
     })
     .filter((p) => !seen.has(norm(p.name)) && seen.add(norm(p.name)));
 }
