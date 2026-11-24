@@ -143,7 +143,8 @@
       <label>Reisemonat <select class="monthSel" id="bundleMonth"></select></label>
       <label hidden>Vorlage <select id="bundleStyle"><option value="flight-simple">◻ Schlicht</option></select></label>
       <label>Thema (Cover) <select id="bundleTheme"><option value="auto">Automatisch (Jahreszeit)</option><option value="summer">Sommer</option><option value="holidays">Ferien</option><option value="families">Familien</option><option value="city">Städtereisen</option><option value="eid">Fest (Eid)</option><option value="newroz">Newroz</option><option value="lastminute">Last Minute</option><option value="autumn">Herbst</option><option value="winter">Winter</option><option value="spring">Frühling</option></select></label>
-      <small style="color:#8e98b3">Nur ein Ziel (z. B. Erbil): Cover zeigt dieses Ziel.</small></div>
+      <label>Cover-Stichwort (Pakete) <input id="bundleKeyword" maxlength="40" placeholder="z. B. Familien, Last Minute"></label>
+      <small style="color:#8e98b3">Cover: ein Ziel → Foto des Ziels; Flüge zu mehreren Zielen → Flugzeug über den Wolken; Pakete → Foto zum Stichwort.</small></div>
     <div id="bundleList" class="pick" style="max-height:340px;overflow:auto"></div>
     <div class="row"><button class="primary" id="bundleGo">Sammel-Beitrag erstellen</button><span id="bundleCount"></span></div>
   </div>
@@ -152,6 +153,7 @@
     <h3>⭐ Gespeicherte Angebote <small>(eigene Angebote und Erbil-Tagespreise, bis zum Ablaufdatum)</small></h3>
     <div id="savedList"></div>
     <div class="row"><label>Thema (Cover, bei 2–6) <select id="savedTheme"><option value="auto">Automatisch</option><option value="summer">Sommer</option><option value="holidays">Ferien</option><option value="families">Familien</option><option value="city">Städtereisen</option><option value="eid">Fest (Eid)</option><option value="newroz">Newroz</option><option value="lastminute">Last Minute</option></select></label>
+      <label>Cover-Stichwort (Pakete) <input id="savedKeyword" maxlength="40" placeholder="z. B. Familien"></label>
       <button class="primary" id="savedGo">Beitrag aus Auswahl erstellen</button><span id="savedCount"></span></div>
   </div>
   <!-- City library (client 2026-11-21): one photo per subject and city, checked once, reused in posts. -->
@@ -468,7 +470,7 @@ $('#bundleGo').onclick = async () => {
   if (bundlePick.length < 2) { $('#msg').textContent = 'Bitte mindestens 2 Angebote wählen.'; return; }
   $('#bundleGo').disabled = true; $('#msg').textContent = 'Sammel-Beitrag wird erstellt …';
   try {
-    await api('/api/studio/drafts/bundle', { method: 'POST', body: JSON.stringify({ kind: $('#bundleKind').value, style: $('#bundleStyle').value, theme: $('#bundleTheme').value, month: $('#bundleMonth').value, keys: bundlePick, ...(defLangs().length ? { langs: defLangs() } : {}) }) });
+    await api('/api/studio/drafts/bundle', { method: 'POST', body: JSON.stringify({ kind: $('#bundleKind').value, style: $('#bundleStyle').value, theme: $('#bundleTheme').value, coverKeyword: $('#bundleKeyword').value, month: $('#bundleMonth').value, keys: bundlePick, ...(defLangs().length ? { langs: defLangs() } : {}) }) });
     const t0 = Date.now();
     for (;;) {
       await new Promise((r) => setTimeout(r, 5000));
@@ -526,13 +528,13 @@ $('#savedGo').onclick = async () => {
   $('#savedGo').disabled = true; $('#msg').textContent = 'Erstelle Beitrag …';
   try {
     if (keys.length === 1) await api('/api/studio/drafts/pick', { method: 'POST', body: JSON.stringify({ kind, key: keys[0], month: '', ...(defLangs().length ? { langs: defLangs() } : {}) }) });
-    else await runBundle({ kind, keys, theme: $('#savedTheme').value, month: '' });
+    else await runBundle({ kind, keys, theme: $('#savedTheme').value, coverKeyword: $('#savedKeyword').value, month: '' });
     $('#msg').textContent = 'Fertig.'; savedPick = []; $('#savedCount').textContent = ''; $('#savedBox').hidden = true; await load();
   } catch (err) { $('#msg').textContent = 'Fehler: ' + err.message; }
   $('#savedGo').disabled = false;
 };
 // City library: photos per subject; generation runs one at a time on the server (polled).
-const SUBJ_DE = { cover: 'Cover-Fotos (Flugzeugfenster)', landmark: 'Wahrzeichen', water: 'Wasser / Hafen', castle: 'Burg / Schloss', nature: 'Natur / Park', bridge: 'Brücke', heights: 'Aussicht / Berg', promenade: 'Promenade / Strand', museum: 'Museum' };
+const SUBJ_DE = { cover: 'Cover-Fotos (Flugzeug)', landmark: 'Wahrzeichen', water: 'Wasser / Hafen', castle: 'Burg / Schloss', nature: 'Natur / Park', bridge: 'Brücke', heights: 'Aussicht / Berg', promenade: 'Promenade / Strand', museum: 'Museum' };
 let libData = null, libKey = null;
 async function loadLib() {
   try { libData = await api('/api/studio/city-library'); } catch (err) { $('#msg').textContent = 'Fehler: ' + err.message; return; }

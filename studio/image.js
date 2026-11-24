@@ -146,23 +146,40 @@ function buildPhotoPrompt(city, place, spot, kind, n) {
   ].filter(Boolean).join(' ');
 }
 
-// Cover of a post with several destinations (client 2026-11-24): a premium travel scene from the
-// aircraft, never an airline's logo or colours. Rotated by the number of covers already saved.
-const TRAVEL_SCENES = [
-  'the view from an aircraft window: the wing above a sea of clouds at golden sunset, warm orange and pink sky',
-  'the view from an aircraft window: the wing above snow-capped mountains at blue hour, deep blue sky with a last glow on the horizon',
-  'the view from an aircraft window: the wing above soft clouds at sunrise, pastel pink and gold sky',
-  'the view from an aircraft window: the wing over a coastline and turquoise sea in late-afternoon sun, deep blue sky with white clouds',
+// Cover of a flight post with several destinations (client 2026-11-24): an aircraft above the
+// clouds, magazine style; never an airline: white plus ONE other colour, no logo, no text, different
+// angles. Rotated by the number of covers already saved.
+const PLANE_COLOURS = ['deep navy blue', 'warm gold', 'burgundy red', 'dark green', 'turquoise', 'graphite grey'];
+const PLANE_VIEWS = [
+  'side view of a modern twin-engine passenger jet cruising above a sea of clouds',
+  'the jet seen from slightly below and behind, banking gently above towering clouds',
+  'front three-quarter view of the jet climbing out of the clouds',
+  'the jet seen from above, flying over a soft blanket of clouds',
+  'rear three-quarter view of the jet heading into the horizon above the clouds',
 ];
+const PLANE_LIGHTS = ['at golden sunset, warm orange and pink sky', 'at blue hour, deep blue sky with a last glow on the horizon', 'at sunrise, pastel pink and gold sky', 'in clear afternoon sun, deep blue sky'];
 function buildTravelCoverPrompt(n) {
+  const i = ((n % 60) + 60) % 60;
   return [
-    `Professional travel photograph, vertical format: ${TRAVEL_SCENES[((n % TRAVEL_SCENES.length) + TRAVEL_SCENES.length) % TRAVEL_SCENES.length]}.`,
-    'A plain white wing without any logo, name, stripes or airline colours.',
-    'The lower third of the frame is naturally darker and calm (the shaded window frame or the dark side of the clouds), for a title.',
-    'Shot on a Sony A7R IV, rich but natural colours, crisp detail, magazine quality. No text, no signs, no logos.',
+    `Professional aviation photograph for a travel magazine cover, vertical format: ${PLANE_VIEWS[i % PLANE_VIEWS.length]}, ${PLANE_LIGHTS[i % PLANE_LIGHTS.length]}.`,
+    `Simple two-colour livery: white fuselage with ${PLANE_COLOURS[i % PLANE_COLOURS.length]} tail and engines only; no logo, no name, no letters, no registration, no flag, nothing that looks like a real airline.`,
+    'The aircraft is sharp and large in the upper middle; the lower third of the frame is darker clouds, calm, for a title.',
+    'Shot with a telephoto lens, rich but natural colours, crisp detail. No text anywhere.',
+  ].join(' ');
+}
+// Cover of a package post (client 2026-11-24): the client types a keyword (e.g. "Familien",
+// "Last Minute"); the photo shows a fitting holiday scene.
+function buildKeywordCoverPrompt(keyword, n) {
+  return [
+    `Professional travel advertising photograph, vertical format, illustrating the holiday offer theme "${String(keyword).slice(0, 60)}"`,
+    '(for example: "Familien" -> a happy family on a beach or by a river; "Last Minute" -> travellers with a suitcase hurrying happily towards the sea; "Wellness" -> a calm spa terrace by the sea).',
+    PLANE_LIGHTS[((n % 4) + 4) % 4].replace(/^at |^in /, 'Light: ') + '.',
+    'People seen from behind or from the side, small to medium in the frame, nobody looks into the camera; real and natural, not posed stock style.',
+    'The lower third of the frame is naturally darker and calm, for a title. Shot on a Sony A7R IV, rich but natural colours. No text, no signs, no logos, no mosques or minarets.',
   ].join(' ');
 }
 async function generateTravelCover(n = 0) { return geminiImage(buildTravelCoverPrompt(n)); }
+async function generateKeywordCover(keyword, n = 0) { return geminiImage(buildKeywordCoverPrompt(keyword, n)); }
 
 function buildPrompt(city, variant, kind, sh) {
   return [
@@ -340,4 +357,4 @@ async function generateThemeCover(theme, fresh = false) {
   return dataUri;
 }
 
-module.exports = { buildTravelCoverPrompt, generateTravelCover, buildPhotoPrompt, lightOf, SEASONS, seasonOf, buildFestivePrompt, variation, LIGHTS, VIEWS, LIFE, SHOTS, shotOf, subjectFor, subjectIds, planSubjects, generateSubjectPhoto, THEMES, themeOf, generateThemeCover, buildThemePrompt, generatePhoto, generateSet, enhancePhoto, buildPrompt, scenesFor };
+module.exports = { buildKeywordCoverPrompt, generateKeywordCover, buildTravelCoverPrompt, generateTravelCover, buildPhotoPrompt, lightOf, SEASONS, seasonOf, buildFestivePrompt, variation, LIGHTS, VIEWS, LIFE, SHOTS, shotOf, subjectFor, subjectIds, planSubjects, generateSubjectPhoto, THEMES, themeOf, generateThemeCover, buildThemePrompt, generatePhoto, generateSet, enhancePhoto, buildPrompt, scenesFor };

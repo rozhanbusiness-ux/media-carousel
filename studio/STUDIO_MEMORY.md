@@ -160,3 +160,7 @@ decision needed.
   several destinations -> aircraft-window scene (TRAVEL_SCENES), saved under library key 'TRAVEL'.
 - Library screen rebuilt: city buttons with counts, photos in a grid with place name and ✕, "+ Neues Foto"
   per subject, "🧹 Alte Fotos löschen" deletes every photo without the v:2 tag (old styles).
+- Covers, final rule (client 2026-11-24): one destination -> destination photo; flights to several
+  destinations -> an aircraft above the clouds (white + one other colour, no logo, different angles and
+  light; library key TRAVEL); packages -> photo for the client's "Cover-Stichwort" (e.g. Familien ->
+  family on a beach; library key PKG-<keyword>). The aircraft-WINDOW cover was rejected (too common).

@@ -168,7 +168,8 @@ const themeFor = (draft, date = new Date()) => require('./image').themeOf(draft.
 function libKey(draft, n) {
   if (n >= 0) return library.keyOf(photoSubject(photoOffer(draft, n)).to);
   const one = singleDest(draft);
-  return one ? library.keyOf(one.to) : 'TRAVEL';
+  if (one) return library.keyOf(one.to);
+  return draft.bundleKind === 'package' && draft.coverKeyword ? 'PKG-' + (library.keyOf({ name: draft.coverKeyword }) || 'X').slice(0, 30) : 'TRAVEL';
 }
 
 /** Cover photo: panorama of the single destination (never the departure city), else the theme photo. */
@@ -182,9 +183,13 @@ async function aiCover(draft, fresh = false) {
     try { library.save(library.keyOf(one.to), r.dataUri, subject, r.place); } catch (err) { console.error('studio library keep:', err.message); }
     return r.dataUri;
   }
-  // Several destinations: a travel scene from the aircraft, saved to the 'TRAVEL' library.
-  const dataUri = await img.generateTravelCover(library.list('TRAVEL').length);
-  try { library.save('TRAVEL', dataUri, 'cover'); } catch (err) { console.error('studio library keep:', err.message); }
+  // Several destinations: packages -> a scene for the client's keyword (else the theme);
+  // flights -> an aircraft above the clouds. Saved to the library under the cover key.
+  const key = libKey(draft, -1);
+  const pkg = draft.bundleKind === 'package';
+  const dataUri = pkg ? await img.generateKeywordCover(draft.coverKeyword || themeFor(draft), library.list(key).length)
+    : await img.generateTravelCover(library.list(key).length);
+  try { library.save(key, dataUri, 'cover'); } catch (err) { console.error('studio library keep:', err.message); }
   return dataUri;
 }
 
@@ -323,7 +328,7 @@ async function renderBundle(draft) {
 }
 
 /** Bundle draft from offer keys of ONE kind (client rule: never mix flights, packages, cruises, ...). */
-async function createBundleDraft({ kind, keys, style, theme, month = '', langs, date, liveOffers, queriesFor, choosePhoto }) {
+async function createBundleDraft({ kind, keys, style, theme, coverKeyword = '', month = '', langs, date, liveOffers, queriesFor, choosePhoto }) {
   if (!KINDS.includes(kind)) throw new Error('unknown kind');
   if (!Array.isArray(keys) || keys.length < MIN || keys.length > MAX) throw new Error(`Bitte ${MIN} bis ${MAX} Angebote wählen.`);
   const all = await liveOffers(kind, month);
@@ -337,7 +342,7 @@ async function createBundleDraft({ kind, keys, style, theme, month = '', langs, 
   if (new Set(keys).size !== keys.length) throw new Error('Ein Angebot wurde doppelt gewählt.');
   const draft = {
     id: crypto.randomBytes(6).toString('hex'), createdAt: new Date().toISOString(), forDate: date.toISOString().slice(0, 10),
-    status: 'pending', style: PACKAGE_STYLES.includes(style) ? style : 'flight', source: 'specials', bundle: true, bundleKind: kind, theme: THEMES.includes(theme) ? theme : 'auto', month: /^\d{4}-\d{2}$/.test(month) ? month : '', // style/theme/month chosen before the photos (client)
+    status: 'pending', style: PACKAGE_STYLES.includes(style) ? style : 'flight', source: 'specials', bundle: true, bundleKind: kind, theme: THEMES.includes(theme) ? theme : 'auto', coverKeyword: String(coverKeyword || '').replace(/[^\p{L}\p{N} &-]/gu, '').trim().slice(0, 40), month: /^\d{4}-\d{2}$/.test(month) ? month : '', // style/theme/month chosen before the photos (client)
     titleIndex: Math.floor(Math.random() * TITLES[kind].length), offers, offer: offers[0], langs, texts: {}, versions: [],
   };
   for (const l of langs) draft.texts[l] = { caption: bundleCaption(offers, l, titleOf(draft, l)) };
