@@ -15,6 +15,15 @@
   button { font: inherit; border: 0; border-radius: 999px; padding: 10px 18px; cursor: pointer; font-weight: 700; }
   .primary { background: linear-gradient(135deg,#f7e7a8,#c9a227); color: var(--navy); }
   .ok { background: #2e7d4f; color: #fff; } .no { background: #8b2f2f; color: #fff; } .ghost { background: rgba(255,255,255,.12); color: #fff; }
+  .libcities { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+  .libcities button { padding: 6px 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,.25); background: none; color: #fff; cursor: pointer; }
+  .libcities button.on { background: #e6c25a; color: #0a1838; border-color: #e6c25a; font-weight: 700; }
+  .libgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin: 8px 0 18px; }
+  .libph { position: relative; border-radius: 10px; overflow: hidden; aspect-ratio: 9 / 16; background: #0a1838; }
+  .libph img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .libph .pl { position: absolute; left: 0; right: 0; bottom: 0; padding: 22px 8px 8px; font-size: 12px; background: linear-gradient(transparent, rgba(0,0,0,.85)); }
+  .libph .del { position: absolute; top: 6px; right: 6px; border: 0; border-radius: 999px; width: 30px; height: 30px; background: rgba(0,0,0,.65); color: #fff; cursor: pointer; }
+  .libnew { min-height: 90px; border-radius: 10px; border: 2px dashed rgba(255,255,255,.3); background: none; color: #fff; font-size: 15px; cursor: pointer; }
   .cands { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; margin: 10px 0; }
   .cand { position: relative; padding: 0; border: 2px solid transparent; border-radius: 10px; overflow: hidden; background: none; cursor: pointer; aspect-ratio: 2 / 3; }
   .cand:hover, .cand:focus { border-color: #e6c25a; }
@@ -54,7 +63,7 @@
     <button class="primary" id="genPkg" hidden>Paket-Entwurf erstellen</button>
     <button class="primary" id="bundleOpen">🗂 Mehrere Angebote</button>
     <button class="primary" id="savedOpen">⭐ Gespeicherte Angebote</button>
-    <button class="primary" id="libOpen">🏙 Städte-Bibliothek</button>
+    <button class="primary" id="libOpen">🏙 Foto-Bibliothek</button>
     <span style="font-size:14px;color:#cfd6e6">Sprachen:</span>
     <label class="chk"><input type="checkbox" name="deflang" value="de"> Deutsch</label>
     <label class="chk"><input type="checkbox" name="deflang" value="ar"> العربية</label>
@@ -147,10 +156,10 @@
   </div>
   <!-- City library (client 2026-11-21): one photo per subject and city, checked once, reused in posts. -->
   <div id="libBox" class="manual" hidden>
-    <h3>🏙 Städte-Bibliothek <small>(je Stadt ein Foto pro Motiv; schlechte löschen, gute bleiben und werden in Beiträgen benutzt)</small></h3>
-    <div class="row"><label>Stadt <select id="libCity"></select></label>
-      <label>Jahreszeit <select id="libSeason"><option value="winter">❄️ Winter</option><option value="spring">🌸 Frühling</option><option value="summer">☀️ Sommer</option><option value="autumn">🍂 Herbst</option></select></label>
-      <label>Stil <select id="libStyle"><option value="festive">🎉 Festlich (Panorama)</option><option value="editorial">📷 Magazin (ein Motiv)</option></select></label><button class="ghost" id="libMissing">Alle fehlenden erzeugen</button><span id="libState"></span></div>
+    <h3>🏙 Foto-Bibliothek <small>(jedes erzeugte Foto bleibt hier und wird in Beiträgen wieder benutzt)</small></h3>
+    <div id="libCities" class="libcities"></div>
+    <div class="row"><button class="ghost" id="libMissing">Für jedes Motiv ohne Foto eins erzeugen</button>
+      <button class="ghost" id="libPurge">🧹 Alte Fotos (alter Stil) löschen</button><span id="libState"></span></div>
     <div id="libGrid"></div>
   </div>
   <!-- Fly Erbil daily prices (client 2026-11-05): one row per German airport, saved as own offers. -->
@@ -523,45 +532,47 @@ $('#savedGo').onclick = async () => {
   $('#savedGo').disabled = false;
 };
 // City library: photos per subject; generation runs one at a time on the server (polled).
-const SUBJ_DE = { landmark: 'Wahrzeichen', water: 'Wasser / Hafen', castle: 'Burg / Schloss', nature: 'Natur / Park', bridge: 'Brücke', heights: 'Aussicht / Berg', promenade: 'Promenade / Strand', museum: 'Museum' };
-let libData = null;
+const SUBJ_DE = { cover: 'Cover-Fotos (Flugzeugfenster)', landmark: 'Wahrzeichen', water: 'Wasser / Hafen', castle: 'Burg / Schloss', nature: 'Natur / Park', bridge: 'Brücke', heights: 'Aussicht / Berg', promenade: 'Promenade / Strand', museum: 'Museum' };
+let libData = null, libKey = null;
 async function loadLib() {
-  const qs = $('#libSeason').dataset.set ? '?season=' + $('#libSeason').value : '';
-  try { libData = await api('/api/studio/city-library' + qs); } catch (err) { $('#msg').textContent = 'Fehler: ' + err.message; return; }
-  if (!$('#libSeason').dataset.set) { $('#libSeason').value = libData.season; $('#libSeason').dataset.set = '1'; }
-  const sel = $('#libCity'), cur = sel.value;
-  sel.innerHTML = libData.cities.map((c) => `<option value="${esc(c.key)}">${esc(c.name)} (${c.subjects.filter((x) => x.files.length).length}/${c.subjects.length})</option>`).join('');
-  if (cur) sel.value = cur;
-  const c = libData.cities.find((x) => x.key === sel.value) || libData.cities[0];
+  try { libData = await api('/api/studio/city-library'); } catch (err) { $('#msg').textContent = 'Fehler: ' + err.message; return; }
+  if (!libKey) libKey = libData.cities[1] ? libData.cities[1].key : libData.cities[0].key;
+  $('#libCities').innerHTML = libData.cities.map((c) => `<button data-lib-city="${esc(c.key)}" class="${c.key === libKey ? 'on' : ''}">${esc(c.name)} (${c.count})</button>`).join('');
+  const c = libData.cities.find((x) => x.key === libKey) || libData.cities[0];
   const job = libData.job;
-  $('#libState').textContent = job.running ? `Erzeuge ${SUBJ_DE[job.subject] || job.subject} (${job.key}) …` : job.error ? 'Fehler: ' + job.error : '';
-  $('#libGrid').innerHTML = c.subjects.map((x) => `<div style="margin:12px 0"><b>${esc(SUBJ_DE[x.id] || x.id)}</b>
-    <div class="cands">${x.files.map(({ file: f, place }) => `<div class="cand" style="cursor:default" title="${esc(place || '')}"><img src="/api/studio/library/${encodeURIComponent(f)}" alt="" loading="lazy"><small style="position:absolute;top:4px;left:4px;right:4px;background:rgba(0,0,0,.6);font-size:11px;padding:2px 4px;border-radius:4px">${esc(place || '')}</small><button class="ghost" data-lib-del="${esc(f)}" style="position:absolute;bottom:4px;left:4px;padding:2px 8px">Löschen</button></div>`).join('')}
-    <button class="ghost" data-lib-gen="${esc(x.id)}" ${job.running ? 'disabled' : ''}>+ Foto erzeugen</button></div></div>`).join('');
+  $('#libState').textContent = job.running ? `Erzeuge Foto (${job.key}, ${SUBJ_DE[job.subject] || job.subject}) … ca. 1 Minute` : job.error ? 'Fehler: ' + job.error : '';
+  $('#libGrid').innerHTML = c.subjects.map((x) => `<h4 style="margin:10px 0 4px">${esc(SUBJ_DE[x.id] || x.id)} <small style="color:#8e98b3">(${x.files.length})</small></h4>
+    <div class="libgrid">${x.files.map(({ file: f, place }) => `<div class="libph"><img src="/api/studio/library/${encodeURIComponent(f)}" alt="" loading="lazy">
+      ${place ? `<div class="pl">${esc(place)}</div>` : ''}<button class="del" title="Löschen" data-lib-del="${esc(f)}">✕</button></div>`).join('')}
+      <button class="libnew" data-lib-gen="${esc(x.id)}" ${job.running ? 'disabled' : ''}>+ Neues Foto</button></div>`).join('');
   return job.running;
 }
 async function libGenerate(subject) {
-  await api('/api/studio/city-library/generate', { method: 'POST', body: JSON.stringify({ key: $('#libCity').value, subject, season: $('#libSeason').value, style: $('#libStyle').value }) });
+  await api('/api/studio/city-library/generate', { method: 'POST', body: JSON.stringify({ key: libKey, subject }) });
   while (await loadLib()) await new Promise((r) => setTimeout(r, 3000));
   if (libData.job.error) throw new Error(libData.job.error);
 }
 $('#libOpen').onclick = () => { const b = $('#libBox'); b.hidden = !b.hidden; if (!b.hidden) loadLib(); };
-$('#libCity').onchange = () => loadLib();
-$('#libSeason').onchange = () => loadLib();
+$('#libCities').onclick = (e) => { const k = e.target.dataset.libCity; if (k) { libKey = k; loadLib(); } };
 $('#libGrid').onclick = async (e) => {
   const del = e.target.dataset.libDel, gen = e.target.dataset.libGen;
   try {
-    if (del && confirm('Dieses Foto aus der Bibliothek löschen?')) { await api('/api/studio/library/' + encodeURIComponent(del), { method: 'DELETE' }); await loadLib(); }
+    if (del && confirm('Dieses Foto löschen?')) { await api('/api/studio/library/' + encodeURIComponent(del), { method: 'DELETE' }); await loadLib(); }
     if (gen) await libGenerate(gen);
   } catch (err) { $('#msg').textContent = 'Fehler: ' + err.message; }
 };
 $('#libMissing').onclick = async () => {
   $('#libMissing').disabled = true;
   try {
-    const c = libData.cities.find((x) => x.key === $('#libCity').value);
+    const c = libData.cities.find((x) => x.key === libKey);
     for (const x of c.subjects.filter((y) => !y.files.length)) await libGenerate(x.id);
   } catch (err) { $('#msg').textContent = 'Fehler: ' + err.message; }
   $('#libMissing').disabled = false;
+};
+$('#libPurge').onclick = async () => {
+  if (!confirm('Alle Fotos im alten Stil (vor dem 24.11.2026) aus der Bibliothek löschen? Das kann nicht rückgängig gemacht werden.')) return;
+  try { const r = await api('/api/studio/city-library/purge-old', { method: 'POST', body: '{}' }); $('#msg').textContent = `${r.deleted} alte Fotos gelöscht.`; await loadLib(); }
+  catch (err) { $('#msg').textContent = 'Fehler: ' + err.message; }
 };
 $('#savedOpen').onclick = () => { const b = $('#savedBox'); b.hidden = !b.hidden; if (!b.hidden) loadSaved(); };
 $('#savedList').onclick = async (e) => {

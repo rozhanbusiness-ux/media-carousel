@@ -168,16 +168,24 @@ const themeFor = (draft, date = new Date()) => require('./image').themeOf(draft.
 function libKey(draft, n) {
   if (n >= 0) return library.keyOf(photoSubject(photoOffer(draft, n)).to);
   const one = singleDest(draft);
-  return one ? library.keyOf(one.to) : 'THEME-' + themeFor(draft).toUpperCase();
+  return one ? library.keyOf(one.to) : 'TRAVEL';
 }
 
 /** Cover photo: panorama of the single destination (never the departure city), else the theme photo. */
 async function aiCover(draft, fresh = false) {
   const one = singleDest(draft);
-  // Destination cover (client 2026-11-21): one of its real subjects (e.g. the Gali Ali Beg waterfall
-  // for Erbil), varying from post to post.
-  if (one) return generatePhoto({ kind: one.kind || 'flight', to: one.to, country: one.country || '' }, undefined, require('./image').planSubjects([one.to], shotStart(draft))[0]);
-  return generateThemeCover(themeFor(draft), fresh);
+  const img = require('./image');
+  // One destination (client 2026-11-24): the destination itself in the photo style, saved to its library.
+  if (one) {
+    const subject = img.planSubjects([one.to], shotStart(draft))[0];
+    const r = await img.generateSubjectPhoto({ kind: one.kind || 'flight', to: one.to, country: one.country || '' }, undefined, subject);
+    try { library.save(library.keyOf(one.to), r.dataUri, subject, r.place); } catch (err) { console.error('studio library keep:', err.message); }
+    return r.dataUri;
+  }
+  // Several destinations: a travel scene from the aircraft, saved to the 'TRAVEL' library.
+  const dataUri = await img.generateTravelCover(library.list('TRAVEL').length);
+  try { library.save('TRAVEL', dataUri, 'cover'); } catch (err) { console.error('studio library keep:', err.message); }
+  return dataUri;
 }
 
 /** AI photos for the cover (n = -1) and every offer, two at a time (client: AI first, one go).

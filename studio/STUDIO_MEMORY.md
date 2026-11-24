@@ -156,3 +156,7 @@ decision needed.
   day in 4/4/2), dark lower fifth for the logo, "Sony A7R IV, rich but natural colours", no text.
   Approved by the client on Düsseldorf and Munich. Festive and editorial prompts are no longer used.
 - Every new AI photo of an offer slide is saved to the library at once (cost); library max 300 per city.
+- Covers (2026-11-24): one destination -> the destination in the photo style (saved to its library);
+  several destinations -> aircraft-window scene (TRAVEL_SCENES), saved under library key 'TRAVEL'.
+- Library screen rebuilt: city buttons with counts, photos in a grid with place name and ✕, "+ Neues Foto"
+  per subject, "🧹 Alte Fotos löschen" deletes every photo without the v:2 tag (old styles).

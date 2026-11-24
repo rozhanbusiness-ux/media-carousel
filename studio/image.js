@@ -146,6 +146,24 @@ function buildPhotoPrompt(city, place, spot, kind, n) {
   ].filter(Boolean).join(' ');
 }
 
+// Cover of a post with several destinations (client 2026-11-24): a premium travel scene from the
+// aircraft, never an airline's logo or colours. Rotated by the number of covers already saved.
+const TRAVEL_SCENES = [
+  'the view from an aircraft window: the wing above a sea of clouds at golden sunset, warm orange and pink sky',
+  'the view from an aircraft window: the wing above snow-capped mountains at blue hour, deep blue sky with a last glow on the horizon',
+  'the view from an aircraft window: the wing above soft clouds at sunrise, pastel pink and gold sky',
+  'the view from an aircraft window: the wing over a coastline and turquoise sea in late-afternoon sun, deep blue sky with white clouds',
+];
+function buildTravelCoverPrompt(n) {
+  return [
+    `Professional travel photograph, vertical format: ${TRAVEL_SCENES[((n % TRAVEL_SCENES.length) + TRAVEL_SCENES.length) % TRAVEL_SCENES.length]}.`,
+    'A plain white wing without any logo, name, stripes or airline colours.',
+    'The lower third of the frame is naturally darker and calm (the shaded window frame or the dark side of the clouds), for a title.',
+    'Shot on a Sony A7R IV, rich but natural colours, crisp detail, magazine quality. No text, no signs, no logos.',
+  ].join(' ');
+}
+async function generateTravelCover(n = 0) { return geminiImage(buildTravelCoverPrompt(n)); }
+
 function buildPrompt(city, variant, kind, sh) {
   return [
     sh
@@ -322,4 +340,4 @@ async function generateThemeCover(theme, fresh = false) {
   return dataUri;
 }
 
-module.exports = { buildPhotoPrompt, lightOf, SEASONS, seasonOf, buildFestivePrompt, variation, LIGHTS, VIEWS, LIFE, SHOTS, shotOf, subjectFor, subjectIds, planSubjects, generateSubjectPhoto, THEMES, themeOf, generateThemeCover, buildThemePrompt, generatePhoto, generateSet, enhancePhoto, buildPrompt, scenesFor };
+module.exports = { buildTravelCoverPrompt, generateTravelCover, buildPhotoPrompt, lightOf, SEASONS, seasonOf, buildFestivePrompt, variation, LIGHTS, VIEWS, LIFE, SHOTS, shotOf, subjectFor, subjectIds, planSubjects, generateSubjectPhoto, THEMES, themeOf, generateThemeCover, buildThemePrompt, generatePhoto, generateSet, enhancePhoto, buildPrompt, scenesFor };

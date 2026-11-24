@@ -31,7 +31,8 @@ function readIndex() { try { return JSON.parse(fs.readFileSync(INDEX, 'utf8')) |
 function tag(file, subject, place, season) {
   if (!FILE.test(file) || !SUBJECT.test(subject || '')) return;
   const idx = readIndex();
-  idx[file] = place || season ? { subject, place: place ? String(place).slice(0, 120) : null, season: SUBJECT.test(season || '') ? season : null } : subject;
+  // v: 2 = photo style of 2026-11-24 (the only style kept by purgeOld).
+  idx[file] = { subject, place: place ? String(place).slice(0, 120) : null, season: SUBJECT.test(season || '') ? season : null, v: 2 };
   fs.mkdirSync(DIR, { recursive: true });
   fs.writeFileSync(INDEX, JSON.stringify(idx));
 }
@@ -41,7 +42,7 @@ function list(key, subject, season) {
   const idx = readIndex();
   try {
     return fs.readdirSync(DIR).filter((f) => FILE.test(f) && FILE.exec(f)[1] === key)
-      .map((f) => ({ file: f, subject: (idx[f] && idx[f].subject) || idx[f] || 'landmark', place: (idx[f] && idx[f].place) || null, season: (idx[f] && idx[f].season) || null, added: fs.statSync(path.join(DIR, f)).mtimeMs }))
+      .map((f) => ({ file: f, subject: (idx[f] && idx[f].subject) || idx[f] || 'landmark', place: (idx[f] && idx[f].place) || null, season: (idx[f] && idx[f].season) || null, v: (idx[f] && idx[f].v) || 1, added: fs.statSync(path.join(DIR, f)).mtimeMs }))
       .filter((x) => (!subject || x.subject === subject) && (!season || x.season === season)).sort((a, b) => b.added - a.added);
   } catch { return []; }
 }
@@ -79,4 +80,26 @@ function remove(file) {
   if (idx[file]) { delete idx[file]; fs.writeFileSync(INDEX, JSON.stringify(idx)); }
 }
 
-module.exports = { remove, keyOf, list, save, tag, fileOf, dataUriOf, KEY, FILE };
+/** Delete every photo older than the 2026-11-24 photo style (client: clean the library). Returns the count. */
+function purgeOld() {
+  const idx = readIndex();
+  let n = 0;
+  let files = [];
+  try { files = fs.readdirSync(DIR).filter((f) => FILE.test(f)); } catch { return 0; }
+  for (const f of files) {
+    if (idx[f] && idx[f].v === 2) continue;
+    try { fs.unlinkSync(path.join(DIR, f)); n++; } catch { /* already gone */ }
+    delete idx[f];
+  }
+  fs.writeFileSync(INDEX, JSON.stringify(idx));
+  return n;
+}
+
+/** Number of photos per key. */
+function counts() {
+  const c = {};
+  try { for (const f of fs.readdirSync(DIR)) { const m = FILE.exec(f); if (m) c[m[1]] = (c[m[1]] || 0) + 1; } } catch { /* empty */ }
+  return c;
+}
+
+module.exports = { purgeOld, counts, remove, keyOf, list, save, tag, fileOf, dataUriOf, KEY, FILE };

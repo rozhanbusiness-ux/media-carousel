@@ -70,23 +70,31 @@ module.exports = function mountStudio(app) {
   router.get('/drafts/ai-photos/status', (req, res) => res.json(aiJob));
   // City library (client 2026-11-21): photos of each city by subject, filled once and reused.
   let libJob = { running: false, error: null, key: null, subject: null };
+  // City library (client 2026-11-24: simpler screen): cities as buttons with counts, photos per
+  // subject with place name and delete; one style only; 'TRAVEL' holds the covers of mixed posts.
   router.get('/city-library', (req, res) => {
     const lib = require('./ai-library'); const img = require('./image'); const subj = require('./subjects');
-    const season = Object.keys(img.SEASONS).includes(req.query.season) ? req.query.season : img.seasonOf();
-    res.json({ job: libJob, season, cities: subj.CITIES.map((c) => ({ key: c.key, name: c.name,
-      subjects: img.subjectIds().map((id) => ({ id, files: lib.list(c.key, id, season).map((x) => ({ file: x.file, place: x.place })) })) })) });
+    const counts = lib.counts();
+    const cities = [{ key: 'TRAVEL', name: '✈️ Cover (mehrere Ziele)', ids: ['cover'] }, ...subj.CITIES.map((c) => ({ key: c.key, name: c.name, ids: img.subjectIds() }))];
+    res.json({ job: libJob, cities: cities.map((c) => ({ key: c.key, name: c.name, count: counts[c.key] || 0,
+      subjects: c.ids.map((id) => ({ id, files: lib.list(c.key, id).map((x) => ({ file: x.file, place: x.place })) })) })) });
   });
   router.post('/city-library/generate', (req, res) => {
-    const { key, subject, season, style } = req.body || {};
-    if (!Object.keys(require('./image').SEASONS).includes(season)) return res.status(400).json({ error: 'bad season' });
+    const { key, subject } = req.body || {};
     const city = require('./subjects').CITIES.find((c) => c.key === key);
-    if (!city || !require('./image').subjectIds().includes(subject)) return res.status(400).json({ error: 'bad request' });
+    const travel = key === 'TRAVEL' && subject === 'cover';
+    if (!travel && (!city || !require('./image').subjectIds().includes(subject))) return res.status(400).json({ error: 'bad request' });
     if (libJob.running) return res.status(429).json({ error: 'Es wird schon ein Foto erzeugt.' });
     libJob = { running: true, error: null, key, subject };
-    require('./image').generateSubjectPhoto({ kind: 'flight', to: city.place, country: city.country }, undefined, subject, { season, style: style === 'editorial' ? 'editorial' : 'festive' })
-      .then(({ dataUri, place }) => { require('./ai-library').save(key, dataUri, subject, place, season); libJob = { ...libJob, running: false }; })
+    const lib = require('./ai-library'); const img = require('./image');
+    (travel ? img.generateTravelCover(lib.list('TRAVEL').length).then((dataUri) => ({ dataUri, place: null }))
+      : img.generateSubjectPhoto({ kind: 'flight', to: city.place, country: city.country }, undefined, subject))
+      .then(({ dataUri, place }) => { lib.save(key, dataUri, subject, place); libJob = { ...libJob, running: false }; })
       .catch((err) => { console.error('studio city library:', err.message); libJob = { ...libJob, running: false, error: err.message }; });
     res.status(202).json({ started: true });
+  });
+  router.post('/city-library/purge-old', (req, res) => {
+    try { res.json({ deleted: require('./ai-library').purgeOld() }); } catch (err) { res.status(500).json({ error: err.message }); }
   });
   router.delete('/library/:file', (req, res) => {
     try { require('./ai-library').remove(req.params.file); res.json({ ok: true }); } catch (err) { res.status(400).json({ error: err.message }); }
