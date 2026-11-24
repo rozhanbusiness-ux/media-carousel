@@ -393,8 +393,17 @@ async function regenerateBundle(draft, what, value, queriesFor, choosePhoto, LAN
   if (what === 'bundle-lib-list') {
     if (!validSlot(draft, value)) throw new Error('bad slide');
     const key = libKey(draft, value);
-    draft.libPick = { n: value, key, files: library.list(key).map((x) => x.file) };
-    if (!draft.libPick.files.length) { draft.libPick = null; throw new Error('Noch keine gespeicherten Fotos für diese Folie.'); }
+    // The variety rule also holds when picking from the library (client 2026-11-24): only photos whose
+    // subject no other slide has and whose light differs from the neighbouring slides (and the cover).
+    let all = library.list(key);
+    if (value >= 0) {
+      const subs = draft.subjects || [], lights = draft.lights || [];
+      const others = new Set(subs.filter((_, i) => i !== value));
+      const near = new Set([lights[value - 1], lights[value + 1], value === 0 ? draft.coverLight : undefined].filter(Boolean));
+      all = all.filter((x) => !others.has(x.subject) && !near.has(x.light));
+    } else if (draft.lights && draft.lights[0]) all = all.filter((x) => x.light !== draft.lights[0]);
+    draft.libPick = { n: value, key, files: all.map((x) => x.file) };
+    if (!draft.libPick.files.length) { draft.libPick = null; throw new Error('Keine passenden Fotos in der Bibliothek (anderes Motiv und anderes Licht als die Nachbar-Folien) – bitte „Neues KI-Foto“ nehmen.'); }
     return store.upsertDraft(draft);
   }
   if (what === 'bundle-lib-pick') {
@@ -402,6 +411,13 @@ async function regenerateBundle(draft, what, value, queriesFor, choosePhoto, LAN
     if (!validSlot(draft, n) || !(draft.libPick && draft.libPick.n === n && draft.libPick.files.includes(value.file))) throw new Error('Foto nicht mehr verfügbar – bitte Bibliothek neu öffnen.');
     fs.writeFileSync(slotPath(draft, n), library.dataUriOf(value.file));
     if (n >= 0 && draft.photoPos) draft.photoPos[n] = null;
+    // Remember the picked photo's subject and light, so later changes keep the variety rule.
+    const meta = library.list(draft.libPick.key).find((x) => x.file === value.file);
+    if (meta && n >= 0) {
+      draft.subjects = (draft.subjects || []).slice(); draft.subjects[n] = meta.subject;
+      draft.lights = (draft.lights || []).slice(); draft.lights[n] = meta.light;
+      draft.places = (draft.places || []).slice(); draft.places[n] = meta.place;
+    } else if (meta) draft.coverLight = meta.light;
     draft.libPick = null;
     for (const l of draft.langs) if (!(draft.texts[l] || {}).caption) draft.texts[l] = { caption: bundleCaption(draft.offers, l, titleOf(draft, l)) };
     return renderBundle(draft);
