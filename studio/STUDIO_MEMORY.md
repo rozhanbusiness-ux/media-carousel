@@ -164,3 +164,7 @@ decision needed.
   destinations -> an aircraft above the clouds (white + one other colour, no logo, different angles and
   light; library key TRAVEL); packages -> photo for the client's "Cover-Stichwort" (e.g. Familien ->
   family on a beach; library key PKG-<keyword>). The aircraft-WINDOW cover was rejected (too common).
+- 2026-11-24: library photos carry their light (blue/golden/day; untagged = blue) and are picked by the
+  slide's light; neighbour slides and the cover never share a light. The dark lower part varies per slide
+  (GROUNDS: shade, trees, grass, steps, water, street) - "water + railing" in every slide was monotonous.
+  🔍 on every slide and library photo opens a large view.

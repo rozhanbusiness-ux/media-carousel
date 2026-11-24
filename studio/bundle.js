@@ -179,8 +179,8 @@ async function aiCover(draft, fresh = false) {
   // One destination (client 2026-11-24): the destination itself in the photo style, saved to its library.
   if (one) {
     const subject = img.planSubjects([one.to], shotStart(draft))[0];
-    const r = await img.generateSubjectPhoto({ kind: one.kind || 'flight', to: one.to, country: one.country || '' }, undefined, subject);
-    try { library.save(library.keyOf(one.to), r.dataUri, subject, r.place); } catch (err) { console.error('studio library keep:', err.message); }
+    const r = await img.generateSubjectPhoto({ kind: one.kind || 'flight', to: one.to, country: one.country || '' }, undefined, subject, { light: draft.coverLight || 'golden', ground: 'shade' });
+    try { library.save(library.keyOf(one.to), r.dataUri, subject, r.place, undefined, r.light); } catch (err) { console.error('studio library keep:', err.message); }
     return r.dataUri;
   }
   // Several destinations: packages -> a scene for the client's keyword (else the theme);
@@ -198,10 +198,10 @@ async function aiCover(draft, fresh = false) {
 // Library first (client 2026-11-05): a new bundle uses a saved photo of the place when there is
 // one and generates only the rest; "AI photos for all" (fresh) always generates new ones.
 const seasonOfDraft = (draft) => require('./image').seasonOf(draft.month);
-function libraryPhoto(draft, n, subject) {
+function libraryPhoto(draft, n, subject, light) {
   const key = libKey(draft, n);
   // Offer slides: only photos of the post's season (client 2026-11-23); cover: any saved photo.
-  const files = key ? library.list(key, subject).map((x) => x.file) : [];
+  const files = key ? library.list(key, subject, undefined, light).map((x) => x.file) : [];
   if (!files.length) return null;
   try { return library.dataUriOf(files[Math.floor(Math.random() * files.length)]); } catch { return null; }
 }
@@ -215,7 +215,7 @@ const planOf = (draft) => require('./image').planSubjects(draft.offers.map((_, n
 /** Every new AI photo of an offer slide goes into the library at once (client 2026-11-24: AI photos
  *  cost money, so each one is kept and can be picked again). */
 function keep(draft, n, dataUri) {
-  try { const key = libKey(draft, n); if (key) library.save(key, dataUri, (draft.subjects || planOf(draft))[n], draft.places && draft.places[n]); }
+  try { const key = libKey(draft, n); if (key) library.save(key, dataUri, (draft.subjects || planOf(draft))[n], draft.places && draft.places[n], undefined, draft.lights && draft.lights[n]); }
   catch (err) { console.error('studio library keep:', err.message); }
 }
 
@@ -230,12 +230,16 @@ async function aiPhotos(draft, report = () => {}, fresh = false) {
   draft.places = draft.offers.map(() => null);
   // Light per slide (client 2026-11-24): neighbours never share the same light.
   draft.lights = draft.offers.map((_, n) => require('./image').lightKeyOf(shotStart(draft) + n));
+  // Cover light differs from the first slide; each slide gets its own kind of dark foreground.
+  draft.coverLight = ['golden', 'blue', 'day'].find((l) => l !== draft.lights[0]);
+  const G = require('./image').GROUND_ORDER;
+  draft.grounds = draft.offers.map((_, n) => G[(shotStart(draft) + n) % G.length]);
   const one = async (n) => {
     try {
-      const lib = fresh ? null : libraryPhoto(draft, n, n < 0 ? undefined : plan[n]);
+      const lib = fresh ? null : libraryPhoto(draft, n, n < 0 ? undefined : plan[n], n < 0 ? (singleDest(draft) ? draft.coverLight : undefined) : draft.lights[n]);
       let dataUri = lib;
       if (!dataUri && n < 0) dataUri = await aiCover(draft, fresh);
-      else if (!dataUri) ({ dataUri, place: draft.places[n] } = await require('./image').generateSubjectPhoto(photoOffer(draft, n), undefined, plan[n], { light: draft.lights[n] }));
+      else if (!dataUri) ({ dataUri, place: draft.places[n] } = await require('./image').generateSubjectPhoto(photoOffer(draft, n), undefined, plan[n], { light: draft.lights[n], ground: draft.grounds[n] }));
       if (n >= 0) sources.use(draft.offers[n], null, dataUri);
       fs.writeFileSync(slotPath(draft, n), dataUri);
       if (n >= 0 && draft.photoPos) draft.photoPos[n] = null;
@@ -425,7 +429,10 @@ async function regenerateBundle(draft, what, value, queriesFor, choosePhoto, LAN
         const lights = draft.lights || subs.map((_, i) => img.lightKeyOf(shotStart(draft) + i));
         const near = new Set([lights[n - 1], lights[n + 1], lights[n]]);
         const light = ['blue', 'golden', 'day'].find((l) => !near.has(l)) || ['blue', 'golden', 'day'].find((l) => l !== lights[n]);
-        const r = await img.generateSubjectPhoto(photoOffer(draft, n), undefined, subject, { light });
+        const G = img.GROUND_ORDER; const usedG = new Set((draft.grounds || []).filter((_, i) => i !== n));
+        const ground = G.find((g) => !usedG.has(g) && g !== (draft.grounds || [])[n]) || G[0];
+        const r = await img.generateSubjectPhoto(photoOffer(draft, n), undefined, subject, { light, ground });
+        draft.grounds = (draft.grounds || draft.offers.map(() => null)).map((x, i) => (i === n ? ground : x));
         dataUri = r.dataUri;
         draft.subjects = subs.map((x, i) => (i === n ? subject : x));
         draft.lights = lights.map((x, i) => (i === n ? light : x));

@@ -135,12 +135,23 @@ const LIGHT_ORDER = ['blue', 'golden', 'blue', 'golden', 'day', 'golden', 'blue'
 const lightKeyOf = (n) => LIGHT_ORDER[((n % 10) + 10) % 10];
 const lightOf = (n) => PHOTO_LIGHTS[typeof n === 'string' && PHOTO_LIGHTS[n] ? n : lightKeyOf(Number(n) || 0)];
 
-function buildPhotoPrompt(city, place, spot, kind, n) {
+// Dark lower part, varied per slide (client 2026-11-24: "water and a railing" in every slide looked the same).
+const GROUNDS = {
+  shade: 'a shaded cobblestone or paved square in the foreground',
+  trees: 'the dark shadows of trees falling across the ground in the foreground',
+  grass: 'dark green grass or a shaded lawn in the foreground',
+  steps: 'shaded old stone steps or a low stone wall in the foreground',
+  water: 'dark calm water in the foreground',
+  street: 'a quiet shaded street or pavement leading into the picture',
+};
+const GROUND_ORDER = Object.keys(GROUNDS);
+
+function buildPhotoPrompt(city, place, spot, kind, n, ground) {
   return [
     `Professional travel photograph of ${city}, vertical format.`,
     `${String(place).replace(/\.+$/, '')}${spot ? ', seen ' + String(spot).replace(/^(seen\s+)?/i, '').replace(/\.+$/, '') : ''}, large in the frame.`,
     lightOf(n),
-    'The lower fifth of the frame is naturally dark (shadowed foreground: dark water, shaded pavement or a silhouetted railing), calm and without detail, for a logo.',
+    `The lower fifth of the frame is naturally dark and calm, for a logo: ${GROUNDS[ground] || GROUNDS.shade}. No railing in the foreground unless it is really part of the place.`,
     'Shot on a Sony A7R IV, rich but natural colours, crisp detail, magazine quality.',
     kind && kind !== 'flight' ? KIND_RULES[kind] : '',
     'No text, no signs, no logos, no mosques or minarets.',
@@ -238,7 +249,7 @@ async function generateSubjectPhoto(offerOrCity, scene, subject, opts = {}) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': config.GEMINI_API_KEY },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: sh ? buildPhotoPrompt(city, found ? found.name : sh.shot, found ? found.spot : '', offer.kind, sh.n || 0) : buildPrompt(city, variant, offer.kind, sh) }] }],
+      contents: [{ parts: [{ text: sh ? buildPhotoPrompt(city, found ? found.name : sh.shot, found ? found.spot : '', offer.kind, sh.n || 0, opts.ground) : buildPrompt(city, variant, offer.kind, sh) }] }],
       generationConfig: { responseModalities: ['Image'], imageConfig: { imageSize: config.GEMINI_IMAGE_SIZE || '2K', aspectRatio: '9:16' } },
     }),
     signal: AbortSignal.timeout(120000),
@@ -249,7 +260,7 @@ async function generateSubjectPhoto(offerOrCity, scene, subject, opts = {}) {
   const part = (json?.candidates?.[0]?.content?.parts || []).find((p) => p.inlineData || p.inline_data);
   if (!part) throw new Error('Gemini returned no image');
   const inline = part.inlineData || part.inline_data;
-  return { dataUri: `data:${inline.mimeType || inline.mime_type || 'image/png'};base64,${inline.data}`, place: found ? found.name : null };
+  return { dataUri: `data:${inline.mimeType || inline.mime_type || 'image/png'};base64,${inline.data}`, place: found ? found.name : null, light: sh ? (typeof sh.n === 'string' ? sh.n : lightKeyOf(sh.n || 0)) : null };
 }
 
 /** Three different AI photos (one per slide), generated in parallel. Fails when the first one fails;
@@ -358,4 +369,4 @@ async function generateThemeCover(theme, fresh = false) {
   return dataUri;
 }
 
-module.exports = { lightKeyOf, PHOTO_LIGHTS, buildKeywordCoverPrompt, generateKeywordCover, buildTravelCoverPrompt, generateTravelCover, buildPhotoPrompt, lightOf, SEASONS, seasonOf, buildFestivePrompt, variation, LIGHTS, VIEWS, LIFE, SHOTS, shotOf, subjectFor, subjectIds, planSubjects, generateSubjectPhoto, THEMES, themeOf, generateThemeCover, buildThemePrompt, generatePhoto, generateSet, enhancePhoto, buildPrompt, scenesFor };
+module.exports = { GROUND_ORDER, lightKeyOf, PHOTO_LIGHTS, buildKeywordCoverPrompt, generateKeywordCover, buildTravelCoverPrompt, generateTravelCover, buildPhotoPrompt, lightOf, SEASONS, seasonOf, buildFestivePrompt, variation, LIGHTS, VIEWS, LIFE, SHOTS, shotOf, subjectFor, subjectIds, planSubjects, generateSubjectPhoto, THEMES, themeOf, generateThemeCover, buildThemePrompt, generatePhoto, generateSet, enhancePhoto, buildPrompt, scenesFor };
