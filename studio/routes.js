@@ -94,7 +94,7 @@ module.exports = function mountStudio(app) {
     res.status(202).json({ started: true });
   });
   router.post('/city-library/purge-old', (req, res) => {
-    try { res.json({ deleted: require('./ai-library').purgeOld() }); } catch (err) { res.status(500).json({ error: err.message }); }
+    try { require('./places').clear(); res.json({ deleted: require('./ai-library').purgeOld() }); } catch (err) { res.status(500).json({ error: err.message }); }
   });
   router.delete('/library/:file', (req, res) => {
     try { require('./ai-library').remove(req.params.file); res.json({ ok: true }); } catch (err) { res.status(400).json({ error: err.message }); }

@@ -34,7 +34,9 @@ async function search(city, country, subject, fetchImpl = fetch) {
   const prompt = [
     `You are the photo editor of a premium travel magazine, scouting locations for a story on ${city}${country ? ', ' + country : ''}. Search the web.`,
     `Find up to 10 REAL ${KINDS[subject]} in or near ${city} (inside it or in its region, at most about 80 km away).`,
-    'Mix: about half are the famous icons, half are photogenic places that locals and photographers love but tourists rarely know. Each must really exist; check it.',
+    'About three quarters are the famous icons of the city, one quarter are beautiful places locals love. Each must really exist; check it.',
+    'Every place must be INSTANTLY RECOGNISABLE as this city to people who live there, and joyful, inviting and beautiful to visit: a place that makes people want to travel.',
+    'NEVER: memorials, monuments to victims, museums about war or persecution, cemeteries, prisons, bunkers, ruins of war, sad or gloomy places, anonymous alleys or backyards, construction sites.',
     'For each place write a SHOT BRIEF a photographer could follow on site:',
     '"spot": the exact place to stand (e.g. "from the steps of the riverside below the east pillar");',
     '"layers": what is in the foreground, middle and background, using real elements that are there;',
@@ -59,7 +61,7 @@ async function search(city, country, subject, fetchImpl = fetch) {
   let list;
   try { list = await call(true); } catch (err) { console.error('studio places (search):', err.message); list = await call(false); }
   const seen = new Set();
-  return (Array.isArray(list) ? list : []).filter((p) => p && typeof p.name === 'string' && p.name.trim() && !/mosque|minaret|moschee|masjid|jami/i.test([p.name, p.view, p.spot, p.layers, p.detail].join(' ')))
+  return (Array.isArray(list) ? list : []).filter((p) => p && typeof p.name === 'string' && p.name.trim() && !/mosque|minaret|moschee|masjid|jami|memorial|mahnmal|gedenk|denkmal f(ü|ue)r|holocaust|jewish museum|jüdisches museum|friedhof|cemetery|prison|gefängnis|bunker|stasi|war museum|kriegs/i.test([p.name, p.view, p.spot, p.layers, p.detail].join(' ')))
     .map((p) => {
       const f = (k, label) => (p[k] ? `${label}: ${String(p[k]).trim().slice(0, 240)}` : '');
       const view = p.spot || p.layers ? [f('spot', 'Camera position'), f('layers', 'Layers'), f('detail', 'Signature detail'), f('avoid', 'Avoid the cliché')].filter(Boolean).join('. ') : String(p.view || '').trim().slice(0, 300);
@@ -86,4 +88,7 @@ async function pick(key, city, country, subject, exclude = [], fetchImpl = fetch
   return free[Math.floor(Math.random() * Math.min(free.length, 4))];
 }
 
-module.exports = { pick, search, KINDS };
+/** Forget every cached place list (client 2026-11-24: lists made with older rules held gloomy places). */
+function clear() { try { fs.rmSync(FILE, { force: true }); } catch { /* none */ } }
+
+module.exports = { pick, search, clear, KINDS };

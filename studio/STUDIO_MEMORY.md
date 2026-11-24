@@ -168,3 +168,6 @@ decision needed.
   slide's light; neighbour slides and the cover never share a light. The dark lower part varies per slide
   (GROUNDS: shade, trees, grass, steps, water, street) - "water + railing" in every slide was monotonous.
   🔍 on every slide and library photo opens a large view.
+- 2026-11-24: place search tightened: 3/4 famous icons, recognisable by locals, joyful; no memorials,
+  war/persecution museums, cemeteries, prisons, bunkers, anonymous alleys (prompt + name filter).
+  The 🧹 button also clears cache/studio-places.json. Zoom button moved to the bottom corner.
